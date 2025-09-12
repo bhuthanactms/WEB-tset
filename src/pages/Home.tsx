@@ -1,11 +1,10 @@
-
 /**
  * Home page - EV Station Calculator
  * Provides a comprehensive calculator for electric vehicle station requirements
  * including power authority selection, transformer sizing, and cost analysis.
  */
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,9 +12,10 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Calculator, Zap, Battery, DollarSign, TrendingUp, Settings, Cable, Plug } from 'lucide-react'
+import { Calculator, Zap, Battery, Settings, Cable } from 'lucide-react'
+import axios from 'axios'
+import * as XLSX from 'xlsx'
 
 /** Form state interface */
 interface CalculatorForm {
@@ -47,6 +47,7 @@ export default function Home(): JSX.Element {
   })
 
   const [results, setResults] = useState<CalculatorResults | null>(null)
+  const [excelData, setExcelData] = useState<any[]>([]);
 
   /** Handle form input changes */
   const handleInputChange = (field: keyof CalculatorForm, value: string) => {
@@ -62,19 +63,65 @@ export default function Home(): JSX.Element {
     return match ? parseInt(match[1]) : 50
   }
 
+  // Mapping Charger Type กับเซลล์ใน Excel
+  const chargerToExcelCell: Record<string, { mea?: string; pea?: string }> = {
+    '30 kW': { mea: 'C7', pea: 'C55' },
+    '40 kW': { mea: 'C8', pea: 'C56' },
+    '60 kW': { mea: 'C9', pea: 'C57' },
+    '80 kW': { mea: 'C10', pea: 'C58' },
+    '120 kW': { mea: 'C11', pea: 'C59' },
+    '160 kW': { mea: 'C12', pea: 'C60' },
+    '200 kW': { mea: 'C13', pea: 'C61' },
+    '240 kW': { mea: 'C14', pea: 'C62' },
+    '320 kW': { mea: 'C15', pea: 'C63' },
+    '360 kW': { mea: 'C16', pea: 'C64' },
+    '480 kW': { mea: 'C17', pea: 'C65' },
+    '600 kW': { mea: 'C18', pea: 'C66' },
+    '600 kW Prime+': { mea: 'C19', pea: 'C67' },
+    '640 kW': {}, // ไม่มีใน excel
+    '640 kW Prime+': { mea: 'C20', pea: 'C68' },
+    '720 kW': { mea: 'C22', pea: 'C70' },
+    '800 kW Prime+': { mea: 'C24', pea: 'C72' },
+  };
+
+  // ดึงค่าจาก Excel ตาม Power Authority และ Charger Type
+  const getInFromExcel = (type: 'inOfCharger' | 'inAllCharger') => {
+    const charger = form.charger;
+    const numberOfChargers = parseInt(form.numberOfChargers) || 1;
+    const cell = chargerToExcelCell[charger];
+    if (!cell) return undefined;
+    let value: number | undefined;
+    if (form.powerAuthority === 'MEA' && cell.mea) {
+      value = excelData.find((row: any) => row.__rowNum__?.toString() === cell.mea?.replace('C', ''))?.__EMPTY;
+    }
+    if (form.powerAuthority === 'PEA' && cell.pea) {
+      value = excelData.find((row: any) => row.__rowNum__?.toString() === cell.pea?.replace('C', ''))?.__EMPTY;
+    }
+    if (typeof value !== 'number' || isNaN(value)) return undefined;
+    if (type === 'inOfCharger') return value; // ไม่คูณจำนวนเครื่อง
+    if (type === 'inAllCharger') return value * numberOfChargers;
+    return undefined;
+  };
+
   /** Calculate EV station requirements */
   const calculateResults = () => {
     const powerPerStation = extractPowerValue(form.charger)
     const numberOfChargers = parseInt(form.numberOfChargers) || 1
-    
+
+    // ใช้ค่าจาก Excel เท่านั้น
+    const inOfChargerExcel = getInFromExcel('inOfCharger');
+    const inAllChargerExcel = getInFromExcel('inAllCharger');
+
+    const inOfCharger = typeof inOfChargerExcel === 'number'
+      ? inOfChargerExcel
+      : 0;
+
+    const inAllCharger = typeof inAllChargerExcel === 'number'
+      ? inAllChargerExcel
+      : 0;
+
     const totalPower = numberOfChargers * powerPerStation
     const transformerSize = Math.ceil(totalPower * 1.2) // 20% safety margin
-
-    // Calculate current values
-    const voltage = 400 // 3-phase voltage
-    const powerFactor = 0.9
-    const inOfCharger = (powerPerStation * 1000) / (voltage * Math.sqrt(3) * powerFactor)
-    const inAllCharger = inOfCharger * numberOfChargers
 
     setResults({
       totalPower,
@@ -98,8 +145,8 @@ export default function Home(): JSX.Element {
 
   // Charger options
   const chargerOptions = [
-    '30 kW', '40 kW', '60 kW', '80 kW', '120 kW', '160 kW', '200 kW', 
-    '240 kW', '320 kW', '480 kW', '600 kW', '640 kW', '600 kW Prime+', 
+    '30 kW', '40 kW', '50 kW', '60 kW', '80 kW', '120 kW', '160 kW', '200 kW',
+    '240 kW', '320 kW', '480 kW', '600 kW', '640 kW', '600 kW Prime+',
     '640 kW Prime+', '800 kW Prime+'
   ]
 
@@ -119,6 +166,33 @@ export default function Home(): JSX.Element {
     'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ',
     'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน'
   ]
+
+  /** Fetch data from Excel file on Google Drive */
+  const fetchExcelData = async () => {
+    const excelFileUrl = 'https://docs.google.com/uc?export=download&id=1U_tFRt3pdQ0IzOr88l81RmJPxDQwFmoC'; // แก้ไขที่นี่ด้วย FILE ID ของไฟล์ที่คุณแชร์
+    try {
+      const response = await axios.get(excelFileUrl, { responseType: 'arraybuffer' });
+      // Read the Excel file
+      const workbook = XLSX.read(response.data, { type: 'array' });
+      const sheetName = workbook.SheetNames[0]; // Access the first sheet
+      const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+      setExcelData(jsonData); // Store Excel data in state
+    } catch (error) {
+      console.error("Error fetching Excel file:", error);
+    }
+  };
+
+  // Call fetchExcelData on component mount
+  useEffect(() => {
+    fetchExcelData();
+  }, []);
+
+  useEffect(() => {
+    // log ดูโครงสร้าง excelData
+    if (excelData.length > 0) {
+      console.log('excelData sample:', excelData.slice(0, 5));
+    }
+  }, [excelData]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
@@ -155,7 +229,7 @@ export default function Home(): JSX.Element {
                       Power Authority
                     </Label>
                     <div className="grid grid-cols-2 gap-3">
-                      <div 
+                      <div
                         className="flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer"
                         onClick={() => handleInputChange('powerAuthority', 'PEA')}
                       >
@@ -171,7 +245,7 @@ export default function Home(): JSX.Element {
                         />
                         <Label htmlFor="PEA" className="font-medium cursor-pointer">PEA</Label>
                       </div>
-                      <div 
+                      <div
                         className="flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer"
                         onClick={() => handleInputChange('powerAuthority', 'MEA')}
                       >
@@ -209,7 +283,7 @@ export default function Home(): JSX.Element {
                     </Select>
                   </div>
 
-                  {/* Number of charger */}
+                  {/* Number of chargers */}
                   <div className="space-y-3">
                     <Label className="text-sm font-medium text-gray-700">
                       Number of Chargers
@@ -409,8 +483,8 @@ export default function Home(): JSX.Element {
                         <Badge className="bg-blue-600 text-white">Recommendation</Badge>
                       </div>
                       <p className="text-sm text-blue-800 leading-relaxed">
-                        Based on your configuration, we recommend a {results.transformerSize} kVA transformer 
-                        with {form.powerAuthority} connection. The total power requirement is {results.totalPower} kW 
+                        Based on your configuration, we recommend a {results.transformerSize} kVA transformer
+                        with {form.powerAuthority} connection. The total power requirement is {results.totalPower} kW
                         with a maximum current of {results.inAllCharger.toFixed(1)} A.
                       </p>
                     </div>
