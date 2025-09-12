@@ -78,7 +78,6 @@ export default function Home(): JSX.Element {
     '480 kW': { mea: 'C17', pea: 'C65' },
     '600 kW': { mea: 'C18', pea: 'C66' },
     '600 kW Prime+': { mea: 'C19', pea: 'C67' },
-    '640 kW': {}, // ไม่มีใน excel
     '640 kW Prime+': { mea: 'C20', pea: 'C68' },
     '720 kW': { mea: 'C22', pea: 'C70' },
     '800 kW Prime+': { mea: 'C24', pea: 'C72' },
@@ -90,15 +89,19 @@ export default function Home(): JSX.Element {
     const numberOfChargers = parseInt(form.numberOfChargers) || 1;
     const cell = chargerToExcelCell[charger];
     if (!cell) return undefined;
-    let value: number | undefined;
+
+    let rowIdx: number | undefined;
     if (form.powerAuthority === 'MEA' && cell.mea) {
-      value = excelData.find((row: any) => row.__rowNum__?.toString() === cell.mea?.replace('C', ''))?.__EMPTY;
+      rowIdx = parseInt(cell.mea.replace('C', '')) - 2; // -2 เพราะ index 0 คือแถว 2 (ถ้ามี header 1 แถว)
     }
     if (form.powerAuthority === 'PEA' && cell.pea) {
-      value = excelData.find((row: any) => row.__rowNum__?.toString() === cell.pea?.replace('C', ''))?.__EMPTY;
+      rowIdx = parseInt(cell.pea.replace('C', '')) - 2;
     }
+    if (rowIdx === undefined || !excelData[rowIdx]) return undefined;
+
+    const value = excelData[rowIdx]["C"];
     if (typeof value !== 'number' || isNaN(value)) return undefined;
-    if (type === 'inOfCharger') return value; // ไม่คูณจำนวนเครื่อง
+    if (type === 'inOfCharger') return value;
     if (type === 'inAllCharger') return value * numberOfChargers;
     return undefined;
   };
@@ -169,14 +172,13 @@ export default function Home(): JSX.Element {
 
   /** Fetch data from Excel file on Google Drive */
   const fetchExcelData = async () => {
-    const excelFileUrl = 'https://docs.google.com/uc?export=download&id=1U_tFRt3pdQ0IzOr88l81RmJPxDQwFmoC'; // แก้ไขที่นี่ด้วย FILE ID ของไฟล์ที่คุณแชร์
+    const excelFileUrl = '/testerAppP1.xlsx'; // เปลี่ยนชื่อไฟล์ตรงนี้
     try {
       const response = await axios.get(excelFileUrl, { responseType: 'arraybuffer' });
-      // Read the Excel file
       const workbook = XLSX.read(response.data, { type: 'array' });
-      const sheetName = workbook.SheetNames[0]; // Access the first sheet
+      const sheetName = workbook.SheetNames[0];
       const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
-      setExcelData(jsonData); // Store Excel data in state
+      setExcelData(jsonData);
     } catch (error) {
       console.error("Error fetching Excel file:", error);
     }
