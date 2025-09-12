@@ -170,9 +170,8 @@ export default function Home(): JSX.Element {
     'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน'
   ]
 
-  /** Fetch data from Excel file on Google Drive */
   const fetchExcelData = async () => {
-    const excelFileUrl = '/testerAppP1.xlsx'; // เปลี่ยนชื่อไฟล์ตรงนี้
+    const excelFileUrl = '/table1.xlsx'; // โหลดจาก public folder
     try {
       const response = await axios.get(excelFileUrl, { responseType: 'arraybuffer' });
       const workbook = XLSX.read(response.data, { type: 'array' });
