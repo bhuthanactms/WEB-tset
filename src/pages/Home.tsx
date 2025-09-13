@@ -171,7 +171,10 @@ export default function Home(): JSX.Element {
   ]
 
   const fetchExcelData = async () => {
-    const excelFileUrl = '/table1.xlsx'; // โหลดจาก public folder
+    // Convert Google Sheets sharing URL to direct download URL
+    const googleSheetsUrl = 'https://docs.google.com/spreadsheets/d/1l1BLnJs2mgV19cO9u_Az-OjU3dLYj4YA/edit?usp=sharing&ouid=100443117052270919276&rtpof=true&sd=true';
+    const fileId = googleSheetsUrl.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1];
+    const excelFileUrl = `https://docs.google.com/spreadsheets/d/${fileId}/export?format=xlsx&usp=sharing`;
     try {
       const response = await axios.get(excelFileUrl, { responseType: 'arraybuffer' });
       const workbook = XLSX.read(response.data, { type: 'array' });
