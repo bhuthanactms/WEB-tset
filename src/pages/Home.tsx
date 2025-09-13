@@ -90,16 +90,24 @@ export default function Home(): JSX.Element {
     const cell = chargerToExcelCell[charger];
     if (!cell) return undefined;
 
-    let rowIdx: number | undefined;
+    // ดึงเลข row จาก cell เช่น 'C7' => 7
+    let rowNum: number | undefined;
     if (form.powerAuthority === 'MEA' && cell.mea) {
-      rowIdx = parseInt(cell.mea.replace('C', '')) - 2; // -2 เพราะ index 0 คือแถว 2 (ถ้ามี header 1 แถว)
+      rowNum = parseInt(cell.mea.replace('C', ''));
     }
     if (form.powerAuthority === 'PEA' && cell.pea) {
-      rowIdx = parseInt(cell.pea.replace('C', '')) - 2;
+      rowNum = parseInt(cell.pea.replace('C', ''));
     }
-    if (rowIdx === undefined || !excelData[rowIdx]) return undefined;
+    if (rowNum === undefined) return undefined;
 
-    const value = excelData[rowIdx]["C"];
+    // หา row ที่ __rowNum__ === rowNum
+    const row = excelData.find((r) => r.__rowNum__ === rowNum);
+    if (!row) return undefined;
+
+    // MEA ใช้ __EMPTY_2, PEA ใช้ __EMPTY_5 (ถ้า column ตรงนี้จริง)
+    const colKey = form.powerAuthority === 'MEA' ? '__EMPTY_2' : '__EMPTY_5';
+    const value = row[colKey];
+
     if (typeof value !== 'number' || isNaN(value)) return undefined;
     if (type === 'inOfCharger') return value;
     if (type === 'inAllCharger') return value * numberOfChargers;
