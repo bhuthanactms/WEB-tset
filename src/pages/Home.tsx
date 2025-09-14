@@ -529,6 +529,68 @@ export default function Home(): JSX.Element {
     return Array(numChargers).fill(value);
   };
 
+  // เพิ่มฟังก์ชันดึง Charger Wiring cable ตาม Power Authority และ Charger Wiring Type
+  const getChargerWiringCable = () => {
+    // Mapping Charger Wiring Type to columns
+    const wiringTypeToCols: Record<string, string[]> = form.powerAuthority === 'MEA'
+      ? {
+        'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ': [
+          '__EMPTY_33', '__EMPTY_34', '__EMPTY_35', '__EMPTY_36', '__EMPTY_37', '__EMPTY_38', '__EMPTY_39', '__EMPTY_40', '__EMPTY_41', '__EMPTY_42', '__EMPTY_43', '__EMPTY_44', '__EMPTY_45'
+        ], // AH-AT
+        'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน': [
+          '__EMPTY_57', '__EMPTY_58', '__EMPTY_59', '__EMPTY_60', '__EMPTY_61', '__EMPTY_62', '__EMPTY_63', '__EMPTY_64', '__EMPTY_65', '__EMPTY_66', '__EMPTY_67', '__EMPTY_68', '__EMPTY_69'
+        ], // BF-BR
+      }
+      : {
+        'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ': [
+          '__EMPTY_31', '__EMPTY_32', '__EMPTY_33', '__EMPTY_34', '__EMPTY_35', '__EMPTY_36', '__EMPTY_37', '__EMPTY_38', '__EMPTY_39', '__EMPTY_40', '__EMPTY_41', '__EMPTY_42', '__EMPTY_43'
+        ], // AF-AR
+        'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน': [
+          '__EMPTY_55', '__EMPTY_56', '__EMPTY_57', '__EMPTY_58', '__EMPTY_59', '__EMPTY_60', '__EMPTY_61', '__EMPTY_62', '__EMPTY_63', '__EMPTY_64', '__EMPTY_65', '__EMPTY_66', '__EMPTY_67'
+        ], // BD-BP
+      };
+
+    const cols = wiringTypeToCols[form.chargerWiringType];
+    if (!cols) return '';
+
+    // หา row ของแต่ละ In of charger (แต่ละเครื่อง)
+    if (chargerTypeMode === 'any') {
+      return multiChargers.map((chargerName, idx) => {
+        const cell = chargerToExcelCell[chargerName];
+        let rowNum: number | undefined;
+        if (form.powerAuthority === 'MEA' && cell?.mea) {
+          rowNum = parseInt(cell.mea.replace('C', ''));
+        }
+        if (form.powerAuthority === 'PEA' && cell?.pea) {
+          rowNum = parseInt(cell.pea.replace('C', ''));
+        }
+        if (!rowNum) return `Charger${idx + 1}: -`;
+        const row = excelData.find(r => r.__rowNum__ === rowNum);
+        if (!row) return `Charger${idx + 1}: -`;
+        const value = cols.map(col => row[col]).filter(Boolean).join(' ');
+        return `Charger${idx + 1}: ${value}`;
+      });
+    } else {
+      // Same kW: ทุกเครื่องใช้ row เดียวกัน
+      const cell = chargerToExcelCell[form.charger];
+      let rowNum: number | undefined;
+      if (form.powerAuthority === 'MEA' && cell?.mea) {
+        rowNum = parseInt(cell.mea.replace('C', ''));
+      }
+      if (form.powerAuthority === 'PEA' && cell?.pea) {
+        rowNum = parseInt(cell.pea.replace('C', ''));
+      }
+      if (!rowNum) return [];
+      const row = excelData.find(r => r.__rowNum__ === rowNum);
+      if (!row) return [];
+      const value = cols.map(col => row[col]).filter(Boolean).join(' ');
+      const numChargers = parseInt(form.numberOfChargers) || 1;
+      return Array(numChargers).fill(`Charger1: ${value}`).map((v, i) =>
+        `Charger${i + 1}: ${value}`
+      );
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
       <div className="max-w-6xl mx-auto px-4 py-8">
@@ -935,6 +997,28 @@ export default function Home(): JSX.Element {
                             <span className="font-medium text-gray-700">TR Wire conduit :</span>
                           </div>
                           <span className="font-semibold text-gray-900 text-sm">{getTRWireConduit()}</span>
+                        </div>
+                      )}
+
+                      {/* Charger Wiring cable */}
+                      {(form.chargerWiringType && form.powerAuthority && getChargerWiringCable() && getChargerWiringCable().length > 0) && (
+                        <div className="flex flex-col gap-1 p-3 bg-yellow-50 rounded-lg border border-yellow-200 mb-2">
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
+                            <span className="font-bold text-yellow-700 text-base">Charger Wiring cable:</span>
+                          </div>
+                          {getChargerWiringCable().map
+                            ? getChargerWiringCable().map((val: string, idx: number) => (
+                              <span key={idx} className="ml-6 font-semibold text-gray-900 text-sm">
+                                {val}
+                              </span>
+                            ))
+                            : (
+                              <span className="ml-6 font-semibold text-gray-900 text-sm">
+                                {getChargerWiringCable()}
+                              </span>
+                            )
+                          }
                         </div>
                       )}
                     </div>
