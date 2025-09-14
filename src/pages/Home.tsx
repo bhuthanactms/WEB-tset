@@ -69,22 +69,22 @@ export default function Home(): JSX.Element {
 
   // Mapping Charger Type กับเซลล์ใน Excel
   const chargerToExcelCell: Record<string, { mea?: string; pea?: string }> = {
-    '30 kW': { mea: 'C7', pea: 'C55' },
-    '40 kW': { mea: 'C8', pea: 'C56' },
-    '60 kW': { mea: 'C9', pea: 'C57' },
-    '80 kW': { mea: 'C10', pea: 'C58' },
-    '120 kW': { mea: 'C11', pea: 'C59' },
-    '160 kW': { mea: 'C12', pea: 'C60' },
-    '200 kW': { mea: 'C13', pea: 'C61' },
-    '240 kW': { mea: 'C14', pea: 'C62' },
-    '320 kW': { mea: 'C15', pea: 'C63' },
-    '360 kW': { mea: 'C16', pea: 'C64' },
-    '480 kW': { mea: 'C17', pea: 'C65' },
-    '600 kW': { mea: 'C18', pea: 'C66' },
-    '600 kW Prime+': { mea: 'C19', pea: 'C67' },
-    '640 kW Prime+': { mea: 'C20', pea: 'C68' },
-    '720 kW Prime+': { mea: 'C22', pea: 'C70' },
-    '800 kW Prime+': { mea: 'C24', pea: 'C72' },
+    '30 kW': { mea: 'C6', pea: 'C54' },
+    '40 kW': { mea: 'C7', pea: 'C55' },
+    '60 kW': { mea: 'C8', pea: 'C56' },
+    '80 kW': { mea: 'C9', pea: 'C57' },
+    '120 kW': { mea: 'C10', pea: 'C58' },
+    '160 kW': { mea: 'C11', pea: 'C59' },
+    '200 kW': { mea: 'C12', pea: 'C60' },
+    '240 kW': { mea: 'C13', pea: 'C61' },
+    '320 kW': { mea: 'C14', pea: 'C62' },
+    '360 kW': { mea: 'C15', pea: 'C63' },
+    '480 kW': { mea: 'C16', pea: 'C64' },
+    '600 kW': { mea: 'C17', pea: 'C65' },
+    '600 kW Prime+': { mea: 'C18', pea: 'C66' },
+    '640 kW Prime+': { mea: 'C19', pea: 'C67' },
+    '720 kW Prime+': { mea: 'C21', pea: 'C69' },
+    '800 kW Prime+': { mea: 'C23', pea: 'C71' },
   };
 
   // ดึงค่าจาก Excel ตาม Power Authority และ Charger Type
@@ -712,15 +712,15 @@ export default function Home(): JSX.Element {
                         let trRowNum: number | undefined = undefined;
                         if (form.powerAuthority === 'MEA') {
                           const steps = [
-                            { max: 444.1, row: 32 },
-                            { max: 555.1, row: 33 },
-                            { max: 699.4, row: 34 },
-                            { max: 888.2, row: 35 },
-                            { max: 1110.3, row: 36 },
-                            { max: 1387.8, row: 37 },
-                            { max: 1665.4, row: 38 },
-                            { max: 2220.6, row: 39 },
-                            { max: 2775.7, row: 40 },
+                            { max: 444.1, row: 33 },
+                            { max: 555.1, row: 34 },
+                            { max: 699.4, row: 35 },
+                            { max: 888.2, row: 36 },
+                            { max: 1110.3, row: 37 },
+                            { max: 1387.8, row: 38 },
+                            { max: 1665.4, row: 39 },
+                            { max: 2220.6, row: 40 },
+                            { max: 2775.7, row: 41 },
                           ];
                           const inAll = chargerTypeMode === 'any'
                             ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
@@ -729,19 +729,19 @@ export default function Home(): JSX.Element {
                           trRowNum = found?.row;
                         } else if (form.powerAuthority === 'PEA') {
                           const steps = [
-                            { max: 115.4, row: 75 },
-                            { max: 184.7, row: 76 },
-                            { max: 288.6, row: 77 },
-                            { max: 363.7, row: 78 },
-                            { max: 461.8, row: 79 },
-                            { max: 577.3, row: 80 },
-                            { max: 727.4, row: 81 },
-                            { max: 923.7, row: 82 },
-                            { max: 1154.7, row: 83 },
-                            { max: 1443.4, row: 84 },
-                            { max: 1732.1, row: 85 },
-                            { max: 2305.4, row: 86 },
-                            { max: 2886.8, row: 87 },
+                            { max: 115.4, row: 76 },
+                            { max: 184.7, row: 77 },
+                            { max: 288.6, row: 78 },
+                            { max: 363.7, row: 79 },
+                            { max: 461.8, row: 80 },
+                            { max: 577.3, row: 81 },
+                            { max: 727.4, row: 82 },
+                            { max: 923.7, row: 83 },
+                            { max: 1154.7, row: 84 },
+                            { max: 1443.4, row: 85 },
+                            { max: 1732.1, row: 86 },
+                            { max: 2305.4, row: 87 },
+                            { max: 2886.8, row: 88 },
                           ];
                           const inAll = chargerTypeMode === 'any'
                             ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
