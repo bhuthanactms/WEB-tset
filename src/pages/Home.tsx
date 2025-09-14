@@ -306,6 +306,44 @@ export default function Home(): JSX.Element {
     });
   };
 
+  // === เพิ่มฟังก์ชันกลางสำหรับหา rowNum และ row ของ Transformer ที่เลือก ===
+  const getTransformerRowNum = (inAllCharger: number, powerAuthority: string) => {
+    const stepsMEA = [
+      { max: 444.1, row: 32 },
+      { max: 555.1, row: 33 },
+      { max: 699.4, row: 34 },
+      { max: 888.2, row: 35 },
+      { max: 1110.3, row: 36 },
+      { max: 1387.8, row: 37 },
+      { max: 1665.4, row: 38 },
+      { max: 2220.6, row: 39 },
+      { max: 2775.7, row: 40 },
+    ];
+    const stepsPEA = [
+      { max: 115.4, row: 75 },
+      { max: 184.7, row: 76 },
+      { max: 288.6, row: 77 },
+      { max: 363.7, row: 78 },
+      { max: 461.8, row: 79 },
+      { max: 577.3, row: 80 },
+      { max: 727.4, row: 81 },
+      { max: 923.7, row: 82 },
+      { max: 1154.7, row: 83 },
+      { max: 1443.4, row: 84 },
+      { max: 1732.1, row: 85 },
+      { max: 2305.4, row: 86 },
+      { max: 2886.8, row: 87 },
+    ];
+    const steps = powerAuthority === 'MEA' ? stepsMEA : stepsPEA;
+    const found = steps.find(s => inAllCharger <= s.max);
+    return found?.row;
+  };
+
+  const getTransformerRow = (inAllCharger: number, powerAuthority: string, excelData: any[]) => {
+    const rowNum = getTransformerRowNum(inAllCharger, powerAuthority);
+    return excelData.find(r => r.__rowNum__ === rowNum);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
       <div className="max-w-6xl mx-auto px-4 py-8">
@@ -402,7 +440,7 @@ export default function Home(): JSX.Element {
                   {/* Number of chargers */}
                   <div className="space-y-3">
                     <Label className="text-sm font-medium text-gray-700">
-                      Number of Chargers
+                      Number of Chargers <span className="text-xs text-gray-400">(unit)</span>
                     </Label>
                     <Select value={form.numberOfChargers} onValueChange={(value) => setForm(f => ({ ...f, numberOfChargers: value }))}>
                       <SelectTrigger className="h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500">
@@ -520,6 +558,7 @@ export default function Home(): JSX.Element {
               <div className="space-y-6">
                 {/* Summary Cards */}
                 <div className="grid grid-cols-2 gap-4">
+                  {/* Total Power */}
                   <Card className="bg-gradient-to-r from-blue-50 to-cyan-50 border-blue-200 shadow-sm">
                     <CardContent className="p-4">
                       <div className="flex items-center gap-2 mb-2">
@@ -527,19 +566,28 @@ export default function Home(): JSX.Element {
                         <span className="text-sm font-medium text-blue-800">Total Power</span>
                       </div>
                       <div className="text-2xl font-bold text-blue-900">
-                        {results.totalPower} kW
+                        {/* ใช้ค่า In all Charger แทน */}
+                        {chargerTypeMode === 'any'
+                          ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0).toFixed(1)
+                          : results?.inAllCharger.toFixed(1)} A
                       </div>
                     </CardContent>
                   </Card>
 
+                  {/* Transformer Size */}
                   <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 shadow-sm">
                     <CardContent className="p-4">
                       <div className="flex items-center gap-2 mb-2">
                         <Battery className="h-5 w-5 text-green-600" />
                         <span className="text-sm font-medium text-green-800">Transformer Size</span>
                       </div>
-                      <div className="text-2xl font-bold text-green-900">
-                        {results.transformerSize} kVA
+                      <div className="text-2xl font-bold text-green-900 flex items-center">
+                        {getTRSizeFromExcel(
+                          chargerTypeMode === 'any'
+                            ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
+                            : results?.inAllCharger || 0
+                        )}
+                        <span className="text-2xl font-bold text-green-900 ml-1">kVA</span>
                       </div>
                     </CardContent>
                   </Card>
@@ -567,13 +615,23 @@ export default function Home(): JSX.Element {
                         <span className="font-semibold text-gray-900">{form.powerAuthority}</span>
                       </div>
 
-                      {/* Charger */}
+                      {/* Charger (แสดง Selected Charger ตรงนี้แทน) */}
                       <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                         <div className="flex items-center gap-2">
                           <div className="w-2 h-2 bg-green-600 rounded-full"></div>
                           <span className="font-medium text-gray-700">Charger:</span>
                         </div>
-                        <span className="font-semibold text-gray-900">{form.charger}</span>
+                        {chargerTypeMode === 'any' ? (
+                          <div className="flex flex-col gap-1 p-3 bg-gray-50 rounded-lg">
+                            {multiChargers.map((name, idx) => (
+                              <span key={idx} className="ml-6 font-semibold text-gray-900">
+                                Charger{idx + 1}: {name}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="font-semibold text-gray-900">{form.charger}</span>
+                        )}
                       </div>
 
                       {/* In of charger */}
@@ -585,7 +643,7 @@ export default function Home(): JSX.Element {
                         {chargerTypeMode === 'any' ? (
                           <div className="flex flex-col gap-1 p-3 bg-gray-50 rounded-lg">
                             {getMultiChargersIn().map((item, idx) => (
-                              <span key={idx} className="ml-6 text-gray-900">
+                              <span key={idx} className="ml-6 font-semibold text-gray-900">
                                 Charger{idx + 1} ({item.name}): {item.in.toFixed(1)} A
                               </span>
                             ))}
@@ -601,7 +659,10 @@ export default function Home(): JSX.Element {
                           <div className="w-2 h-2 bg-orange-600 rounded-full"></div>
                           <span className="font-medium text-gray-700">Number of Chargers:</span>
                         </div>
-                        <span className="font-semibold text-gray-900">{form.numberOfChargers}</span>
+                        <span className="font-semibold text-gray-900 text-base flex items-center">
+                          {form.numberOfChargers}
+                          <span className="ml-1 text-base text-gray-900">unit</span>
+                        </span>
                       </div>
 
                       {/* In all Charger */}
@@ -634,12 +695,13 @@ export default function Home(): JSX.Element {
                           <div className="w-2 h-2 bg-indigo-600 rounded-full"></div>
                           <span className="font-medium text-gray-700">Transformer:</span>
                         </div>
-                        <span className="font-semibold text-gray-900">
+                        <span className="font-semibold text-gray-900 text-base flex items-center">
                           {getTRSizeFromExcel(
                             chargerTypeMode === 'any'
                               ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
                               : results?.inAllCharger || 0
                           )}
+                          <span className="text-base text-gray-900 ml-1">kVA</span>
                         </span>
                       </div>
 
@@ -678,6 +740,85 @@ export default function Home(): JSX.Element {
                         with {form.powerAuthority} connection. The total power requirement is {results.totalPower} kW
                         with a maximum current of {results.inAllCharger.toFixed(1)} A.
                       </p>
+                    </div>
+
+                    <Separator className="my-6" />
+                    <div className="bg-gradient-to-r from-blue-50 to-cyan-50 p-4 rounded-lg border border-blue-200 mt-6">
+                      <div className="text-lg font-bold text-blue-900 mb-2">MDB</div>
+                      {(() => {
+                        const inAll = chargerTypeMode === 'any'
+                          ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
+                          : results?.inAllCharger || 0;
+                        const trRow = getTransformerRow(inAll, form.powerAuthority, excelData);
+                        const mccbMain = trRow ? trRow.__EMPTY_11 : '-';
+
+                        // MCCB Sub: ใช้ row ของแต่ละ In of charger (แต่ละเครื่อง)
+                        let mccbSubs: string[] = [];
+                        if (chargerTypeMode === 'any') {
+                          mccbSubs = multiChargers.map((chargerName) => {
+                            const cell = chargerToExcelCell[chargerName];
+                            let rowNum: number | undefined;
+                            if (form.powerAuthority === 'MEA' && cell?.mea) {
+                              rowNum = parseInt(cell.mea.replace('C', ''));
+                            }
+                            if (form.powerAuthority === 'PEA' && cell?.pea) {
+                              rowNum = parseInt(cell.pea.replace('C', ''));
+                            }
+                            const row = excelData.find(r => r.__rowNum__ === rowNum);
+                            if (form.powerAuthority === 'MEA') {
+                              return row ? row.__EMPTY_29 || '-' : '-';
+                            } else {
+                              return row ? row.__EMPTY_27 || '-' : '-';
+                            }
+                          });
+                        } else {
+                          // Same kW: ทุกเครื่องใช้ row เดียวกัน
+                          const cell = chargerToExcelCell[form.charger];
+                          let rowNum: number | undefined;
+                          if (form.powerAuthority === 'MEA' && cell?.mea) {
+                            rowNum = parseInt(cell.mea.replace('C', ''));
+                          }
+                          if (form.powerAuthority === 'PEA' && cell?.pea) {
+                            rowNum = parseInt(cell.pea.replace('C', ''));
+                          }
+                          const row = excelData.find(r => r.__rowNum__ === rowNum);
+                          const value =
+                            form.powerAuthority === 'MEA'
+                              ? (row ? row.__EMPTY_29 || '-' : '-')
+                              : (row ? row.__EMPTY_27 || '-' : '-');
+                          const numChargers = parseInt(form.numberOfChargers) || 1;
+                          mccbSubs = Array(numChargers).fill(value);
+                        }
+
+                        const numChargers = parseInt(form.numberOfChargers) || 1;
+
+                        return (
+                          <div className="space-y-2">
+                            {/* MCCB Main */}
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium text-gray-700">MCCB Main</span>
+                              <span className="font-semibold text-gray-900">{mccbMain} A</span>
+                            </div>
+                            {/* MCCB Sub C1-C12 */}
+                            {mccbSubs.map((val, idx) => (
+                              <div key={idx} className="flex items-center justify-between">
+                                <span className="font-medium text-gray-700">MCCB Sub C{idx + 1}</span>
+                                <span className="font-semibold text-gray-900">{val} A</span>
+                              </div>
+                            ))}
+                            {/* MCCB for Lighting */}
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium text-gray-700">MCCB for Lighting</span>
+                              <span className="font-semibold text-gray-900">10 A</span>
+                            </div>
+                            {/* MCCB for Commu */}
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium text-gray-700">MCCB for Commu</span>
+                              <span className="font-semibold text-gray-900">10 A</span>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </CardContent>
                 </Card>
