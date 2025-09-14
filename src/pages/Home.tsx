@@ -378,6 +378,157 @@ export default function Home(): JSX.Element {
     return values;
   };
 
+  // เพิ่มฟังก์ชันดึง TR Wire conduit ตาม Power Authority และ TR Wiring Type
+  const getTRWireConduit = () => {
+    // หา rowNum ของ Transformer ที่เลือก (เหมือน getTRWiringSizeCV)
+    let trRowNum: number | undefined = undefined;
+    if (form.powerAuthority === 'MEA') {
+      const steps = [
+        { max: 444.1, row: 33 },
+        { max: 555.1, row: 34 },
+        { max: 699.4, row: 35 },
+        { max: 888.2, row: 36 },
+        { max: 1110.3, row: 37 },
+        { max: 1387.8, row: 38 },
+        { max: 1665.4, row: 39 },
+        { max: 2220.6, row: 40 },
+        { max: 2775.7, row: 41 },
+      ];
+      const inAll = chargerTypeMode === 'any'
+        ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
+        : results?.inAllCharger || 0;
+      const found = steps.find(s => inAll <= s.max);
+      trRowNum = found?.row;
+    } else if (form.powerAuthority === 'PEA') {
+      const steps = [
+        { max: 115.4, row: 76 },
+        { max: 184.7, row: 77 },
+        { max: 288.6, row: 78 },
+        { max: 363.7, row: 79 },
+        { max: 461.8, row: 80 },
+        { max: 577.3, row: 81 },
+        { max: 727.4, row: 82 },
+        { max: 923.7, row: 83 },
+        { max: 1154.7, row: 84 },
+        { max: 1443.4, row: 85 },
+        { max: 1732.1, row: 86 },
+        { max: 2305.4, row: 87 },
+        { max: 2886.8, row: 88 },
+      ];
+      const inAll = chargerTypeMode === 'any'
+        ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
+        : results?.inAllCharger || 0;
+      const found = steps.find(s => inAll <= s.max);
+      trRowNum = found?.row;
+    }
+    if (!trRowNum) return '';
+
+    const trRow = excelData.find(r => r.__rowNum__ === trRowNum);
+    if (!trRow) return '';
+
+    // Mapping TR Wiring Type to columns and units
+    const wiringTypeToColsAndUnit: Record<string, { cols: string[]; unit: string }> = {
+      'ร้อยท่อเดินในอากาศ กลุ่ม 2': {
+        cols: ['__EMPTY_32', '__EMPTY_33', '__EMPTY_34', '__EMPTY_35'], // AG-AJ
+        unit: 'นิ้ว'
+      },
+      'ร้อยท่อฝังใต้ดิน กลุ่ม 5': {
+        cols: ['__EMPTY_53', '__EMPTY_54', '__EMPTY_55'], // BB-BD
+        unit: 'มม.'
+      },
+      'ราง TRAY ไม่มีฝา': {
+        cols: ['__EMPTY_74'], // BW
+        unit: 'ซม.'
+      },
+      'ราง LADDER ไม่มีฝา': {
+        cols: ['__EMPTY_95'], // CR
+        unit: 'ซม.'
+      },
+    };
+
+    const config = wiringTypeToColsAndUnit[form.trWiringType];
+    if (!config) return '';
+
+    const values = config.cols.map(col => trRow[col]).filter(Boolean).join(' ');
+    if (!values) return '';
+    return `${values} ${config.unit}`;
+  };
+
+  // เพิ่มฟังก์ชันดึง TR Wiring Size (CV) แยกแต่ละ Charger
+  const getTRWiringSizeCVs = () => {
+    // Mapping TR Wiring Type to columns
+    const wiringTypeToCols: Record<string, string[]> = {
+      'ร้อยท่อเดินในอากาศ กลุ่ม 2': [
+        '__EMPTY_15', '__EMPTY_16', '__EMPTY_17', '__EMPTY_18', '__EMPTY_19', '__EMPTY_20', '__EMPTY_21', '__EMPTY_22', '__EMPTY_23', '__EMPTY_24'
+      ], // P-Y
+      'ร้อยท่อฝังใต้ดิน กลุ่ม 5': [
+        '__EMPTY_36', '__EMPTY_37', '__EMPTY_38', '__EMPTY_39', '__EMPTY_40', '__EMPTY_41', '__EMPTY_42', '__EMPTY_43', '__EMPTY_44', '__EMPTY_45'
+      ], // AK-AT
+      'ราง TRAY ไม่มีฝา': [
+        '__EMPTY_57', '__EMPTY_58', '__EMPTY_59', '__EMPTY_60', '__EMPTY_61', '__EMPTY_62', '__EMPTY_63', '__EMPTY_64', '__EMPTY_65', '__EMPTY_66'
+      ], // BF-BO
+      'ราง LADDER ไม่มีฝา': [
+        '__EMPTY_78', '__EMPTY_79', '__EMPTY_80', '__EMPTY_81', '__EMPTY_82', '__EMPTY_83', '__EMPTY_84', '__EMPTY_85', '__EMPTY_86', '__EMPTY_87'
+      ], // CA-CJ
+    };
+
+    const cols = wiringTypeToCols[form.trWiringType];
+    if (!cols) return [];
+
+    // หา rowNum ของ Transformer ที่เลือก
+    let trRowNum: number | undefined = undefined;
+    if (form.powerAuthority === 'MEA') {
+      const steps = [
+        { max: 444.1, row: 33 },
+        { max: 555.1, row: 34 },
+        { max: 699.4, row: 35 },
+        { max: 888.2, row: 36 },
+        { max: 1110.3, row: 37 },
+        { max: 1387.8, row: 38 },
+        { max: 1665.4, row: 39 },
+        { max: 2220.6, row: 40 },
+        { max: 2775.7, row: 41 },
+      ];
+      const inAll = chargerTypeMode === 'any'
+        ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
+        : results?.inAllCharger || 0;
+      const found = steps.find(s => inAll <= s.max);
+      trRowNum = found?.row;
+    } else if (form.powerAuthority === 'PEA') {
+      const steps = [
+        { max: 115.4, row: 76 },
+        { max: 184.7, row: 77 },
+        { max: 288.6, row: 78 },
+        { max: 363.7, row: 79 },
+        { max: 461.8, row: 80 },
+        { max: 577.3, row: 81 },
+        { max: 727.4, row: 82 },
+        { max: 923.7, row: 83 },
+        { max: 1154.7, row: 84 },
+        { max: 1443.4, row: 85 },
+        { max: 1732.1, row: 86 },
+        { max: 2305.4, row: 87 },
+        { max: 2886.8, row: 88 },
+      ];
+      const inAll = chargerTypeMode === 'any'
+        ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
+        : results?.inAllCharger || 0;
+      const found = steps.find(s => inAll <= s.max);
+      trRowNum = found?.row;
+    }
+    if (!trRowNum) return [];
+
+    const trRow = excelData.find(r => r.__rowNum__ === trRowNum);
+    if (!trRow) return [];
+
+    // ดึงค่าทุกคอลัมน์มาต่อกัน (เว้นวรรค)
+    const value = cols.map(col => trRow[col]).filter(Boolean).join(' ');
+
+    // คืน array ตามจำนวนเครื่อง
+    const numChargers = parseInt(form.numberOfChargers) || 1;
+    return Array(numChargers).fill(value);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
       <div className="max-w-6xl mx-auto px-4 py-8">
@@ -762,13 +913,28 @@ export default function Home(): JSX.Element {
                       </div>
 
                       {/* TR Wiring Size (CV) */}
-                      {(form.trWiringType && form.powerAuthority && getTRWiringSizeCV()) && (
-                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                          <div className="flex items-center gap-2">
+                      {(form.trWiringType && form.powerAuthority && getTRWiringSizeCVs().length > 0) && (
+                        <div className="flex flex-col gap-1 p-3 bg-gray-50 rounded-lg">
+                          <div className="flex items-center gap-2 mb-1">
                             <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
                             <span className="font-medium text-gray-700">TR Wiring Size (CV):</span>
                           </div>
-                          <span className="font-semibold text-gray-900 text-sm">{getTRWiringSizeCV()}</span>
+                          {getTRWiringSizeCVs().map((val, idx) => (
+                            <span key={idx} className="ml-6 font-semibold text-gray-900 text-sm">
+                              Charger{idx + 1}: {val}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* TR Wire conduit */}
+                      {(form.trWiringType && form.powerAuthority && getTRWireConduit()) && (
+                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 bg-blue-300 rounded-full"></div>
+                            <span className="font-medium text-gray-700">TR Wire conduit :</span>
+                          </div>
+                          <span className="font-semibold text-gray-900 text-sm">{getTRWireConduit()}</span>
                         </div>
                       )}
                     </div>
