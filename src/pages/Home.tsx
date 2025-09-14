@@ -306,6 +306,44 @@ export default function Home(): JSX.Element {
     });
   };
 
+  // === เพิ่มฟังก์ชันกลางสำหรับหา rowNum และ row ของ Transformer ที่เลือก ===
+  const getTransformerRowNum = (inAllCharger: number, powerAuthority: string) => {
+    const stepsMEA = [
+      { max: 444.1, row: 32 },
+      { max: 555.1, row: 33 },
+      { max: 699.4, row: 34 },
+      { max: 888.2, row: 35 },
+      { max: 1110.3, row: 36 },
+      { max: 1387.8, row: 37 },
+      { max: 1665.4, row: 38 },
+      { max: 2220.6, row: 39 },
+      { max: 2775.7, row: 40 },
+    ];
+    const stepsPEA = [
+      { max: 115.4, row: 75 },
+      { max: 184.7, row: 76 },
+      { max: 288.6, row: 77 },
+      { max: 363.7, row: 78 },
+      { max: 461.8, row: 79 },
+      { max: 577.3, row: 80 },
+      { max: 727.4, row: 81 },
+      { max: 923.7, row: 82 },
+      { max: 1154.7, row: 83 },
+      { max: 1443.4, row: 84 },
+      { max: 1732.1, row: 85 },
+      { max: 2305.4, row: 86 },
+      { max: 2886.8, row: 87 },
+    ];
+    const steps = powerAuthority === 'MEA' ? stepsMEA : stepsPEA;
+    const found = steps.find(s => inAllCharger <= s.max);
+    return found?.row;
+  };
+
+  const getTransformerRow = (inAllCharger: number, powerAuthority: string, excelData: any[]) => {
+    const rowNum = getTransformerRowNum(inAllCharger, powerAuthority);
+    return excelData.find(r => r.__rowNum__ === rowNum);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
       <div className="max-w-6xl mx-auto px-4 py-8">
@@ -708,48 +746,10 @@ export default function Home(): JSX.Element {
                     <div className="bg-gradient-to-r from-blue-50 to-cyan-50 p-4 rounded-lg border border-blue-200 mt-6">
                       <div className="text-lg font-bold text-blue-900 mb-2">MDB</div>
                       {(() => {
-                        // หา rowNum ของ Transformer ที่เลือก (ใช้กับ MCCB Main)
-                        let trRowNum: number | undefined = undefined;
-                        if (form.powerAuthority === 'MEA') {
-                          const steps = [
-                            { max: 444.1, row: 32 },
-                            { max: 555.1, row: 33 },
-                            { max: 699.4, row: 34 },
-                            { max: 888.2, row: 35 },
-                            { max: 1110.3, row: 36 },
-                            { max: 1387.8, row: 37 },
-                            { max: 1665.4, row: 38 },
-                            { max: 2220.6, row: 39 },
-                            { max: 2775.7, row: 40 },
-                          ];
-                          const inAll = chargerTypeMode === 'any'
-                            ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
-                            : results?.inAllCharger || 0;
-                          const found = steps.find(s => inAll <= s.max);
-                          trRowNum = found?.row;
-                        } else if (form.powerAuthority === 'PEA') {
-                          const steps = [
-                            { max: 115.4, row: 75 },
-                            { max: 184.7, row: 76 },
-                            { max: 288.6, row: 77 },
-                            { max: 363.7, row: 78 },
-                            { max: 461.8, row: 79 },
-                            { max: 577.3, row: 80 },
-                            { max: 727.4, row: 81 },
-                            { max: 923.7, row: 82 },
-                            { max: 1154.7, row: 83 },
-                            { max: 1443.4, row: 84 },
-                            { max: 1732.1, row: 85 },
-                            { max: 2305.4, row: 86 },
-                            { max: 2886.8, row: 87 },
-                          ];
-                          const inAll = chargerTypeMode === 'any'
-                            ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
-                            : results?.inAllCharger || 0;
-                          const found = steps.find(s => inAll <= s.max);
-                          trRowNum = found?.row;
-                        }
-                        const trRow = excelData.find(r => r.__rowNum__ === trRowNum);
+                        const inAll = chargerTypeMode === 'any'
+                          ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
+                          : results?.inAllCharger || 0;
+                        const trRow = getTransformerRow(inAll, form.powerAuthority, excelData);
                         const mccbMain = trRow ? trRow.__EMPTY_11 : '-';
 
                         // MCCB Sub: ใช้ row ของแต่ละ In of charger (แต่ละเครื่อง)
