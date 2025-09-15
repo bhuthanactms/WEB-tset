@@ -813,10 +813,18 @@ export default function Home(): JSX.Element {
                         <span className="text-sm font-medium text-blue-800">Total Power</span>
                       </div>
                       <div className="text-2xl font-bold text-blue-900">
-                        {/* ใช้ค่า In all Charger แทน */}
-                        {chargerTypeMode === 'any'
-                          ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0).toFixed(1)
-                          : results?.inAllCharger.toFixed(1)} A
+                        {/* In all Charger × √3 × 400 / 1000 (kVA) */}
+                        {(
+                          (
+                            (chargerTypeMode === 'any'
+                              ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
+                              : results?.inAllCharger || 0
+                            ) * Math.sqrt(3) * 400
+                          ) / 1000
+                        ).toFixed(2)} kVA
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        (In all Charger × √3 × 400 ÷ 1000)
                       </div>
                     </CardContent>
                   </Card>
@@ -1084,6 +1092,8 @@ export default function Home(): JSX.Element {
                         }
                         const trRow = excelData.find(r => r.__rowNum__ === trRowNum);
                         const mccbMain = trRow ? trRow.__EMPTY_11 : '-';
+                        const main2 = trRow ? trRow.__EMPTY_14 : '-'; // __EMPTY_14 คือคอลัมน์ O
+
 
                         // MCCB Sub: ใช้ row ของแต่ละ In of charger (แต่ละเครื่อง)
                         let mccbSubs: string[] = [];
@@ -1130,7 +1140,11 @@ export default function Home(): JSX.Element {
                             {/* MCCB Main */}
                             <div className="flex items-center justify-between">
                               <span className="font-medium text-gray-700">MCCB Main</span>
-                              <span className="font-semibold text-gray-900">{mccbMain} A</span>
+                              <span className="font-semibold text-gray-900">
+                                {mccbMain} A <span className="text-gray-400 text-xs ml-1">(AT)</span>
+                                {" / "}
+                                {main2} A <span className="text-gray-400 text-xs ml-1">(AF)</span>
+                              </span>
                             </div>
                             {/* MCCB Sub C1-C12 */}
                             {mccbSubs.map((val, idx) => (
