@@ -8,8 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
-import { login, getDemoUsers } from '@/utils/auth'
+import { login } from '@/utils/auth'
 import { Lock, LogIn } from 'lucide-react'
 
 /** Credentials form state */
@@ -37,12 +36,6 @@ export default function Login(): JSX.Element {
     window.location.hash = '#/'
   }
 
-  /** Quick-fill demo credentials. */
-  const applyDemo = (u: string, p: string) => {
-    setForm({ username: u, password: p })
-    setError('')
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
       <div className="max-w-6xl mx-auto px-4 py-10 grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
@@ -55,28 +48,8 @@ export default function Login(): JSX.Element {
             <div className="p-6">
               <h2 className="text-2xl font-bold text-gray-900">Welcome back</h2>
               <p className="text-gray-600 mt-1">
-                Sign in with one of the demo accounts below and you can change them later.
+                Please sign in to continue.
               </p>
-
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                {getDemoUsers().map((u) => (
-                  <button
-                    key={u.username}
-                    onClick={() => applyDemo(u.username, u.password)}
-                    className="group text-left p-3 rounded-lg border bg-gradient-to-r from-blue-50 to-cyan-50 hover:from-blue-100 hover:to-cyan-100 transition"
-                    title="Click to autofill"
-                  >
-                    <div className="text-sm text-gray-700">
-                      <span className="font-semibold">{u.username}</span>
-                    </div>
-                    <div className="text-xs text-gray-500">Password: {u.password}</div>
-                  </button>
-                ))}
-              </div>
-
-              <div className="mt-4">
-                <Badge className="bg-blue-600 text-white">Demo only</Badge>
-              </div>
             </div>
           </div>
         </div>
@@ -90,7 +63,7 @@ export default function Login(): JSX.Element {
                 Sign in
               </CardTitle>
               <CardDescription className="text-blue-100">
-                Use one of the demo accounts. You can replace them later with real auth.
+                Please sign in to continue.
               </CardDescription>
             </CardHeader>
             <CardContent className="p-8">
@@ -138,10 +111,6 @@ export default function Login(): JSX.Element {
                   <LogIn className="h-5 w-5 mr-2" />
                   Sign in
                 </Button>
-
-                <div className="text-xs text-gray-500 text-center">
-                  Tip: click a demo account on the left to autofill.
-                </div>
               </form>
             </CardContent>
           </Card>

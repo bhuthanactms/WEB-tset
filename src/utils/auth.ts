@@ -13,7 +13,13 @@ const DEMO_USERS: Array<{ username: string; password: string }> = [
   { username: 'admin', usernameDisplay: 'admin', password: 'admin123' } as any, // keep display alignment
   { username: 'user1', password: 'pass123' },
   { username: 'demo', password: 'demo123' },
-  { username: 'guest', password: 'guest123' }
+  { username: 'guest', password: 'guest123' },
+  // เพิ่ม sale users ให้ล็อกอินได้จริง
+  { username: 'sale01', password: 'Eicsale01' },
+  { username: 'sale02', password: 'Ctmssale01' },
+  { username: 'sale03', password: 'Saleei01' },
+  { username: 'sale04', password: 'Eicsale02' },
+  { username: 'sale05', password: 'Ctmssale02' }
 ]
 
 // Storage key used to persist the authenticated user
@@ -65,4 +71,15 @@ export function isAuthenticated(): boolean {
 /** Returns a copy of the demo users for UI hints. */
 export function getDemoUsers(): Array<{ username: string; password: string }> {
   return DEMO_USERS.map((u) => ({ username: u.username, password: u.password }))
+}
+
+/** Returns 5 static sale users with different passwords */
+export function getSaleUsers() {
+  return [
+    { username: 'sale01', password: 'Eicsale01' },
+    { username: 'sale02', password: 'Ctmssale01' },
+    { username: 'sale03', password: 'Saleei01' },
+    { username: 'sale04', password: 'Eicsale02' },
+    { username: 'sale05', password: 'Ctmssale02' },
+  ]
 }

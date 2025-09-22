@@ -1062,25 +1062,33 @@ export default function Home(): JSX.Element {
                         return (
                           <div className="space-y-2">
                             <div className="flex items-center justify-between">
-                              <span className="font-medium text-gray-700">MCCB Main</span>
+                              <span className="font-medium text-gray-700">&nbsp;&nbsp;&nbsp;&nbsp;MCCB Main</span>
                               <span className="font-semibold text-gray-900">
-                                {mccbMain} A <span className="text-gray-400 text-xs ml-1">(AT)</span>
-                                {" / "}
-                                {main2} A <span className="text-gray-400 text-xs ml-1">(AF)</span>
+                                {/* เพิ่มช่องว่างหลัง Main */}
+                                <span style={{ marginRight: '0.5rem' }}></span>
+                                {mccbMain && (
+                                  <>
+                                    <span style={{ marginRight: '0.5rem' }}>{mccbMain}</span>
+                                    A <span className="text-gray-400 text-xs ml-1">(AT)</span>
+                                    <span style={{ margin: '0 0.5rem' }}>/</span>
+                                    <span style={{ marginRight: '0.5rem' }}>{main2}</span>
+                                    A <span className="text-gray-400 text-xs ml-1">(AF)</span>
+                                  </>
+                                )}
                               </span>
                             </div>
                             {mccbSubs.map((val, idx) => (
                               <div key={idx} className="flex items-center justify-between">
-                                <span className="font-medium text-gray-700">MCCB Sub C{idx + 1}</span>
+                                <span className="font-medium text-gray-700">&nbsp;&nbsp;&nbsp;&nbsp;MCCB Sub C{idx + 1}</span>
                                 <span className="font-semibold text-gray-900">{val} A</span>
                               </div>
                             ))}
                             <div className="flex items-center justify-between">
-                              <span className="font-medium text-gray-700">MCCB for Lighting</span>
+                              <span className="font-medium text-gray-700">&nbsp;&nbsp;&nbsp;&nbsp;MCCB for Lighting</span>
                               <span className="font-semibold text-gray-900">10 A</span>
                             </div>
                             <div className="flex items-center justify-between">
-                              <span className="font-medium text-gray-700">MCCB for Commu</span>
+                              <span className="font-medium text-gray-700">&nbsp;&nbsp;&nbsp;&nbsp;MCCB for Commu</span>
                               <span className="font-semibold text-gray-900">10 A</span>
                             </div>
                           </div>
@@ -1095,16 +1103,16 @@ export default function Home(): JSX.Element {
                       {chargerTypeMode === 'any'
                         ? multiChargers.filter(Boolean).length > 0
                           ? Object.entries(
-                              multiChargers.filter(Boolean).reduce((acc, name) => {
-                                acc[name] = (acc[name] || 0) + 1;
-                                return acc;
-                              }, {} as Record<string, number>)
-                            ).map(([name, count], idx) => (
-                              <span key={name}>
-                                {idx > 0 && ', '}
-                                {name} x {count}
-                              </span>
-                            ))
+                            multiChargers.filter(Boolean).reduce((acc, name) => {
+                              acc[name] = (acc[name] || 0) + 1;
+                              return acc;
+                            }, {} as Record<string, number>)
+                          ).map(([name, count], idx) => (
+                            <span key={name}>
+                              {idx > 0 && ', '}
+                              {name} x {count}
+                            </span>
+                          ))
                           : '-'
                         : form.charger
                           ? `${form.charger} x ${form.numberOfChargers || 1}`
@@ -1151,78 +1159,6 @@ export default function Home(): JSX.Element {
               </CardContent>
             </Card>
 
-            {/* --- New: Chargers Summary Card --- */}
-            {/* <Card className="shadow-lg border-0">
-              <CardHeader className="bg-gradient-to-r from-blue-50 to-cyan-50 border-b">
-                <CardTitle className="flex items-center gap-2 text-blue-800">
-                  Chargers
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6">
-                <div className="space-y-4">
-                  {/* Charger */}
-                  {/* <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <span className="font-medium text-gray-700">Charger:</span>
-                    {chargerTypeMode === 'any' ? (
-                      <div className="flex flex-col gap-1">
-                        {multiChargers.map((name, idx) => (
-                          <span key={idx} className="ml-6 font-semibold text-gray-900">
-                            Charger{idx + 1}: {name}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="font-semibold text-gray-900">{form.charger}</span>
-                    )}
-                  </div>
-                  {/* Number of Chargers */}
-                  {/* <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <span className="font-medium text-gray-700">Number of Chargers:</span>
-                    <span className="font-semibold text-gray-900">
-                      {form.numberOfChargers || '-'}
-                    </span>
-                  </div>
-                  {/* In of Charger */}
-                  {/* <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <span className="font-medium text-gray-700">In of Charger:</span>
-                    <span className="font-semibold text-gray-900 text-base">
-                      {chargerTypeMode === 'any'
-                        ? (
-                          getMultiChargersIn().length > 0
-                            ? (
-                              <span>
-                                {getMultiChargersIn().map((item, idx) => (
-                                  <span key={idx}>
-                                    {idx > 0 && ', '}
-                                    Charger{idx + 1}: {item.in.toFixed(2)} A
-                                  </span>
-                                ))}
-                              </span>
-                            )
-                            : '-'
-                        )
-                        : results?.inOfCharger !== undefined
-                          ? results.inOfCharger.toFixed(2) + ' A'
-                          : '-'
-                      }
-                    </span>
-                  </div>
-                  {/* In of all Charger */}
-                  {/* <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <span className="font-medium text-gray-700">In of all Charger:</span>
-                    <span className="font-semibold text-gray-900 text-base">
-                      {chargerTypeMode === 'any'
-                        ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0).toFixed(2)
-                        : results?.inAllCharger !== undefined
-                          ? results.inAllCharger.toFixed(2)
-                          : '-'
-                      }
-                      <span className="text-base text-gray-900 ml-1">A</span>
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card> */}
           </div>
 
           {/* Right side: 4 summary cards (top) + Chargers + TR to MDB Summary Card */}
@@ -1364,7 +1300,7 @@ export default function Home(): JSX.Element {
             <Card className="shadow-lg border-0 mb-6">
               <CardHeader className="bg-gradient-to-r from-blue-100 to-cyan-100 border-b">
                 <CardTitle className="flex items-center gap-2 text-blue-800">
-                  Sammary
+                  Summary for Charger
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6">
@@ -1411,10 +1347,10 @@ export default function Home(): JSX.Element {
                             In: {results?.inOfCharger !== undefined ? results.inOfCharger.toFixed(2) : '-'} A
                           </span>
                           <span className="text-gray-700">
-                            Cable: {Array.isArray(cableArr) ? (cableArr[idx] ? cableArr[idx].replace(/^Charger\d+:\s*/, '') : '-') : (typeof cableArr === 'string' ? cableArr : '-')} 
+                            Cable: {Array.isArray(cableArr) ? (cableArr[idx] ? cableArr[idx].replace(/^Charger\d+:\s*/, '') : '-') : (typeof cableArr === 'string' ? cableArr : '-')}
                           </span>
                           <span className="text-gray-700">
-                            Conduit: {Array.isArray(conduitArr) ? (conduitArr[idx] ? conduitArr[idx].replace(/^Charger\d+:\s*/, '') : '-') : (typeof conduitArr === 'string' ? conduitArr : '-')} 
+                            Conduit: {Array.isArray(conduitArr) ? (conduitArr[idx] ? conduitArr[idx].replace(/^Charger\d+:\s*/, '') : '-') : (typeof conduitArr === 'string' ? conduitArr : '-')}
                           </span>
                         </div>
                       ));
@@ -1430,6 +1366,9 @@ export default function Home(): JSX.Element {
                         : '-'
                     }
                     <span className="ml-1">A</span>
+                  </div>
+                  <div className="font-semibold text-blue-900 text-base">
+                    Charger Wiring Type: <span className="font-normal">{form.chargerWiringType}</span>
                   </div>
                 </div>
               </CardContent>
