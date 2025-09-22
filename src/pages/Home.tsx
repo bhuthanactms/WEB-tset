@@ -173,7 +173,7 @@ export default function Home(): JSX.Element {
       const multi = getMultiChargersIn();
       inAllCharger = multi.reduce((sum, item) => sum + item.in, 0);
       inOfCharger = multi.length === 1 ? multi[0].in : 0;
-      totalPower = multiChargers.reduce((sum, chargerName) => {
+      totalPower = multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
         return sum + extractPowerValue(chargerName);
       }, 0);
     } else {
@@ -309,9 +309,8 @@ export default function Home(): JSX.Element {
 
   // ฟังก์ชันดึงค่า In ของแต่ละเครื่อง (ใช้กับ Any type kW)
   const getMultiChargersIn = () => {
-    // กรองเฉพาะที่เป็น string และไม่ว่าง
     return multiChargers
-      .map((chargerName) => typeof chargerName === 'string' ? chargerName : '')
+      .filter((chargerName) => typeof chargerName === 'string' && chargerName !== '')
       .map((chargerName) => {
         const cell = chargerToExcelCell[chargerName];
         if (!cell) return { name: chargerName, in: 0 };
@@ -543,10 +542,10 @@ export default function Home(): JSX.Element {
       const found = steps.find(s => inAll <= s.max);
       trRowNum = found?.row;
     }
-    if (!trRowNum) return [];
+    if (!trRowNum) return '';
 
     const trRow = excelData.find(r => r.__rowNum__ === trRowNum);
-    if (!trRow) return [];
+    if (!trRow) return '';
 
     // ดึงค่าทุกคอลัมน์มาต่อกัน (เว้นวรรค)
     const value = cols.map(col => trRow[col]).filter(Boolean).join(' ');
@@ -582,21 +581,23 @@ export default function Home(): JSX.Element {
 
     // หา row ของแต่ละ In of charger (แต่ละเครื่อง)
     if (chargerTypeMode === 'any') {
-      return multiChargers.map((chargerName, idx) => {
-        const cell = chargerToExcelCell[chargerName];
-        let rowNum: number | undefined;
-        if (form.powerAuthority === 'MEA' && cell?.mea) {
-          rowNum = parseInt(cell.mea.replace('C', ''));
-        }
-        if (form.powerAuthority === 'PEA' && cell?.pea) {
-          rowNum = parseInt(cell.pea.replace('C', ''));
-        }
-        if (!rowNum) return `Charger${idx + 1}: -`;
-        const row = excelData.find(r => r.__rowNum__ === rowNum);
-        if (!row) return `Charger${idx + 1}: -`;
-        const value = cols.map(col => row[col]).filter(Boolean).join(' ');
-        return `Charger${idx + 1}: ${value}`;
-      });
+      return multiChargers
+        .filter(name => name !== '')
+        .map((chargerName, idx) => {
+          const cell = chargerToExcelCell[chargerName];
+          let rowNum: number | undefined;
+          if (form.powerAuthority === 'MEA' && cell?.mea) {
+            rowNum = parseInt(cell.mea.replace('C', ''));
+          }
+          if (form.powerAuthority === 'PEA' && cell?.pea) {
+            rowNum = parseInt(cell.pea.replace('C', ''));
+          }
+          if (!rowNum) return `Charger${idx + 1}: -`;
+          const row = excelData.find(r => r.__rowNum__ === rowNum);
+          if (!row) return `Charger${idx + 1}: -`;
+          const value = cols.map(col => row[col]).filter(Boolean).join(' ');
+          return `Charger${idx + 1}: ${value}`;
+        });
     } else {
       // Same kW: ทุกเครื่องใช้ row เดียวกัน
       const cell = chargerToExcelCell[form.charger];
@@ -626,16 +627,18 @@ export default function Home(): JSX.Element {
         // คอลัมน์ AY-BD (index 50-55) = ['__EMPTY_50', '__EMPTY_51', '__EMPTY_52', '__EMPTY_53', '__EMPTY_54', '__EMPTY_55']
         const cols = ['__EMPTY_50', '__EMPTY_51', '__EMPTY_52', '__EMPTY_53', '__EMPTY_54', '__EMPTY_55'];
         if (chargerTypeMode === 'any') {
-          return multiChargers.map((chargerName, idx) => {
-            const cell = chargerToExcelCell[chargerName];
-            let rowNum: number | undefined;
-            if (cell?.mea) rowNum = parseInt(cell.mea.replace('C', ''));
-            if (!rowNum) return `Charger${idx + 1}: -`;
-            const row = excelData.find(r => r.__rowNum__ === rowNum);
-            if (!row) return `Charger${idx + 1}: -`;
-            const value = cols.map(col => row[col]).filter(Boolean).join(' ');
-            return `Charger${idx + 1}: ${value} นิ้ว`;
-          });
+          return multiChargers
+            .filter(name => name !== '')
+            .map((chargerName, idx) => {
+              const cell = chargerToExcelCell[chargerName];
+              let rowNum: number | undefined;
+              if (cell?.mea) rowNum = parseInt(cell.mea.replace('C', ''));
+              if (!rowNum) return `Charger${idx + 1}: -`;
+              const row = excelData.find(r => r.__rowNum__ === rowNum);
+              if (!row) return `Charger${idx + 1}: -`;
+              const value = cols.map(col => row[col]).filter(Boolean).join(' ');
+              return `Charger${idx + 1}: ${value} นิ้ว`;
+            });
         } else {
           const cell = chargerToExcelCell[form.charger];
           let rowNum: number | undefined;
@@ -654,16 +657,18 @@ export default function Home(): JSX.Element {
         // คอลัมน์ BW-CB (index 74-79) = ['__EMPTY_74', '__EMPTY_75', '__EMPTY_76', '__EMPTY_77', '__EMPTY_78', '__EMPTY_79']
         const cols = ['__EMPTY_74', '__EMPTY_75', '__EMPTY_76', '__EMPTY_77', '__EMPTY_78', '__EMPTY_79'];
         if (chargerTypeMode === 'any') {
-          return multiChargers.map((chargerName, idx) => {
-            const cell = chargerToExcelCell[chargerName];
-            let rowNum: number | undefined;
-            if (cell?.mea) rowNum = parseInt(cell.mea.replace('C', ''));
-            if (!rowNum) return `Charger${idx + 1}: -`;
-            const row = excelData.find(r => r.__rowNum__ === rowNum);
-            if (!row) return `Charger${idx + 1}: -`;
-            const value = cols.map(col => row[col]).filter(Boolean).join(' ');
-            return `Charger${idx + 1}: ${value} มม.`;
-          });
+          return multiChargers
+            .filter(name => name !== '')
+            .map((chargerName, idx) => {
+              const cell = chargerToExcelCell[chargerName];
+              let rowNum: number | undefined;
+              if (cell?.mea) rowNum = parseInt(cell.mea.replace('C', ''));
+              if (!rowNum) return `Charger${idx + 1}: -`;
+              const row = excelData.find(r => r.__rowNum__ === rowNum);
+              if (!row) return `Charger${idx + 1}: -`;
+              const value = cols.map(col => row[col]).filter(Boolean).join(' ');
+              return `Charger${idx + 1}: ${value} มม.`;
+            });
         } else {
           const cell = chargerToExcelCell[form.charger];
           let rowNum: number | undefined;
@@ -685,16 +690,18 @@ export default function Home(): JSX.Element {
         // คอลัมน์ AW-BB (index 48-53) = ['__EMPTY_48', '__EMPTY_49', '__EMPTY_50', '__EMPTY_51', '__EMPTY_52', '__EMPTY_53']
         const cols = ['__EMPTY_48', '__EMPTY_49', '__EMPTY_50', '__EMPTY_51', '__EMPTY_52', '__EMPTY_53'];
         if (chargerTypeMode === 'any') {
-          return multiChargers.map((chargerName, idx) => {
-            const cell = chargerToExcelCell[chargerName];
-            let rowNum: number | undefined;
-            if (cell?.pea) rowNum = parseInt(cell.pea.replace('C', ''));
-            if (!rowNum) return `Charger${idx + 1}: -`;
-            const row = excelData.find(r => r.__rowNum__ === rowNum);
-            if (!row) return `Charger${idx + 1}: -`;
-            const value = cols.map(col => row[col]).filter(Boolean).join(' ');
-            return `Charger${idx + 1}: ${value} นิ้ว`;
-          });
+          return multiChargers
+            .filter(name => name !== '')
+            .map((chargerName, idx) => {
+              const cell = chargerToExcelCell[chargerName];
+              let rowNum: number | undefined;
+              if (cell?.pea) rowNum = parseInt(cell.pea.replace('C', ''));
+              if (!rowNum) return `Charger${idx + 1}: -`;
+              const row = excelData.find(r => r.__rowNum__ === rowNum);
+              if (!row) return `Charger${idx + 1}: -`;
+              const value = cols.map(col => row[col]).filter(Boolean).join(' ');
+              return `Charger${idx + 1}: ${value} นิ้ว`;
+            });
         } else {
           const cell = chargerToExcelCell[form.charger];
           let rowNum: number | undefined;
@@ -713,16 +720,18 @@ export default function Home(): JSX.Element {
         // คอลัมน์ BU-BZ (index 72-77) = ['__EMPTY_72', '__EMPTY_73', '__EMPTY_74', '__EMPTY_75', '__EMPTY_76', '__EMPTY_77']
         const cols = ['__EMPTY_72', '__EMPTY_73', '__EMPTY_74', '__EMPTY_75', '__EMPTY_76', '__EMPTY_77'];
         if (chargerTypeMode === 'any') {
-          return multiChargers.map((chargerName, idx) => {
-            const cell = chargerToExcelCell[chargerName];
-            let rowNum: number | undefined;
-            if (cell?.pea) rowNum = parseInt(cell.pea.replace('C', ''));
-            if (!rowNum) return `Charger${idx + 1}: -`;
-            const row = excelData.find(r => r.__rowNum__ === rowNum);
-            if (!row) return `Charger${idx + 1}: -`;
-            const value = cols.map(col => row[col]).filter(Boolean).join(' ');
-            return `Charger${idx + 1}: ${value} มม.`;
-          });
+          return multiChargers
+            .filter(name => name !== '')
+            .map((chargerName, idx) => {
+              const cell = chargerToExcelCell[chargerName];
+              let rowNum: number | undefined;
+              if (cell?.pea) rowNum = parseInt(cell.pea.replace('C', ''));
+              if (!rowNum) return `Charger${idx + 1}: -`;
+              const row = excelData.find(r => r.__rowNum__ === rowNum);
+              if (!row) return `Charger${idx + 1}: -`;
+              const value = cols.map(col => row[col]).filter(Boolean).join(' ');
+              return `Charger${idx + 1}: ${value} มม.`;
+            });
         } else {
           const cell = chargerToExcelCell[form.charger];
           let rowNum: number | undefined;
@@ -1085,30 +1094,22 @@ export default function Home(): JSX.Element {
                     <span className="font-semibold text-gray-900 text-sm">
                       {chargerTypeMode === 'any'
                         ? multiChargers.filter(Boolean).length > 0
-                          ? multiChargers.reduce((acc, name) => {
-                              acc[name] = (acc[name] || 0) + 1;
-                              return acc;
-                            }, {} as Record<string, number>)
+                          ? Object.entries(
+                              multiChargers.filter(Boolean).reduce((acc, name) => {
+                                acc[name] = (acc[name] || 0) + 1;
+                                return acc;
+                              }, {} as Record<string, number>)
+                            ).map(([name, count], idx) => (
+                              <span key={name}>
+                                {idx > 0 && ', '}
+                                {name} x {count}
+                              </span>
+                            ))
                           : '-'
                         : form.charger
                           ? `${form.charger} x ${form.numberOfChargers || 1}`
                           : '-'
                       }
-                      {chargerTypeMode === 'any' && multiChargers.filter(Boolean).length > 0 && (
-                        <span>
-                          {Object.entries(
-                            multiChargers.reduce((acc, name) => {
-                              acc[name] = (acc[name] || 0) + 1;
-                              return acc;
-                            }, {} as Record<string, number>)
-                          ).map(([name, count], idx) => (
-                            <span key={name}>
-                              {idx > 0 && ', '}
-                              {name} x {count}
-                            </span>
-                          ))}
-                        </span>
-                      )}
                     </span>
                   </div>
                   {/* Charger Wiring Type */}
@@ -1151,7 +1152,7 @@ export default function Home(): JSX.Element {
             </Card>
 
             {/* --- New: Chargers Summary Card --- */}
-            <Card className="shadow-lg border-0">
+            {/* <Card className="shadow-lg border-0">
               <CardHeader className="bg-gradient-to-r from-blue-50 to-cyan-50 border-b">
                 <CardTitle className="flex items-center gap-2 text-blue-800">
                   Chargers
@@ -1160,7 +1161,7 @@ export default function Home(): JSX.Element {
               <CardContent className="p-6">
                 <div className="space-y-4">
                   {/* Charger */}
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  {/* <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <span className="font-medium text-gray-700">Charger:</span>
                     {chargerTypeMode === 'any' ? (
                       <div className="flex flex-col gap-1">
@@ -1175,29 +1176,39 @@ export default function Home(): JSX.Element {
                     )}
                   </div>
                   {/* Number of Chargers */}
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  {/* <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <span className="font-medium text-gray-700">Number of Chargers:</span>
                     <span className="font-semibold text-gray-900">
                       {form.numberOfChargers || '-'}
                     </span>
                   </div>
                   {/* In of Charger */}
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  {/* <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <span className="font-medium text-gray-700">In of Charger:</span>
                     <span className="font-semibold text-gray-900 text-base">
                       {chargerTypeMode === 'any'
-                        ? getMultiChargersIn().length === 1
-                          ? getMultiChargersIn()[0].in.toFixed(2)
-                          : '-'
+                        ? (
+                          getMultiChargersIn().length > 0
+                            ? (
+                              <span>
+                                {getMultiChargersIn().map((item, idx) => (
+                                  <span key={idx}>
+                                    {idx > 0 && ', '}
+                                    Charger{idx + 1}: {item.in.toFixed(2)} A
+                                  </span>
+                                ))}
+                              </span>
+                            )
+                            : '-'
+                        )
                         : results?.inOfCharger !== undefined
-                          ? results.inOfCharger.toFixed(2)
+                          ? results.inOfCharger.toFixed(2) + ' A'
                           : '-'
                       }
-                      <span className="text-base text-gray-900 ml-1">A</span>
                     </span>
                   </div>
                   {/* In of all Charger */}
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  {/* <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <span className="font-medium text-gray-700">In of all Charger:</span>
                     <span className="font-semibold text-gray-900 text-base">
                       {chargerTypeMode === 'any'
@@ -1211,10 +1222,10 @@ export default function Home(): JSX.Element {
                   </div>
                 </div>
               </CardContent>
-            </Card>
+            </Card> */}
           </div>
 
-          {/* Right side: 4 summary cards (top) + TR to MDB Summary Card */}
+          {/* Right side: 4 summary cards (top) + Chargers + TR to MDB Summary Card */}
           <div>
             {/* --- 4 Summary Cards (Top) --- */}
             {results && (
@@ -1293,7 +1304,7 @@ export default function Home(): JSX.Element {
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="h-5 w-5 rounded-full bg-yellow-400 inline-block" />
-                      <span className="text-sm fontmedium text-yellow-800">MDB (MCCB Main)</span>
+                      <span className="text-sm font-medium text-yellow-800">MDB (MCCB Main)</span>
                     </div>
                     <div className="text-2xl font-bold text-yellow-700">
                       {(() => {
@@ -1349,6 +1360,80 @@ export default function Home(): JSX.Element {
                 </Card>
               </div>
             )}
+            {/* --- Sammary Horizontal Summary (ใหม่) --- */}
+            <Card className="shadow-lg border-0 mb-6">
+              <CardHeader className="bg-gradient-to-r from-blue-100 to-cyan-100 border-b">
+                <CardTitle className="flex items-center gap-2 text-blue-800">
+                  Sammary
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="space-y-2">
+                  {/* Horizontal summary for each charger */}
+                  {chargerTypeMode === 'any' ? (
+                    getMultiChargersIn().length > 0 ? (
+                      getMultiChargersIn().map((item, idx) => {
+                        const cableArr = getChargerWiringCable();
+                        const cable = Array.isArray(cableArr) ? cableArr[idx] || '-' : (typeof cableArr === 'string' ? cableArr : '-');
+                        const conduitArr = getChargerWireConduit();
+                        const conduit = Array.isArray(conduitArr) ? conduitArr[idx] || '-' : (typeof conduitArr === 'string' ? conduitArr : '-');
+                        return (
+                          <div key={idx} className="flex flex-wrap gap-4 items-center text-base">
+                            <span className="font-semibold text-gray-900">
+                              Charger{idx + 1}: {multiChargers[idx] || '-'}
+                            </span>
+                            <span className="text-gray-700">
+                              In: {item.in.toFixed(2)} A
+                            </span>
+                            <span className="text-gray-700">
+                              Cable: {cable.replace(/^Charger\d+:\s*/, '')}
+                            </span>
+                            <span className="text-gray-700">
+                              Conduit: {conduit.replace(/^Charger\d+:\s*/, '')}
+                            </span>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="text-gray-400">-</div>
+                    )
+                  ) : (
+                    (() => {
+                      const num = parseInt(form.numberOfChargers) || 1;
+                      const cableArr = getChargerWiringCable();
+                      const conduitArr = getChargerWireConduit();
+                      return Array.from({ length: num }).map((_, idx) => (
+                        <div key={idx} className="flex flex-wrap gap-4 items-center text-base">
+                          <span className="font-semibold text-gray-900">
+                            Charger{idx + 1}: {form.charger}
+                          </span>
+                          <span className="text-gray-700">
+                            In: {results?.inOfCharger !== undefined ? results.inOfCharger.toFixed(2) : '-'} A
+                          </span>
+                          <span className="text-gray-700">
+                            Cable: {Array.isArray(cableArr) ? (cableArr[idx] ? cableArr[idx].replace(/^Charger\d+:\s*/, '') : '-') : (typeof cableArr === 'string' ? cableArr : '-')} 
+                          </span>
+                          <span className="text-gray-700">
+                            Conduit: {Array.isArray(conduitArr) ? (conduitArr[idx] ? conduitArr[idx].replace(/^Charger\d+:\s*/, '') : '-') : (typeof conduitArr === 'string' ? conduitArr : '-')} 
+                          </span>
+                        </div>
+                      ));
+                    })()
+                  )}
+                  {/* In of all Charger summary */}
+                  <div className="mt-4 font-semibold text-blue-900 text-base">
+                    In of all Charger:{" "}
+                    {chargerTypeMode === 'any'
+                      ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0).toFixed(2)
+                      : results?.inAllCharger !== undefined
+                        ? results.inAllCharger.toFixed(2)
+                        : '-'
+                    }
+                    <span className="ml-1">A</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
             {/* --- TR to MDB Summary Card --- */}
             {results ? (
               <div className="space-y-6">
@@ -1398,6 +1483,79 @@ export default function Home(): JSX.Element {
                           <span className="font-semibold text-gray-900 text-sm">{getTRWireConduit()}</span>
                         </div>
                       )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* --- Chargers Summary Card (ย้ายมาไว้ใต้ TR to MDB) --- */}
+                <Card className="shadow-lg border-0">
+                  <CardHeader className="bg-gradient-to-r from-blue-50 to-cyan-50 border-b">
+                    <CardTitle className="flex items-center gap-2 text-blue-800">
+                      Chargers
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-6">
+                    <div className="space-y-4">
+                      {/* Charger */}
+                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <span className="font-medium text-gray-700">Charger:</span>
+                        {chargerTypeMode === 'any' ? (
+                          <div className="flex flex-col gap-1">
+                            {multiChargers.map((name, idx) => (
+                              <span key={idx} className="ml-6 font-semibold text-gray-900">
+                                Charger{idx + 1}: {name}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="font-semibold text-gray-900">{form.charger}</span>
+                        )}
+                      </div>
+                      {/* Number of Chargers */}
+                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <span className="font-medium text-gray-700">Number of Chargers:</span>
+                        <span className="font-semibold text-gray-900">
+                          {form.numberOfChargers || '-'}
+                        </span>
+                      </div>
+                      {/* In of Charger */}
+                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <span className="font-medium text-gray-700">In of Charger:</span>
+                        <span className="font-semibold text-gray-900 text-base">
+                          {chargerTypeMode === 'any'
+                            ? (
+                              getMultiChargersIn().length > 0
+                                ? (
+                                  <span>
+                                    {getMultiChargersIn().map((item, idx) => (
+                                      <span key={idx}>
+                                        {idx > 0 && ', '}
+                                        Charger{idx + 1}: {item.in.toFixed(2)} A
+                                      </span>
+                                    ))}
+                                  </span>
+                                )
+                                : '-'
+                            )
+                            : results?.inOfCharger !== undefined
+                              ? results.inOfCharger.toFixed(2) + ' A'
+                              : '-'
+                          }
+                        </span>
+                      </div>
+                      {/* In of all Charger */}
+                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <span className="font-medium text-gray-700">In of all Charger:</span>
+                        <span className="font-semibold text-gray-900 text-base">
+                          {chargerTypeMode === 'any'
+                            ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0).toFixed(2)
+                            : results?.inAllCharger !== undefined
+                              ? results.inAllCharger.toFixed(2)
+                              : '-'
+                          }
+                          <span className="text-base text-gray-900 ml-1">A</span>
+                        </span>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
