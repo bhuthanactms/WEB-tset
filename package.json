@@ -4,7 +4,9 @@
   "scripts": {
     "start": "npm run dev",
     "dev": "node scripts/build.mjs",
-    "build": "node scripts/build.mjs --production"
+    "build": "node scripts/build.mjs --production",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist"
   },
   "dependencies": {
     "@azure/msal-browser": "^4.22.1",
@@ -46,6 +48,7 @@
     "cmdk": "^1.1.1",
     "date-fns": "^3.6.0",
     "embla-carousel-react": "^8.6.0",
+    "gh-pages": "^6.3.0",
     "googleapis": "^159.0.0",
     "html2canvas": "latest",
     "i18next": "^25.1.2",
