@@ -1128,7 +1128,7 @@ export default function Home(): JSX.Element {
                   {/* Charger Wiring Cable */}
                   {(form.chargerWiringType && form.powerAuthority) && (
                     <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <span className="font-medium text-gray-700">Charger Wiring Cable:</span>
+                      <span className="font-medium text-gray-700">Charger Wiring Cable (CV/THW):</span>
                       <div className="flex flex-col items-end">
                         {getChargerWiringCable() && Array.isArray(getChargerWiringCable())
                           ? getChargerWiringCable().map((val: string, idx: number) => (
@@ -1322,7 +1322,7 @@ export default function Home(): JSX.Element {
                               In: {item.in.toFixed(2)} A
                             </span>
                             <span className="text-gray-700">
-                              Cable: {cable.replace(/^Charger\d+:\s*/, '')}
+                              Cable (CV/THW): {cable.replace(/^Charger\d+:\s*/, '')}
                             </span>
                             <span className="text-gray-700">
                               Conduit: {conduit.replace(/^Charger\d+:\s*/, '')}
@@ -1347,7 +1347,7 @@ export default function Home(): JSX.Element {
                             In: {results?.inOfCharger !== undefined ? results.inOfCharger.toFixed(2) : '-'} A
                           </span>
                           <span className="text-gray-700">
-                            Cable: {Array.isArray(cableArr) ? (cableArr[idx] ? cableArr[idx].replace(/^Charger\d+:\s*/, '') : '-') : (typeof cableArr === 'string' ? cableArr : '-')}
+                            Cable (CV/THW): {Array.isArray(cableArr) ? (cableArr[idx] ? cableArr[idx].replace(/^Charger\d+:\s*/, '') : '-') : (typeof cableArr === 'string' ? cableArr : '-')}
                           </span>
                           <span className="text-gray-700">
                             Conduit: {Array.isArray(conduitArr) ? (conduitArr[idx] ? conduitArr[idx].replace(/^Charger\d+:\s*/, '') : '-') : (typeof conduitArr === 'string' ? conduitArr : '-')}
@@ -1409,7 +1409,7 @@ export default function Home(): JSX.Element {
                       {/* TR Wiring Size (CV) */}
                       {(form.trWiringType && form.powerAuthority && getTRWiringSizeCVs().length > 0) && (
                         <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                          <span className="font-medium text-gray-700">TR Wiring Size (CV):</span>
+                          <span className="font-medium text-gray-700">TR Wiring Size (CV/THW):</span>
                           <span className="font-semibold text-gray-900 text-sm">
                             {getTRWiringSizeCVs()[0]}
                           </span>
