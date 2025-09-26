@@ -15,11 +15,11 @@ const DEMO_USERS: Array<{ username: string; password: string }> = [
   { username: 'demo', password: 'demo123' },
   { username: 'guest', password: 'guest123' },
   // เพิ่ม sale users ให้ล็อกอินได้จริง
-  { username: 'sale01', password: 'Eicsale01' },
-  { username: 'sale02', password: 'Ctmssale01' },
-  { username: 'sale03', password: 'Saleei01' },
-  { username: 'sale04', password: 'Eicsale02' },
-  { username: 'sale05', password: 'Ctmssale02' }
+  { username: 'Sale_game', password: 'game1234' },
+  { username: 'Sale_Ton', password: 'Ton2345' },
+  { username: 'Sale_Tak', password: 'Tak3456' },
+  { username: 'sale.sp', password: 'Sale001' },
+  { username: 'Technic_A', password: 'tech4567' }
 ]
 
 // Storage key used to persist the authenticated user
@@ -76,10 +76,10 @@ export function getDemoUsers(): Array<{ username: string; password: string }> {
 /** Returns 5 static sale users with different passwords */
 export function getSaleUsers() {
   return [
-    { username: 'sale01', password: 'Eicsale01' },
-    { username: 'sale02', password: 'Ctmssale01' },
-    { username: 'sale03', password: 'Saleei01' },
-    { username: 'sale04', password: 'Eicsale02' },
-    { username: 'sale05', password: 'Ctmssale02' },
+    { username: 'Sale_game', password: 'game1234' },
+    { username: 'Sale_Ton', password: 'Ton2345' },
+    { username: 'Sale_Tak', password: 'Tak3456' },
+    { username: 'sale.sp', password: 'Sale001' },
+    { username: 'Technic_A', password: 'tech4567' },
   ]
 }
