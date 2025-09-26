@@ -1031,7 +1031,7 @@ export default function Home(): JSX.Element {
                       หลังคาคลุมเฉพาะ Charger
                     </Label>
                     <div className="flex gap-6">
-                                 git checkout -b feature/ev-calc                                git checkout -b feature/ev-calc                                git checkout -b feature/ev-calc                                git checkout -b feature/ev-calc                                git checkout -b feature/ev-calc           <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2">
                         <Checkbox
                           id="roof-composit"
                           name="roof-charger"
@@ -1499,7 +1499,7 @@ export default function Home(): JSX.Element {
                       {/* Charger Wiring Cable */}
                       {(form.chargerWiringType && form.powerAuthority) && (
                         <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                                   <span className="font-medium text-gray-700">Charger Wiring Cable (CV/THW):</span>
+                          <span className="font-medium text-gray-700">Charger Wiring Cable (CV/THW):</span>
                           <div className="flex flex-col items-end">
                             {getChargerWiringCable() && Array.isArray(getChargerWiringCable())
                               ? getChargerWiringCable().map((val: string, idx: number) => (
