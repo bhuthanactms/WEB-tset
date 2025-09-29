@@ -14,6 +14,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Calculator, Zap, Battery, Settings, Cable } from 'lucide-react'
 import axios from 'axios'
 import * as XLSX from 'xlsx'
+import { useNavigate } from 'react-router-dom'
 
 /** Form state interface */
 interface CalculatorForm {
@@ -50,6 +51,7 @@ export default function Home(): JSX.Element {
 
   const [results, setResults] = useState<CalculatorResults | null>(null)
   const [excelData, setExcelData] = useState<any[]>([]);
+  const navigate = useNavigate();
 
   /** Handle form input changes */
   const handleInputChange = (field: keyof CalculatorForm, value: string) => {
@@ -240,7 +242,7 @@ export default function Home(): JSX.Element {
 
   const fetchExcelData = async () => {
     // Convert Google Sheets sharing URL to direct download URL
-    const googleSheetsUrl = 'https://docs.google.com/spreadsheets/d/1l1BLnJs2mgV19cO9u_Az-OjU3dLYj4YA/edit?usp=sharing&ouid=100443117052270919276&rtpof=true&sd=true';
+    const googleSheetsUrl = 'https://docs.google.com/spreadsheets/d/1U_tFRt3pdQ0IzOr88l81RmJPxDQwFmoC/edit?usp=sharing&ouid=111737986991833013743&rtpof=true&sd=true';
     const fileId = googleSheetsUrl.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1];
     const excelFileUrl = `https://docs.google.com/spreadsheets/d/${fileId}/export?format=xlsx&usp=sharing`;
     try {
@@ -748,8 +750,23 @@ export default function Home(): JSX.Element {
     return null;
   };
 
+  // เพิ่มฟังก์ชันสำหรับเปลี่ยน label
+  function getTrWireLabel(trWiringType: string) {
+    if (trWiringType === 'ราง TRAY ไม่มีฝา') return 'TR Wire tray :';
+    if (trWiringType === 'ราง LADDER ไม่มีฝา') return 'TR Wire ladder :';
+    return 'TR Wire conduit :';
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 relative">
+      {/* Next Button (top-right corner) */}
+      <button
+        onClick={() => navigate('/station-accessory')}
+        className="absolute top-8 right-8 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded shadow-lg z-10"
+      >
+        Next
+      </button>
+
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-8">
@@ -962,113 +979,6 @@ export default function Home(): JSX.Element {
               </CardContent>
             </Card>
 
-            {/* --- Station Accessory Card --- */}
-            <Card className="shadow-xl border-0 overflow-hidden mb-6">
-              <CardHeader className="bg-gradient-to-r from-emerald-600 to-cyan-600 text-white">
-                <CardTitle className="flex items-center gap-2 text-xl">
-                  <Settings className="h-5 w-5" />
-                  Station Accessory
-                </CardTitle>
-                <CardDescription className="text-emerald-100">
-                  รายการอุปกรณ์เสริมสถานี (ยังไม่เชื่อมต่อระบบ)
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-6">
-                <div className="space-y-6">
-                  {/* 1. ทาสีพื้น */}
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-700">
-                      ทาสีพื้น
-                    </Label>
-                    <Select>
-                      <SelectTrigger className="h-12 border-gray-200 focus:border-emerald-500 focus:ring-emerald-500">
-                        <SelectValue placeholder="เลือกประเภทการทาสีพื้น" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="border">ทาเส้นขอบ</SelectItem>
-                        <SelectItem value="border-symbol">ทาเส้นขอบพร้อมสัญลักษณ์</SelectItem>
-                        <SelectItem value="border-symbol-fill">ทาเส้นขอบพร้อมสัญลักษณ์และพื้น</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {/* 2. หลังคาคลุมช่องจอด */}
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-700">
-                      หลังคาคลุมช่องจอด (กว้าง x ยาว เมตร)
-                    </Label>
-                    <div className="flex gap-2">
-                      <input
-                        type="number"
-                        className="w-20 border rounded px-2 py-1"
-                        placeholder="กว้าง"
-                        min={0}
-                      />
-                      <span className="self-center">x</span>
-                      <input
-                        type="number"
-                        className="w-20 border rounded px-2 py-1"
-                        placeholder="ยาว"
-                        min={0}
-                      />
-                      <span className="self-center">เมตร</span>
-                    </div>
-                  </div>
-                  {/* 3. หลังคาคลุมเฉพาะ MDB */}
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-700">
-                      หลังคาคลุมเฉพาะ MDB (ตรม.)
-                    </Label>
-                    <input
-                      type="number"
-                      className="w-32 border rounded px-2 py-1"
-                      placeholder="พื้นที่ ตรม."
-                      min={0}
-                    />
-                  </div>
-                  {/* 4. หลังคาคลุมเฉพาะ Charger (เลือกอย่างใดอย่างหนึ่ง แต่ให้ติ๊กเลือก) */}
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-700">
-                      หลังคาคลุมเฉพาะ Charger
-                    </Label>
-                    <div className="flex gap-6">
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="roof-composit"
-                          name="roof-charger"
-                          // checked={roofType === 'composit'}
-                          // onCheckedChange={() => setRoofType('composit')}
-                        />
-                        <Label htmlFor="roof-composit" className="cursor-pointer">แบบ composit</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="roof-normal"
-                          name="roof-charger"
-                          // checked={roofType === 'normal'}
-                          // onCheckedChange={() => setRoofType('normal')}
-                        />
-                        <Label htmlFor="roof-normal" className="cursor-pointer">แบบธรรมดา</Label>
-                      </div>
-                    </div>
-                    <div className="text-xs text-gray-400 mt-1">
-                      * เลือกได้อย่างใดอย่างหนึ่ง (ควรเลือกแค่ 1 อัน)
-                    </div>
-                  </div>
-                  {/* 5. ค่าเดินทาง */}
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-700">
-                      ค่าเดินทาง (กิโลเมตร)
-                    </Label>
-                    <input
-                      type="number"
-                      className="w-32 border rounded px-2 py-1"
-                      placeholder="ระยะทาง"
-                      min={0}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
           </div>
 
           {/* Right side: 4 summary cards (top) + Chargers + TR to MDB Summary Card */}
@@ -1328,7 +1238,7 @@ export default function Home(): JSX.Element {
                       {/* TR Wire conduit */}
                       {(form.trWiringType && form.powerAuthority && getTRWireConduit()) && (
                         <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                          <span className="font-medium text-gray-700">TR Wire conduit :</span>
+                          <span className="font-medium text-gray-700">{getTrWireLabel(form.trWiringType)}</span>
                           <span className="font-semibold text-gray-900 text-sm">{getTRWireConduit()}</span>
                         </div>
                       )}
@@ -1621,4 +1531,50 @@ export default function Home(): JSX.Element {
       </div>
     </div>
   )
+}
+
+/**
+ * Component to fetch and display Excel data from OneDrive
+ */
+function ExcelFromOneDrive() {
+  const [sheetsData, setSheetsData] = useState<{ name: string; data: any[][] }[]>([]);
+
+  useEffect(() => {
+    const fileUrl = "https://1drv.ms/x/c/8811C791092F5560/EQZSFFUZXuJLt8bhY7mFrggBGj1UMbTIlCMFTSvLpAbKcA";
+
+    fetch(fileUrl, { mode: 'cors' })
+      .then(res => res.blob())
+      .then(blob => blob.arrayBuffer())
+      .then(buffer => {
+        const workbook = XLSX.read(buffer, { type: "array" });
+        const allSheets = workbook.SheetNames.map(sheetName => ({
+          name: sheetName,
+          data: XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 }) as any[][]
+        }));
+        setSheetsData(allSheets);
+      })
+      .catch(err => {
+        console.error("ไม่สามารถโหลดไฟล์ Excel จาก OneDrive ได้:", err);
+      });
+  }, []);
+
+  return (
+    <div>
+      <h2>Excel Data from OneDrive (ทุกแผ่น)</h2>
+      {sheetsData.map(sheet => (
+        <div key={sheet.name} style={{ marginBottom: 32 }}>
+          <h3>Sheet: {sheet.name}</h3>
+          <table border={1}>
+            <tbody>
+              {sheet.data.map((row, i) => (
+                <tr key={i}>
+                  {row.map((cell, j) => <td key={j}>{cell}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
+    </div>
+  );
 }
