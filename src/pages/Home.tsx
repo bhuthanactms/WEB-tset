@@ -761,7 +761,73 @@ export default function Home(): JSX.Element {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 relative">
       {/* Next Button (top-right corner) */}
       <button
-        onClick={() => navigate('/station-accessory')}
+        onClick={() => {
+          // ส่งข้อมูลที่ต้องการไปหน้า StationAccessory
+          navigate('/station-accessory', {
+            state: {
+              powerAuthority: form.powerAuthority,
+              numberOfChargers: form.numberOfChargers,
+              transformer: getTRSizeFromExcel(
+                chargerTypeMode === 'any'
+                  ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
+                  : results?.inAllCharger || 0
+              ),
+              trWiringType: form.trWiringType,
+              trWiringSize: getTRWiringSizeCVs()[0] || '',
+              trWireConduit: getTRWireConduit() || '',
+              mdb: (() => {
+                let trRowNum: number | undefined = undefined;
+                if (form.powerAuthority === 'MEA') {
+                  const steps = [
+                    { max: 444.1, row: 33 },
+                    { max: 555.1, row: 34 },
+                    { max: 699.4, row: 35 },
+                    { max: 888.2, row: 36 },
+                    { max: 1110.3, row: 37 },
+                    { max: 1387.8, row: 38 },
+                    { max: 1665.4, row: 39 },
+                    { max: 2220.6, row: 40 },
+                    { max: 2775.7, row: 41 },
+                  ];
+                  const inAll = chargerTypeMode === 'any'
+                    ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
+                    : results?.inAllCharger || 0;
+                  const found = steps.find(s => inAll <= s.max);
+                  trRowNum = found?.row;
+                } else if (form.powerAuthority === 'PEA') {
+                  const steps = [
+                    { max: 115.4, row: 76 },
+                    { max: 184.7, row: 77 },
+                    { max: 288.6, row: 78 },
+                    { max: 363.7, row: 79 },
+                    { max: 461.8, row: 80 },
+                    { max: 577.3, row: 81 },
+                    { max: 727.4, row: 82 },
+                    { max: 923.7, row: 83 },
+                    { max: 1154.7, row: 84 },
+                    { max: 1443.4, row: 85 },
+                    { max: 1732.1, row: 86 },
+                    { max: 2305.4, row: 87 },
+                    { max: 2886.8, row: 88 },
+                  ];
+                  const inAll = chargerTypeMode === 'any'
+                    ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
+                    : results?.inAllCharger || 0;
+                  const found = steps.find(s => inAll <= s.max);
+                  trRowNum = found?.row;
+                }
+                const trRow = excelData.find(r => r.__rowNum__ === trRowNum);
+                const mccbMain = trRow ? trRow.__EMPTY_11 : '-';
+                return mccbMain ? `${mccbMain} A` : '-';
+              })(),
+              chargerWiringType: form.chargerWiringType,
+              chargerWiringCable: Array.isArray(getChargerWiringCable()) ? getChargerWiringCable()[0] : getChargerWiringCable(),
+              chargerWireConduit: Array.isArray(getChargerWireConduit()) ? (getChargerWireConduit()[0] ?? '') : (getChargerWireConduit() ?? ''),
+              chargerDistance: 0, // เพิ่มช่องกรอกในหน้า StationAccessory
+              trDistance: 0, // เพิ่มช่องกรอกในหน้า StationAccessory
+            }
+          });
+        }}
         className="absolute top-8 right-8 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded shadow-lg z-10"
       >
         Next

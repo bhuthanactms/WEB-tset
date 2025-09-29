@@ -4,6 +4,7 @@ import LoginPage from './pages/Login'
 import AppHeader from './components/layout/AppHeader'
 import { isAuthenticated } from '@/utils/auth'
 import React, { useEffect, useState } from 'react'
+import StationAccessory from './pages/StationAccessory'
 
 /**
  * RequireAuth - guards child content. If not authenticated, redirects to /login.
@@ -46,6 +47,15 @@ export default function App() {
           }
         />
         <Route path="/login" element={<LoginPage />} />
+        {/* เพิ่ม Route สำหรับ StationAccessory */}
+        <Route
+          path="/station-accessory"
+          element={
+            <RequireAuth>
+              <StationAccessory />
+            </RequireAuth>
+          }
+        />
       </Routes>
     </HashRouter>
   )
