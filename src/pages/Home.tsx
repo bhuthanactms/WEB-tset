@@ -36,7 +36,7 @@ interface CalculatorResults {
 /**
  * Home component - Main EV Station Calculator interface
  */
-export default function Home(): JSX.Element {
+export default function Home(): React.JSX.Element {
   // เพิ่ม state สำหรับประเภทการเลือก Charger Type
   const [chargerTypeMode, setChargerTypeMode] = useState<'same' | 'any'>('same');
   const [multiChargers, setMultiChargers] = useState<string[]>([]);
@@ -164,26 +164,37 @@ export default function Home(): JSX.Element {
 
   /** Calculate EV station requirements */
   const calculateResults = () => {
+    console.log('=== Calculate Results Debug ===');
+    console.log('Form data:', form);
+    console.log('Charger type mode:', chargerTypeMode);
+    console.log('Multi chargers:', multiChargers);
+
     let inOfCharger = 0;
     let inAllCharger = 0;
     let totalPower = 0;
 
     if (chargerTypeMode === 'any') {
       // กรณี Any type kW
+      console.log('=== Any type kW calculation ===');
       const multi = getMultiChargersIn();
+      console.log('Multi chargers In:', multi);
       inAllCharger = multi.reduce((sum, item) => sum + item.in, 0);
       inOfCharger = multi.length === 1 ? multi[0].in : 0;
       totalPower = multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
         return sum + extractPowerValue(chargerName);
       }, 0);
+      console.log('Any type - inOfCharger:', inOfCharger, 'inAllCharger:', inAllCharger, 'totalPower:', totalPower);
     } else {
       // กรณี Same kW
+      console.log('=== Same kW calculation ===');
       const powerPerStation = extractPowerValue(form.charger)
       const numberOfChargers = parseInt(form.numberOfChargers) || 1
+      console.log('Power per station:', powerPerStation, 'Number of chargers:', numberOfChargers);
 
       // ใช้ค่าจาก Excel เท่านั้น
       const inOfChargerExcel = getInFromExcel('inOfCharger');
       const inAllChargerExcel = getInFromExcel('inAllCharger');
+      console.log('Excel values - inOfCharger:', inOfChargerExcel, 'inAllCharger:', inAllChargerExcel);
 
       inOfCharger = typeof inOfChargerExcel === 'number'
         ? inOfChargerExcel
@@ -194,6 +205,7 @@ export default function Home(): JSX.Element {
         : 0;
 
       totalPower = numberOfChargers * powerPerStation;
+      console.log('Same type - inOfCharger:', inOfCharger, 'inAllCharger:', inAllCharger, 'totalPower:', totalPower);
     }
 
     setResults({
@@ -242,7 +254,7 @@ export default function Home(): JSX.Element {
 
   const fetchExcelData = async () => {
     // Convert Google Sheets sharing URL to direct download URL
-    const googleSheetsUrl = 'https://docs.google.com/spreadsheets/d/1U_tFRt3pdQ0IzOr88l81RmJPxDQwFmoC/edit?usp=sharing&ouid=111737986991833013743&rtpof=true&sd=true';
+    const googleSheetsUrl = 'https://docs.google.com/spreadsheets/d/1l1BLnJs2mgV19cO9u_Az-OjU3dLYj4YA/edit?usp=sharing&ouid=111737986991833013743&rtpof=true&sd=true';
     const fileId = googleSheetsUrl.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1];
     const excelFileUrl = `https://docs.google.com/spreadsheets/d/${fileId}/export?format=xlsx&usp=sharing`;
     try {
@@ -265,6 +277,25 @@ export default function Home(): JSX.Element {
     // log ดูโครงสร้าง excelData
     if (excelData.length > 0) {
       console.log('excelData sample:', excelData.slice(0, 5));
+      console.log('excelData columns for row 6 (30kW MEA):', excelData.find(r => r.__rowNum__ === 6));
+      console.log('excelData columns for row 54 (30kW PEA):', excelData.find(r => r.__rowNum__ === 54));
+
+      // Debug: ดูข้อมูล Transformer rows
+      console.log('MEA Transformer rows (33-41):');
+      for (let i = 33; i <= 41; i++) {
+        const row = excelData.find(r => r.__rowNum__ === i);
+        if (row) {
+          console.log(`Row ${i}:`, row);
+        }
+      }
+
+      console.log('PEA Transformer rows (76-88):');
+      for (let i = 76; i <= 88; i++) {
+        const row = excelData.find(r => r.__rowNum__ === i);
+        if (row) {
+          console.log(`Row ${i}:`, row);
+        }
+      }
     }
   }, [excelData]);
 
@@ -399,8 +430,19 @@ export default function Home(): JSX.Element {
     const cols = wiringTypeToCols[form.trWiringType];
     if (!cols) return '';
 
+    // Debug: ดูข้อมูลที่ดึงมา
+    console.log(`TR Wiring Size Debug - Row ${trRowNum}:`, trRow);
+    console.log(`TR Wiring Type: ${form.trWiringType}`);
+    console.log(`Columns to check:`, cols);
+
     // ดึงค่าทุกคอลัมน์มาต่อกัน (เว้นวรรค)
-    const values = cols.map(col => trRow[col]).filter(Boolean).join(' ');
+    const values = cols.map(col => {
+      const val = trRow[col];
+      console.log(`Column ${col}: ${val}`);
+      return val;
+    }).filter(Boolean).join(' ');
+
+    console.log(`Final TR Wiring Size: "${values}"`);
     return values;
   };
 
@@ -547,8 +589,19 @@ export default function Home(): JSX.Element {
     const trRow = excelData.find(r => r.__rowNum__ === trRowNum);
     if (!trRow) return '';
 
+    // Debug: ดูข้อมูลที่ดึงมา
+    console.log(`TR Wiring Size CVs Debug - Row ${trRowNum}:`, trRow);
+    console.log(`TR Wiring Type: ${form.trWiringType}`);
+    console.log(`Columns to check:`, cols);
+
     // ดึงค่าทุกคอลัมน์มาต่อกัน (เว้นวรรค)
-    const value = cols.map(col => trRow[col]).filter(Boolean).join(' ');
+    const value = cols.map(col => {
+      const val = trRow[col];
+      console.log(`Column ${col}: ${val}`);
+      return val;
+    }).filter(Boolean).join(' ');
+
+    console.log(`Final TR Wiring Size CVs: "${value}"`);
 
     // คืน array ตามจำนวนเครื่อง
     const numChargers = parseInt(form.numberOfChargers) || 1;
@@ -775,6 +828,7 @@ export default function Home(): JSX.Element {
               trWiringType: form.trWiringType,
               trWiringSize: getTRWiringSizeCVs()[0] || '',
               trWireConduit: getTRWireConduit() || '',
+              // Legacy MDB summary for backward compatibility
               mdb: (() => {
                 let trRowNum: number | undefined = undefined;
                 if (form.powerAuthority === 'MEA') {
@@ -820,9 +874,149 @@ export default function Home(): JSX.Element {
                 const mccbMain = trRow ? trRow.__EMPTY_11 : '-';
                 return mccbMain ? `${mccbMain} A` : '-';
               })(),
+              // New detailed MDB fields
+              mdbMainAt: (() => {
+                let trRowNum: number | undefined = undefined;
+                if (form.powerAuthority === 'MEA') {
+                  const steps = [
+                    { max: 444.1, row: 33 },
+                    { max: 555.1, row: 34 },
+                    { max: 699.4, row: 35 },
+                    { max: 888.2, row: 36 },
+                    { max: 1110.3, row: 37 },
+                    { max: 1387.8, row: 38 },
+                    { max: 1665.4, row: 39 },
+                    { max: 2220.6, row: 40 },
+                    { max: 2775.7, row: 41 },
+                  ];
+                  const inAll = chargerTypeMode === 'any'
+                    ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
+                    : results?.inAllCharger || 0;
+                  const found = steps.find(s => inAll <= s.max);
+                  trRowNum = found?.row;
+                } else if (form.powerAuthority === 'PEA') {
+                  const steps = [
+                    { max: 115.4, row: 76 },
+                    { max: 184.7, row: 77 },
+                    { max: 288.6, row: 78 },
+                    { max: 363.7, row: 79 },
+                    { max: 461.8, row: 80 },
+                    { max: 577.3, row: 81 },
+                    { max: 727.4, row: 82 },
+                    { max: 923.7, row: 83 },
+                    { max: 1154.7, row: 84 },
+                    { max: 1443.4, row: 85 },
+                    { max: 1732.1, row: 86 },
+                    { max: 2305.4, row: 87 },
+                    { max: 2886.8, row: 88 },
+                  ];
+                  const inAll = chargerTypeMode === 'any'
+                    ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
+                    : results?.inAllCharger || 0;
+                  const found = steps.find(s => inAll <= s.max);
+                  trRowNum = found?.row;
+                }
+                const trRow = excelData.find(r => r.__rowNum__ === trRowNum);
+                const mccbMain = trRow ? trRow.__EMPTY_11 : '';
+                return mccbMain ? `${mccbMain} A` : '';
+              })(),
+              mdbMainAf: (() => {
+                let trRowNum: number | undefined = undefined;
+                if (form.powerAuthority === 'MEA') {
+                  const steps = [
+                    { max: 444.1, row: 33 },
+                    { max: 555.1, row: 34 },
+                    { max: 699.4, row: 35 },
+                    { max: 888.2, row: 36 },
+                    { max: 1110.3, row: 37 },
+                    { max: 1387.8, row: 38 },
+                    { max: 1665.4, row: 39 },
+                    { max: 2220.6, row: 40 },
+                    { max: 2775.7, row: 41 },
+                  ];
+                  const inAll = chargerTypeMode === 'any'
+                    ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
+                    : results?.inAllCharger || 0;
+                  const found = steps.find(s => inAll <= s.max);
+                  trRowNum = found?.row;
+                } else if (form.powerAuthority === 'PEA') {
+                  const steps = [
+                    { max: 115.4, row: 76 },
+                    { max: 184.7, row: 77 },
+                    { max: 288.6, row: 78 },
+                    { max: 363.7, row: 79 },
+                    { max: 461.8, row: 80 },
+                    { max: 577.3, row: 81 },
+                    { max: 727.4, row: 82 },
+                    { max: 923.7, row: 83 },
+                    { max: 1154.7, row: 84 },
+                    { max: 1443.4, row: 85 },
+                    { max: 1732.1, row: 86 },
+                    { max: 2305.4, row: 87 },
+                    { max: 2886.8, row: 88 },
+                  ];
+                  const inAll = chargerTypeMode === 'any'
+                    ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
+                    : results?.inAllCharger || 0;
+                  const found = steps.find(s => inAll <= s.max);
+                  trRowNum = found?.row;
+                }
+                const trRow = excelData.find(r => r.__rowNum__ === trRowNum);
+                const main2 = trRow ? trRow.__EMPTY_14 : '';
+                return main2 ? `${main2} A` : '';
+              })(),
+              mdbSubs: (() => {
+                if (chargerTypeMode === 'any') {
+                  return multiChargers.map((chargerName) => {
+                    const cell = chargerToExcelCell[chargerName];
+                    let rowNum: number | undefined;
+                    if (form.powerAuthority === 'MEA' && cell?.mea) {
+                      rowNum = parseInt(cell.mea.replace('C', ''));
+                    }
+                    if (form.powerAuthority === 'PEA' && cell?.pea) {
+                      rowNum = parseInt(cell.pea.replace('C', ''));
+                    }
+                    const row = excelData.find(r => r.__rowNum__ === rowNum);
+                    const val = form.powerAuthority === 'MEA'
+                      ? (row ? row.__EMPTY_29 || '-' : '-')
+                      : (row ? row.__EMPTY_27 || '-' : '-');
+                    return `${val} A`;
+                  });
+                } else {
+                  const cell = chargerToExcelCell[form.charger];
+                  let rowNum: number | undefined;
+                  if (form.powerAuthority === 'MEA' && cell?.mea) {
+                    rowNum = parseInt(cell.mea.replace('C', ''));
+                  }
+                  if (form.powerAuthority === 'PEA' && cell?.pea) {
+                    rowNum = parseInt(cell.pea.replace('C', ''));
+                  }
+                  const row = excelData.find(r => r.__rowNum__ === rowNum);
+                  const value = form.powerAuthority === 'MEA'
+                    ? (row ? row.__EMPTY_29 || '-' : '-')
+                    : (row ? row.__EMPTY_27 || '-' : '-');
+                  const numChargers = parseInt(form.numberOfChargers) || 1;
+                  return Array(numChargers).fill(`${value} A`);
+                }
+              })(),
+              mdbLighting: '10 A',
+              mdbCommu: '10 A',
               chargerWiringType: form.chargerWiringType,
               chargerWiringCable: Array.isArray(getChargerWiringCable()) ? getChargerWiringCable()[0] : getChargerWiringCable(),
-              chargerWireConduit: Array.isArray(getChargerWireConduit()) ? (getChargerWireConduit()[0] ?? '') : (getChargerWireConduit() ?? ''),
+              chargerWireConduit: Array.isArray(getChargerWireConduit()) ? (getChargerWireConduit()?.[0] ?? '') : (getChargerWireConduit() ?? ''),
+              chargerWiringCableAll: (() => {
+                const v = getChargerWiringCable();
+                if (Array.isArray(v)) return v;
+                const n = parseInt(form.numberOfChargers) || 1;
+                return Array(n).fill(v);
+              })(),
+              chargerWireConduitAll: (() => {
+                const v = getChargerWireConduit();
+                const norm = (s: string) => (s || '').replace(/^Charger\d+:\s*/i, '').trim();
+                if (Array.isArray(v)) return v.map(norm);
+                const n = parseInt(form.numberOfChargers) || 1;
+                return Array(n).fill(norm((v as unknown as string) || ''));
+              })(),
               chargerDistance: 0, // เพิ่มช่องกรอกในหน้า StationAccessory
               trDistance: 0, // เพิ่มช่องกรอกในหน้า StationAccessory
             }
@@ -1464,7 +1658,7 @@ export default function Home(): JSX.Element {
                             : form.charger
                               ? `${form.charger} x ${form.numberOfChargers || 1}`
                               : '-'
-                        }
+                          }
                         </span>
                       </div>
                       {/* Charger Wiring Type */}
@@ -1477,12 +1671,14 @@ export default function Home(): JSX.Element {
                         <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                           <span className="font-medium text-gray-700">Charger Wiring Cable (CV/THW):</span>
                           <div className="flex flex-col items-end">
-                            {getChargerWiringCable() && Array.isArray(getChargerWiringCable())
-                              ? getChargerWiringCable().map((val: string, idx: number) => (
-                                <span key={idx} className="font-semibold text-gray-900 text-sm">{val}</span>
-                              ))
-                              : <span className="font-semibold text-gray-900 text-sm">{getChargerWiringCable()}</span>
-                            }
+                            {(() => {
+                              const cableData = getChargerWiringCable();
+                              return Array.isArray(cableData)
+                                ? cableData.map((val: string, idx: number) => (
+                                  <span key={idx} className="font-semibold text-gray-900 text-sm">{val}</span>
+                                ))
+                                : <span className="font-semibold text-gray-900 text-sm">{cableData}</span>
+                            })()}
                           </div>
                         </div>
                       )}
