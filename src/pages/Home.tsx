@@ -262,6 +262,7 @@ export default function Home(): React.JSX.Element {
       const response = await axios.get(excelFileUrl, { responseType: 'arraybuffer' });
       const workbook = XLSX.read(response.data, { type: 'array' });
       const sheetName = workbook.SheetNames[0];
+      console.log('sheetName', sheetName);
       const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
       setExcelData(jsonData);
       console.log('excelData', jsonData);
