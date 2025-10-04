@@ -253,8 +253,9 @@ export default function Home(): React.JSX.Element {
   ]
 
   const fetchExcelData = async () => {
+    console.log('fetchExcelData');
     // Convert Google Sheets sharing URL to direct download URL
-    const googleSheetsUrl = 'https://docs.google.com/spreadsheets/d/1l1BLnJs2mgV19cO9u_Az-OjU3dLYj4YA/edit?usp=sharing&ouid=111737986991833013743&rtpof=true&sd=true';
+    const googleSheetsUrl = 'https://docs.google.com/spreadsheets/d/1kluTW-GWQexPQ0PDCAv2PQdUNndnz-1-XcYwotQaUVQ/edit?usp=sharing';
     const fileId = googleSheetsUrl.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1];
     const excelFileUrl = `https://docs.google.com/spreadsheets/d/${fileId}/export?format=xlsx&usp=sharing`;
     try {
@@ -263,6 +264,7 @@ export default function Home(): React.JSX.Element {
       const sheetName = workbook.SheetNames[0];
       const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
       setExcelData(jsonData);
+      console.log('excelData', jsonData);
     } catch (error) {
       console.error("Error fetching Excel file:", error);
     }
