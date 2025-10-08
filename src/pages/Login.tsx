@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { login } from '@/utils/auth'
-import { Lock, LogIn } from 'lucide-react'
+import { Lock, LogIn, Zap } from 'lucide-react'
 
 /** Credentials form state */
 interface LoginForm {
@@ -20,7 +20,7 @@ interface LoginForm {
 /**
  * Login component provides basic demo authentication.
  */
-export default function Login(): JSX.Element {
+export default function Login() {
   const [form, setForm] = useState<LoginForm>({ username: '', password: '' })
   const [error, setError] = useState<string>('')
 
@@ -43,7 +43,15 @@ export default function Login(): JSX.Element {
         <div className="hidden lg:block">
           <div className="relative overflow-hidden rounded-2xl shadow-lg border bg-white">
             <div className="aspect-[4/3] bg-slate-100">
-              <img src="https://pub-cdn.sider.ai/u/U0GVH7W4264/web-coder/68ba39d638697d89a15e5601/resource/0cb57f62-7041-4ac3-9646-96ef2c90413d.jpg" className="object-cover w-full h-full" />
+              <div className="w-full h-full bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center">
+                <div className="text-center text-white">
+                  <div className="w-24 h-24 mx-auto mb-4 bg-white/20 rounded-full flex items-center justify-center">
+                    <Zap className="h-12 w-12 text-white" />
+                  </div>
+                  <h3 className="text-2xl font-bold mb-2">ENCHARG</h3>
+                  <p className="text-blue-100">Ev Station Solutions</p>
+                </div>
+              </div>
             </div>
             <div className="p-6">
               <h2 className="text-2xl font-bold text-gray-900">Welcome back</h2>

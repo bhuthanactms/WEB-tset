@@ -30,7 +30,7 @@ interface CalculatorResults {
   totalPower: number
   transformerSize: number
   inOfCharger: number
-  inAllCharger: number
+  kWAllCharger: number
 }
 
 /**
@@ -116,21 +116,21 @@ export default function Home(): React.JSX.Element {
     return undefined;
   };
 
-  // ฟังก์ชันเลือก TR size ตาม Power Authority และผลรวม In all charger
-  const getTRSizeFromExcel = (inAllCharger: number) => {
+  // ฟังก์ชันเลือก TR size ตาม Power Authority และผลรวม kW All charger
+  const getTRSizeFromExcel = (kWAllCharger: number) => {
     if (form.powerAuthority === 'MEA') {
       const steps = [
-        { max: 444.1, row: 33 },
-        { max: 555.1, row: 34 },
-        { max: 699.4, row: 35 },
-        { max: 888.2, row: 36 },
-        { max: 1110.3, row: 37 },
-        { max: 1387.8, row: 38 },
-        { max: 1665.4, row: 39 },
-        { max: 2220.6, row: 40 },
-        { max: 2775.7, row: 41 },
+        { max: 320, row: 33 },
+        { max: 400, row: 34 },
+        { max: 504, row: 35 },
+        { max: 640, row: 36 },
+        { max: 800, row: 37 },
+        { max: 1000, row: 38 },
+        { max: 1200, row: 39 },
+        { max: 1600, row: 40 },
+        { max: 2000, row: 41 },
       ];
-      const found = steps.find(s => inAllCharger <= s.max); // ใช้ <=
+      const found = steps.find(s => kWAllCharger <= s.max); // ใช้ <=
       if (found) {
         const row = excelData.find(r => r.__rowNum__ === found.row);
         return row ? row.__EMPTY : '-';
@@ -138,21 +138,21 @@ export default function Home(): React.JSX.Element {
       return '-';
     } else if (form.powerAuthority === 'PEA') {
       const steps = [
-        { max: 115.4, row: 76 },
-        { max: 184.7, row: 77 },
-        { max: 288.6, row: 78 },
-        { max: 363.7, row: 79 },
-        { max: 461.8, row: 80 },
-        { max: 577.3, row: 81 },
-        { max: 727.4, row: 82 },
-        { max: 923.7, row: 83 },
-        { max: 1154.7, row: 84 },
-        { max: 1443.4, row: 85 },
-        { max: 1732.1, row: 86 },
-        { max: 2305.4, row: 87 },
-        { max: 2886.8, row: 88 },
+        { max: 80, row: 76 },
+        { max: 128, row: 77 },
+        { max: 200, row: 78 },
+        { max: 252, row: 79 },
+        { max: 320, row: 80 },
+        { max: 400, row: 81 },
+        { max: 504, row: 82 },
+        { max: 640, row: 83 },
+        { max: 800, row: 84 },
+        { max: 1000, row: 85 },
+        { max: 1200, row: 86 },
+        { max: 1600, row: 87 },
+        { max: 2000, row: 88 },
       ];
-      const found = steps.find(s => inAllCharger <= s.max); // ใช้ <=
+      const found = steps.find(s => kWAllCharger <= s.max); // ใช้ <=
       if (found) {
         const row = excelData.find(r => r.__rowNum__ === found.row);
         return row ? row.__EMPTY : '-';
@@ -170,7 +170,7 @@ export default function Home(): React.JSX.Element {
     console.log('Multi chargers:', multiChargers);
 
     let inOfCharger = 0;
-    let inAllCharger = 0;
+    let kWAllCharger = 0;
     let totalPower = 0;
 
     if (chargerTypeMode === 'any') {
@@ -178,12 +178,14 @@ export default function Home(): React.JSX.Element {
       console.log('=== Any type kW calculation ===');
       const multi = getMultiChargersIn();
       console.log('Multi chargers In:', multi);
-      inAllCharger = multi.reduce((sum, item) => sum + item.in, 0);
+      kWAllCharger = multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
+        return sum + extractPowerValue(chargerName);
+      }, 0);
       inOfCharger = multi.length === 1 ? multi[0].in : 0;
       totalPower = multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
         return sum + extractPowerValue(chargerName);
       }, 0);
-      console.log('Any type - inOfCharger:', inOfCharger, 'inAllCharger:', inAllCharger, 'totalPower:', totalPower);
+      console.log('Any type - inOfCharger:', inOfCharger, 'kWAllCharger:', kWAllCharger, 'totalPower:', totalPower);
     } else {
       // กรณี Same kW
       console.log('=== Same kW calculation ===');
@@ -193,26 +195,24 @@ export default function Home(): React.JSX.Element {
 
       // ใช้ค่าจาก Excel เท่านั้น
       const inOfChargerExcel = getInFromExcel('inOfCharger');
-      const inAllChargerExcel = getInFromExcel('inAllCharger');
-      console.log('Excel values - inOfCharger:', inOfChargerExcel, 'inAllCharger:', inAllChargerExcel);
+      console.log('Excel values - inOfCharger:', inOfChargerExcel);
 
       inOfCharger = typeof inOfChargerExcel === 'number'
         ? inOfChargerExcel
         : 0;
 
-      inAllCharger = typeof inAllChargerExcel === 'number'
-        ? inAllChargerExcel
-        : 0;
+      // คำนวณ kWAllCharger จาก Charger x numberOfChargers
+      kWAllCharger = powerPerStation * numberOfChargers;
 
       totalPower = numberOfChargers * powerPerStation;
-      console.log('Same type - inOfCharger:', inOfCharger, 'inAllCharger:', inAllCharger, 'totalPower:', totalPower);
+      console.log('Same type - inOfCharger:', inOfCharger, 'kWAllCharger:', kWAllCharger, 'totalPower:', totalPower);
     }
 
     setResults({
       totalPower,
       transformerSize: 0, // ไม่ใช้สูตรคำนวณเองอีกต่อไป
       inOfCharger,
-      inAllCharger
+      kWAllCharger
     })
   }
 
@@ -254,7 +254,7 @@ export default function Home(): React.JSX.Element {
 
   const fetchExcelData = async () => {
     // Convert Google Sheets sharing URL to direct download URL
-    const googleSheetsUrl = 'https://docs.google.com/spreadsheets/d/1l1BLnJs2mgV19cO9u_Az-OjU3dLYj4YA/edit?usp=sharing&ouid=111737986991833013743&rtpof=true&sd=true';
+    const googleSheetsUrl = 'https://docs.google.com/spreadsheets/d/1yxZvBr0O9ZzFpQCgBeZIcQrKGq_x2wQz/edit?usp=sharing&ouid=111737986991833013743&rtpof=true&sd=true';
     const fileId = googleSheetsUrl.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1];
     const excelFileUrl = `https://docs.google.com/spreadsheets/d/${fileId}/export?format=xlsx&usp=sharing`;
     try {
@@ -380,8 +380,10 @@ export default function Home(): React.JSX.Element {
         { max: 2775.7, row: 41 },
       ];
       const inAll = chargerTypeMode === 'any'
-        ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
-        : results?.inAllCharger || 0;
+        ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
+          return sum + extractPowerValue(chargerName);
+        }, 0)
+        : results?.kWAllCharger || 0;
       const found = steps.find(s => inAll <= s.max);
       trRowNum = found?.row;
     } else if (form.powerAuthority === 'PEA') {
@@ -401,8 +403,10 @@ export default function Home(): React.JSX.Element {
         { max: 2886.8, row: 88 },
       ];
       const inAll = chargerTypeMode === 'any'
-        ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
-        : results?.inAllCharger || 0;
+        ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
+          return sum + extractPowerValue(chargerName);
+        }, 0)
+        : results?.kWAllCharger || 0;
       const found = steps.find(s => inAll <= s.max);
       trRowNum = found?.row;
     }
@@ -463,8 +467,10 @@ export default function Home(): React.JSX.Element {
         { max: 2775.7, row: 41 },
       ];
       const inAll = chargerTypeMode === 'any'
-        ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
-        : results?.inAllCharger || 0;
+        ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
+          return sum + extractPowerValue(chargerName);
+        }, 0)
+        : results?.kWAllCharger || 0;
       const found = steps.find(s => inAll <= s.max);
       trRowNum = found?.row;
     } else if (form.powerAuthority === 'PEA') {
@@ -484,8 +490,10 @@ export default function Home(): React.JSX.Element {
         { max: 2886.8, row: 88 },
       ];
       const inAll = chargerTypeMode === 'any'
-        ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
-        : results?.inAllCharger || 0;
+        ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
+          return sum + extractPowerValue(chargerName);
+        }, 0)
+        : results?.kWAllCharger || 0;
       const found = steps.find(s => inAll <= s.max);
       trRowNum = found?.row;
     }
@@ -547,40 +555,44 @@ export default function Home(): React.JSX.Element {
     let trRowNum: number | undefined = undefined;
     if (form.powerAuthority === 'MEA') {
       const steps = [
-        { max: 444.1, row: 33 },
-        { max: 555.1, row: 34 },
-        { max: 699.4, row: 35 },
-        { max: 888.2, row: 36 },
-        { max: 1110.3, row: 37 },
-        { max: 1387.8, row: 38 },
-        { max: 1665.4, row: 39 },
-        { max: 2220.6, row: 40 },
-        { max: 2775.7, row: 41 },
+        { max: 320, row: 33 },
+        { max: 400, row: 34 },
+        { max: 504, row: 35 },
+        { max: 640, row: 36 },
+        { max: 800, row: 37 },
+        { max: 1000, row: 38 },
+        { max: 1200, row: 39 },
+        { max: 1600, row: 40 },
+        { max: 2000, row: 41 },
       ];
       const inAll = chargerTypeMode === 'any'
-        ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
-        : results?.inAllCharger || 0;
+        ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
+          return sum + extractPowerValue(chargerName);
+        }, 0)
+        : results?.kWAllCharger || 0;
       const found = steps.find(s => inAll <= s.max);
       trRowNum = found?.row;
     } else if (form.powerAuthority === 'PEA') {
       const steps = [
-        { max: 115.4, row: 76 },
-        { max: 184.7, row: 77 },
-        { max: 288.6, row: 78 },
-        { max: 363.7, row: 79 },
-        { max: 461.8, row: 80 },
-        { max: 577.3, row: 81 },
-        { max: 727.4, row: 82 },
-        { max: 923.7, row: 83 },
-        { max: 1154.7, row: 84 },
-        { max: 1443.4, row: 85 },
-        { max: 1732.1, row: 86 },
-        { max: 2305.4, row: 87 },
-        { max: 2886.8, row: 88 },
+        { max: 80, row: 76 },
+        { max: 128, row: 77 },
+        { max: 200, row: 78 },
+        { max: 252, row: 79 },
+        { max: 320, row: 80 },
+        { max: 400, row: 81 },
+        { max: 504, row: 82 },
+        { max: 640, row: 83 },
+        { max: 800, row: 84 },
+        { max: 1000, row: 85 },
+        { max: 1200, row: 86 },
+        { max: 1600, row: 87 },
+        { max: 2000, row: 88 },
       ];
       const inAll = chargerTypeMode === 'any'
-        ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
-        : results?.inAllCharger || 0;
+        ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
+          return sum + extractPowerValue(chargerName);
+        }, 0)
+        : results?.kWAllCharger || 0;
       const found = steps.find(s => inAll <= s.max);
       trRowNum = found?.row;
     }
@@ -822,8 +834,10 @@ export default function Home(): React.JSX.Element {
               numberOfChargers: form.numberOfChargers,
               transformer: getTRSizeFromExcel(
                 chargerTypeMode === 'any'
-                  ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
-                  : results?.inAllCharger || 0
+                  ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
+                    return sum + extractPowerValue(chargerName);
+                  }, 0)
+                  : results?.kWAllCharger || 0
               ),
               trWiringType: form.trWiringType,
               trWiringSize: getTRWiringSizeCVs()[0] || '',
@@ -833,40 +847,44 @@ export default function Home(): React.JSX.Element {
                 let trRowNum: number | undefined = undefined;
                 if (form.powerAuthority === 'MEA') {
                   const steps = [
-                    { max: 444.1, row: 33 },
-                    { max: 555.1, row: 34 },
-                    { max: 699.4, row: 35 },
-                    { max: 888.2, row: 36 },
-                    { max: 1110.3, row: 37 },
-                    { max: 1387.8, row: 38 },
-                    { max: 1665.4, row: 39 },
-                    { max: 2220.6, row: 40 },
-                    { max: 2775.7, row: 41 },
+                    { max: 320, row: 33 },
+                    { max: 400, row: 34 },
+                    { max: 504, row: 35 },
+                    { max: 640, row: 36 },
+                    { max: 800, row: 37 },
+                    { max: 1000, row: 38 },
+                    { max: 1200, row: 39 },
+                    { max: 1600, row: 40 },
+                    { max: 2000, row: 41 },
                   ];
                   const inAll = chargerTypeMode === 'any'
-                    ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
-                    : results?.inAllCharger || 0;
+                    ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
+                      return sum + extractPowerValue(chargerName);
+                    }, 0)
+                    : results?.kWAllCharger || 0;
                   const found = steps.find(s => inAll <= s.max);
                   trRowNum = found?.row;
                 } else if (form.powerAuthority === 'PEA') {
                   const steps = [
-                    { max: 115.4, row: 76 },
-                    { max: 184.7, row: 77 },
-                    { max: 288.6, row: 78 },
-                    { max: 363.7, row: 79 },
-                    { max: 461.8, row: 80 },
-                    { max: 577.3, row: 81 },
-                    { max: 727.4, row: 82 },
-                    { max: 923.7, row: 83 },
-                    { max: 1154.7, row: 84 },
-                    { max: 1443.4, row: 85 },
-                    { max: 1732.1, row: 86 },
-                    { max: 2305.4, row: 87 },
-                    { max: 2886.8, row: 88 },
+                    { max: 80, row: 76 },
+                    { max: 128, row: 77 },
+                    { max: 200, row: 78 },
+                    { max: 252, row: 79 },
+                    { max: 320, row: 80 },
+                    { max: 400, row: 81 },
+                    { max: 504, row: 82 },
+                    { max: 640, row: 83 },
+                    { max: 800, row: 84 },
+                    { max: 1000, row: 85 },
+                    { max: 1200, row: 86 },
+                    { max: 1600, row: 87 },
+                    { max: 2000, row: 88 },
                   ];
                   const inAll = chargerTypeMode === 'any'
-                    ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
-                    : results?.inAllCharger || 0;
+                    ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
+                      return sum + extractPowerValue(chargerName);
+                    }, 0)
+                    : results?.kWAllCharger || 0;
                   const found = steps.find(s => inAll <= s.max);
                   trRowNum = found?.row;
                 }
@@ -879,40 +897,44 @@ export default function Home(): React.JSX.Element {
                 let trRowNum: number | undefined = undefined;
                 if (form.powerAuthority === 'MEA') {
                   const steps = [
-                    { max: 444.1, row: 33 },
-                    { max: 555.1, row: 34 },
-                    { max: 699.4, row: 35 },
-                    { max: 888.2, row: 36 },
-                    { max: 1110.3, row: 37 },
-                    { max: 1387.8, row: 38 },
-                    { max: 1665.4, row: 39 },
-                    { max: 2220.6, row: 40 },
-                    { max: 2775.7, row: 41 },
+                    { max: 320, row: 33 },
+                    { max: 400, row: 34 },
+                    { max: 504, row: 35 },
+                    { max: 640, row: 36 },
+                    { max: 800, row: 37 },
+                    { max: 1000, row: 38 },
+                    { max: 1200, row: 39 },
+                    { max: 1600, row: 40 },
+                    { max: 2000, row: 41 },
                   ];
                   const inAll = chargerTypeMode === 'any'
-                    ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
-                    : results?.inAllCharger || 0;
+                    ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
+                      return sum + extractPowerValue(chargerName);
+                    }, 0)
+                    : results?.kWAllCharger || 0;
                   const found = steps.find(s => inAll <= s.max);
                   trRowNum = found?.row;
                 } else if (form.powerAuthority === 'PEA') {
                   const steps = [
-                    { max: 115.4, row: 76 },
-                    { max: 184.7, row: 77 },
-                    { max: 288.6, row: 78 },
-                    { max: 363.7, row: 79 },
-                    { max: 461.8, row: 80 },
-                    { max: 577.3, row: 81 },
-                    { max: 727.4, row: 82 },
-                    { max: 923.7, row: 83 },
-                    { max: 1154.7, row: 84 },
-                    { max: 1443.4, row: 85 },
-                    { max: 1732.1, row: 86 },
-                    { max: 2305.4, row: 87 },
-                    { max: 2886.8, row: 88 },
+                    { max: 80, row: 76 },
+                    { max: 128, row: 77 },
+                    { max: 200, row: 78 },
+                    { max: 252, row: 79 },
+                    { max: 320, row: 80 },
+                    { max: 400, row: 81 },
+                    { max: 504, row: 82 },
+                    { max: 640, row: 83 },
+                    { max: 800, row: 84 },
+                    { max: 1000, row: 85 },
+                    { max: 1200, row: 86 },
+                    { max: 1600, row: 87 },
+                    { max: 2000, row: 88 },
                   ];
                   const inAll = chargerTypeMode === 'any'
-                    ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
-                    : results?.inAllCharger || 0;
+                    ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
+                      return sum + extractPowerValue(chargerName);
+                    }, 0)
+                    : results?.kWAllCharger || 0;
                   const found = steps.find(s => inAll <= s.max);
                   trRowNum = found?.row;
                 }
@@ -924,40 +946,44 @@ export default function Home(): React.JSX.Element {
                 let trRowNum: number | undefined = undefined;
                 if (form.powerAuthority === 'MEA') {
                   const steps = [
-                    { max: 444.1, row: 33 },
-                    { max: 555.1, row: 34 },
-                    { max: 699.4, row: 35 },
-                    { max: 888.2, row: 36 },
-                    { max: 1110.3, row: 37 },
-                    { max: 1387.8, row: 38 },
-                    { max: 1665.4, row: 39 },
-                    { max: 2220.6, row: 40 },
-                    { max: 2775.7, row: 41 },
+                    { max: 320, row: 33 },
+                    { max: 400, row: 34 },
+                    { max: 504, row: 35 },
+                    { max: 640, row: 36 },
+                    { max: 800, row: 37 },
+                    { max: 1000, row: 38 },
+                    { max: 1200, row: 39 },
+                    { max: 1600, row: 40 },
+                    { max: 2000, row: 41 },
                   ];
                   const inAll = chargerTypeMode === 'any'
-                    ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
-                    : results?.inAllCharger || 0;
+                    ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
+                      return sum + extractPowerValue(chargerName);
+                    }, 0)
+                    : results?.kWAllCharger || 0;
                   const found = steps.find(s => inAll <= s.max);
                   trRowNum = found?.row;
                 } else if (form.powerAuthority === 'PEA') {
                   const steps = [
-                    { max: 115.4, row: 76 },
-                    { max: 184.7, row: 77 },
-                    { max: 288.6, row: 78 },
-                    { max: 363.7, row: 79 },
-                    { max: 461.8, row: 80 },
-                    { max: 577.3, row: 81 },
-                    { max: 727.4, row: 82 },
-                    { max: 923.7, row: 83 },
-                    { max: 1154.7, row: 84 },
-                    { max: 1443.4, row: 85 },
-                    { max: 1732.1, row: 86 },
-                    { max: 2305.4, row: 87 },
-                    { max: 2886.8, row: 88 },
+                    { max: 80, row: 76 },
+                    { max: 128, row: 77 },
+                    { max: 200, row: 78 },
+                    { max: 252, row: 79 },
+                    { max: 320, row: 80 },
+                    { max: 400, row: 81 },
+                    { max: 504, row: 82 },
+                    { max: 640, row: 83 },
+                    { max: 800, row: 84 },
+                    { max: 1000, row: 85 },
+                    { max: 1200, row: 86 },
+                    { max: 1600, row: 87 },
+                    { max: 2000, row: 88 },
                   ];
                   const inAll = chargerTypeMode === 'any'
-                    ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
-                    : results?.inAllCharger || 0;
+                    ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
+                      return sum + extractPowerValue(chargerName);
+                    }, 0)
+                    : results?.kWAllCharger || 0;
                   const found = steps.find(s => inAll <= s.max);
                   trRowNum = found?.row;
                 }
@@ -1254,17 +1280,15 @@ export default function Home(): React.JSX.Element {
                       <span className="text-sm font-medium text-blue-800">Total Power</span>
                     </div>
                     <div className="text-2xl font-bold text-blue-900">
-                      {(
-                        (
-                          (chargerTypeMode === 'any'
-                            ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
-                            : results?.inAllCharger || 0
-                          ) * Math.sqrt(3) * 400
-                        ) / 1000
-                      ).toFixed(2)} kVA
+                      {chargerTypeMode === 'any'
+                        ? Math.round(multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
+                          return sum + extractPowerValue(chargerName);
+                        }, 0))
+                        : Math.round(results?.kWAllCharger || 0)
+                      } kW
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
-                      (In all Charger × √3 × 400 ÷ 1000)
+                      (kW of all Charger)
                     </div>
                   </CardContent>
                 </Card>
@@ -1278,8 +1302,10 @@ export default function Home(): React.JSX.Element {
                     <div className="text-2xl font-bold text-green-900 flex items-center">
                       {getTRSizeFromExcel(
                         chargerTypeMode === 'any'
-                          ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
-                          : results?.inAllCharger || 0
+                          ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
+                            return sum + extractPowerValue(chargerName);
+                          }, 0)
+                          : results?.kWAllCharger || 0
                       )}
                       <span className="text-2xl font-bold text-green-900 ml-1">kVA</span>
                     </div>
@@ -1338,8 +1364,10 @@ export default function Home(): React.JSX.Element {
                             { max: 2775.7, row: 41 },
                           ];
                           const inAll = chargerTypeMode === 'any'
-                            ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
-                            : results?.inAllCharger || 0;
+                            ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
+                              return sum + extractPowerValue(chargerName);
+                            }, 0)
+                            : results?.kWAllCharger || 0;
                           const found = steps.find(s => inAll <= s.max);
                           trRowNum = found?.row;
                         } else if (form.powerAuthority === 'PEA') {
@@ -1359,8 +1387,10 @@ export default function Home(): React.JSX.Element {
                             { max: 2886.8, row: 88 },
                           ];
                           const inAll = chargerTypeMode === 'any'
-                            ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
-                            : results?.inAllCharger || 0;
+                            ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
+                              return sum + extractPowerValue(chargerName);
+                            }, 0)
+                            : results?.kWAllCharger || 0;
                           const found = steps.find(s => inAll <= s.max);
                           trRowNum = found?.row;
                         }
@@ -1387,8 +1417,8 @@ export default function Home(): React.JSX.Element {
                 <div className="space-y-2">
                   {/* Horizontal summary for each charger */}
                   {chargerTypeMode === 'any' ? (
-                    getMultiChargersIn().length > 0 ? (
-                      getMultiChargersIn().map((item, idx) => {
+                    multiChargers.filter(name => name !== '').length > 0 ? (
+                      multiChargers.filter(name => name !== '').map((chargerName, idx) => {
                         const cableArr = getChargerWiringCable();
                         const cable = Array.isArray(cableArr) ? cableArr[idx] || '-' : (typeof cableArr === 'string' ? cableArr : '-');
                         const conduitArr = getChargerWireConduit();
@@ -1399,7 +1429,7 @@ export default function Home(): React.JSX.Element {
                               Charger{idx + 1}: {multiChargers[idx] || '-'}
                             </span>
                             <span className="text-gray-700">
-                              In: {item.in.toFixed(2)} A
+                              kW: {extractPowerValue(chargerName)} kW
                             </span>
                             <span className="text-gray-700">
                               Cable (CV/THW): {cable.replace(/^Charger\d+:\s*/, '')}
@@ -1436,16 +1466,18 @@ export default function Home(): React.JSX.Element {
                       ));
                     })()
                   )}
-                  {/* In of all Charger summary */}
+                  {/* kW of all Charger summary */}
                   <div className="mt-4 font-semibold text-blue-900 text-base">
-                    In of all Charger:{" "}
+                    kW of all Charger:{" "}
                     {chargerTypeMode === 'any'
-                      ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0).toFixed(2)
-                      : results?.inAllCharger !== undefined
-                        ? results.inAllCharger.toFixed(2)
+                      ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
+                        return sum + extractPowerValue(chargerName);
+                      }, 0).toFixed(2)
+                      : results?.kWAllCharger !== undefined
+                        ? results.kWAllCharger.toFixed(2)
                         : '-'
                     }
-                    <span className="ml-1">A</span>
+                    <span className="ml-1">kW</span>
                   </div>
                   <div className="font-semibold text-blue-900 text-base">
                     Charger Wiring Type: <span className="font-normal">{form.chargerWiringType}</span>
@@ -1475,8 +1507,10 @@ export default function Home(): React.JSX.Element {
                         <span className="font-semibold text-gray-900 text-base flex items-center">
                           {getTRSizeFromExcel(
                             chargerTypeMode === 'any'
-                              ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
-                              : results?.inAllCharger || 0
+                              ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
+                                return sum + extractPowerValue(chargerName);
+                              }, 0)
+                              : results?.kWAllCharger || 0
                           )}
                           <span className="text-base text-gray-900 ml-1">kVA</span>
                         </span>
@@ -1535,8 +1569,10 @@ export default function Home(): React.JSX.Element {
                                 { max: 2775.7, row: 41 },
                               ];
                               const inAll = chargerTypeMode === 'any'
-                                ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
-                                : results?.inAllCharger || 0;
+                                ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
+                                  return sum + extractPowerValue(chargerName);
+                                }, 0)
+                                : results?.kWAllCharger || 0;
                               const found = steps.find(s => inAll <= s.max);
                               trRowNum = found?.row;
                             } else if (form.powerAuthority === 'PEA') {
@@ -1556,8 +1592,10 @@ export default function Home(): React.JSX.Element {
                                 { max: 2886.8, row: 88 },
                               ];
                               const inAll = chargerTypeMode === 'any'
-                                ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
-                                : results?.inAllCharger || 0;
+                                ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
+                                  return sum + extractPowerValue(chargerName);
+                                }, 0)
+                                : results?.kWAllCharger || 0;
                               const found = steps.find(s => inAll <= s.max);
                               trRowNum = found?.row;
                             }
@@ -1733,19 +1771,19 @@ export default function Home(): React.JSX.Element {
                           {form.numberOfChargers || '-'}
                         </span>
                       </div>
-                      {/* In of Charger */}
+                      {/* kW of Charger */}
                       <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <span className="font-medium text-gray-700">In of Charger:</span>
+                        <span className="font-medium text-gray-700">kW of Charger:</span>
                         <span className="font-semibold text-gray-900 text-base">
                           {chargerTypeMode === 'any'
                             ? (
-                              getMultiChargersIn().length > 0
+                              multiChargers.filter(name => name !== '').length > 0
                                 ? (
                                   <span>
-                                    {getMultiChargersIn().map((item, idx) => (
+                                    {multiChargers.filter(name => name !== '').map((chargerName, idx) => (
                                       <span key={idx}>
                                         {idx > 0 && ', '}
-                                        Charger{idx + 1}: {item.in.toFixed(2)} A
+                                        Charger{idx + 1}: {extractPowerValue(chargerName)} kW
                                       </span>
                                     ))}
                                   </span>
@@ -1760,15 +1798,17 @@ export default function Home(): React.JSX.Element {
                       </div>
                       {/* In of all Charger */}
                       <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <span className="font-medium text-gray-700">In of all Charger:</span>
+                        <span className="font-medium text-gray-700">kW of all Charger:</span>
                         <span className="font-semibold text-gray-900 text-base">
                           {chargerTypeMode === 'any'
-                            ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0).toFixed(2)
-                            : results?.inAllCharger !== undefined
-                              ? results.inAllCharger.toFixed(2)
+                            ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
+                              return sum + extractPowerValue(chargerName);
+                            }, 0).toFixed(2)
+                            : results?.kWAllCharger !== undefined
+                              ? results.kWAllCharger.toFixed(2)
                               : '-'
                           }
-                          <span className="text-base text-gray-900 ml-1">A</span>
+                          <span className="text-base text-gray-900 ml-1">kW</span>
                         </span>
                       </div>
                     </div>

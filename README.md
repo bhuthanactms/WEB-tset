@@ -1,13 +1,12 @@
-# FES Evaporative Cooling Calculator
+# EV station Calculator
 
 A Python-based web application for calculating evaporative cooling requirements using Streamlit.
 
 ## Features
 
 - User authentication with demo accounts
-- Cooling requirement calculations
 - Unit selection and comparison
-- Cost and CO₂ savings analysis
+- Cost 
 - PDF report generation
 - Responsive design
 
@@ -35,19 +34,6 @@ streamlit run app.py
 | demo     | demo123  |
 | guest    | guest123 |
 
-## Project Structure
-
-```
-fes_calculator/
-├── app.py                 # Main Streamlit application
-├── requirements.txt       # Python dependencies
-├── style.css             # Custom CSS styles
-├── utils/
-│   ├── auth.py           # Authentication utilities
-│   ├── calculator.py     # Cooling calculation logic
-│   └── pdf_generator.py  # PDF report generation
-└── README.md             # This file
-```
 
 ## Features Overview
 
