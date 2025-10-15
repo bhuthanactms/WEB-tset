@@ -1088,7 +1088,7 @@ export default function Home(): React.JSX.Element {
                     </Label>
                     <div className="grid grid-cols-2 gap-3">
                       <div
-                        className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-orange-50 cursor-pointer ${form.powerAuthority === 'PEA' ? 'bg-orange-100 border-orange-300' : ''
+                        className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-violet-50 cursor-pointer ${form.powerAuthority === 'PEA' ? 'bg-violet-100 border-violet-300' : ''
                           }`}
                         onClick={() => setForm(f => ({ ...f, powerAuthority: 'PEA' }))}
                       >
@@ -1098,12 +1098,12 @@ export default function Home(): React.JSX.Element {
                           onCheckedChange={(checked) => {
                             if (checked) setForm(f => ({ ...f, powerAuthority: 'PEA' }));
                           }}
-                          className="text-orange-500 border-orange-400 data-[state=checked]:bg-orange-500"
+                          className="text-violet-500 border-violet-400 data-[state=checked]:bg-violet-500"
                         />
-                        <Label htmlFor="PEA" className="font-medium cursor-pointer text-orange-700">PEA</Label>
+                        <Label htmlFor="PEA" className="font-medium cursor-pointer text-violet-700">PEA</Label>
                       </div>
                       <div
-                        className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-violet-50 cursor-pointer ${form.powerAuthority === 'MEA' ? 'bg-violet-100 border-violet-300' : ''
+                        className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-orange-50 cursor-pointer ${form.powerAuthority === 'MEA' ? 'bg-orange-100 border-orange-300' : ''
                           }`}
                         onClick={() => setForm(f => ({ ...f, powerAuthority: 'MEA' }))}
                       >
@@ -1113,9 +1113,9 @@ export default function Home(): React.JSX.Element {
                           onCheckedChange={(checked) => {
                             if (checked) setForm(f => ({ ...f, powerAuthority: 'MEA' }));
                           }}
-                          className="text-violet-500 border-violet-400 data-[state=checked]:bg-violet-500"
+                          className="text-orange-500 border-orange-400 data-[state=checked]:bg-orange-500"
                         />
-                        <Label htmlFor="MEA" className="font-medium cursor-pointer text-violet-700">MEA</Label>
+                        <Label htmlFor="MEA" className="font-medium cursor-pointer text-orange-700">MEA</Label>
                       </div>
                     </div>
                   </div>
@@ -1314,28 +1314,28 @@ export default function Home(): React.JSX.Element {
                 {/* Power Authority Card */}
                 <Card className={
                   form.powerAuthority === 'PEA'
-                    ? "bg-orange-50 border border-orange-100 shadow-none"
-                    : "bg-violet-50 border border-violet-100 shadow-none"
+                    ? "bg-violet-50 border border-violet-100 shadow-none"
+                    : "bg-orange-50 border border-orange-100 shadow-none"
                 }>
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2 mb-2">
                       <span className={
                         form.powerAuthority === 'PEA'
-                          ? "h-5 w-5 rounded-full bg-orange-400 inline-block"
-                          : "h-5 w-5 rounded-full bg-violet-900 inline-block"
+                          ? "h-5 w-5 rounded-full bg-violet-400 inline-block"
+                          : "h-5 w-5 rounded-full bg-orange-400 inline-block"
                       } />
                       <span className={
                         form.powerAuthority === 'PEA'
-                          ? "text-sm font-medium text-orange-800"
-                          : "text-sm font-medium text-violet-800"
+                          ? "text-sm font-medium text-violet-800"
+                          : "text-sm font-medium text-orange-800"
                       }>
                         Power Authority
                       </span>
                     </div>
                     <div className={
                       form.powerAuthority === 'PEA'
-                        ? "text-2xl font-bold text-orange-700"
-                        : "text-2xl font-bold text-violet-800"
+                        ? "text-2xl font-bold text-violet-700"
+                        : "text-2xl font-bold text-orange-800"
                     }>
                       {form.powerAuthority || '-'}
                     </div>
