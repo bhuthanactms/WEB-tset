@@ -452,72 +452,31 @@ export default function Home(): React.JSX.Element {
 
   // เพิ่มฟังก์ชันดึง TR Wire conduit ตาม Power Authority และ TR Wiring Type
   const getTRWireConduit = () => {
-    // หา rowNum ของ Transformer ที่เลือก (เหมือน getTRWiringSizeCV)
-    let trRowNum: number | undefined = undefined;
-    if (form.powerAuthority === 'MEA') {
-      const steps = [
-        { max: 444.1, row: 33 },
-        { max: 555.1, row: 34 },
-        { max: 699.4, row: 35 },
-        { max: 888.2, row: 36 },
-        { max: 1110.3, row: 37 },
-        { max: 1387.8, row: 38 },
-        { max: 1665.4, row: 39 },
-        { max: 2220.6, row: 40 },
-        { max: 2775.7, row: 41 },
-      ];
-      const inAll = chargerTypeMode === 'any'
-        ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
-          return sum + extractPowerValue(chargerName);
-        }, 0)
-        : results?.kWAllCharger || 0;
-      const found = steps.find(s => inAll <= s.max);
-      trRowNum = found?.row;
-    } else if (form.powerAuthority === 'PEA') {
-      const steps = [
-        { max: 115.4, row: 76 },
-        { max: 184.7, row: 77 },
-        { max: 288.6, row: 78 },
-        { max: 363.7, row: 79 },
-        { max: 461.8, row: 80 },
-        { max: 577.3, row: 81 },
-        { max: 727.4, row: 82 },
-        { max: 923.7, row: 83 },
-        { max: 1154.7, row: 84 },
-        { max: 1443.4, row: 85 },
-        { max: 1732.1, row: 86 },
-        { max: 2305.4, row: 87 },
-        { max: 2886.8, row: 88 },
-      ];
-      const inAll = chargerTypeMode === 'any'
-        ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
-          return sum + extractPowerValue(chargerName);
-        }, 0)
-        : results?.kWAllCharger || 0;
-      const found = steps.find(s => inAll <= s.max);
-      trRowNum = found?.row;
-    }
-    if (!trRowNum) return '';
+    // ใช้ row number จาก TR Wiring Size CVs แทน Transformer Size
+    const trWiringRowNum = getTRWiringSizeCVsRowNumber();
+    if (!trWiringRowNum) return '';
 
-    const trRow = excelData.find(r => r.__rowNum__ === trRowNum);
+    const trRow = excelData.find(r => r.__rowNum__ === trWiringRowNum);
     if (!trRow) return '';
+
+    console.log(`TR Wire Conduit Debug - Using TR Wiring Row ${trWiringRowNum}:`, trRow);
 
     // Mapping TR Wiring Type to columns and units
     const wiringTypeToColsAndUnit: Record<string, { cols: string[]; unit: string }> = {
       'ร้อยท่อเดินในอากาศ กลุ่ม 2': {
-        cols: ['__EMPTY_32', '__EMPTY_33', '__EMPTY_34', '__EMPTY_35'], // AG-AJ
+        cols: ['__EMPTY_32', '__EMPTY_33', '__EMPTY_34'], // ตามที่ผู้ใช้ระบุ
         unit: 'นิ้ว'
       },
       'ร้อยท่อฝังใต้ดิน กลุ่ม 5': {
-        cols: ['__EMPTY_53', '__EMPTY_54', '__EMPTY_55'], // BB-BD
+        cols: ['__EMPTY_53', '__EMPTY_54', '__EMPTY_55'], // ตามที่ผู้ใช้ระบุ
         unit: 'มม.'
       },
       'ราง TRAY ไม่มีฝา': {
-        cols: ['__EMPTY_74'], // BW
+        cols: ['__EMPTY_74'], // ตามที่ผู้ใช้ระบุ
         unit: 'ซม.'
       },
       'ราง LADDER ไม่มีฝา': {
-        cols: ['__EMPTY_95'], // CR
+        cols: ['__EMPTY_95'], // ตามที่ผู้ใช้ระบุ
         unit: 'ซม.'
       },
     };
@@ -525,7 +484,16 @@ export default function Home(): React.JSX.Element {
     const config = wiringTypeToColsAndUnit[form.trWiringType];
     if (!config) return '';
 
-    const values = config.cols.map(col => trRow[col]).filter(Boolean).join(' ');
+    console.log(`TR Wire Conduit - Wiring Type: ${form.trWiringType}`);
+    console.log(`TR Wire Conduit - Columns to check:`, config.cols);
+
+    const values = config.cols.map(col => {
+      const val = trRow[col];
+      console.log(`TR Wire Conduit - Column ${col}: ${val}`);
+      return val;
+    }).filter(Boolean).join(' ');
+
+    console.log(`TR Wire Conduit - Final values: "${values}"`);
     if (!values) return '';
     return `${values} ${config.unit}`;
   };
@@ -618,6 +586,58 @@ export default function Home(): React.JSX.Element {
     // คืน array ตามจำนวนเครื่อง
     const numChargers = parseInt(form.numberOfChargers) || 1;
     return Array(numChargers).fill(value);
+  };
+
+  // ฟังก์ชันดึง row number สำหรับ TR Wiring Size CVs
+  const getTRWiringSizeCVsRowNumber = (): number | undefined => {
+    let trRowNum: number | undefined = undefined;
+
+    if (form.powerAuthority === 'MEA') {
+      const steps = [
+        { max: 320, row: 33 },
+        { max: 400, row: 34 },
+        { max: 504, row: 35 },
+        { max: 640, row: 36 },
+        { max: 800, row: 37 },
+        { max: 1000, row: 38 },
+        { max: 1200, row: 39 },
+        { max: 1600, row: 40 },
+        { max: 2000, row: 41 },
+      ];
+      const inAll = chargerTypeMode === 'any'
+        ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
+          return sum + extractPowerValue(chargerName);
+        }, 0)
+        : results?.kWAllCharger || 0;
+      const found = steps.find(s => inAll <= s.max);
+      trRowNum = found?.row;
+    } else if (form.powerAuthority === 'PEA') {
+      const steps = [
+        { max: 80, row: 76 },
+        { max: 128, row: 77 },
+        { max: 200, row: 78 },
+        { max: 252, row: 79 },
+        { max: 320, row: 80 },
+        { max: 400, row: 81 },
+        { max: 504, row: 82 },
+        { max: 640, row: 83 },
+        { max: 800, row: 84 },
+        { max: 1000, row: 85 },
+        { max: 1200, row: 86 },
+        { max: 1600, row: 87 },
+        { max: 2000, row: 88 },
+      ];
+      const inAll = chargerTypeMode === 'any'
+        ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
+          return sum + extractPowerValue(chargerName);
+        }, 0)
+        : results?.kWAllCharger || 0;
+      const found = steps.find(s => inAll <= s.max);
+      trRowNum = found?.row;
+    }
+
+    console.log(`TR Wiring Size CVs Row Number Debug: ${trRowNum}`);
+    return trRowNum;
   };
 
   // เพิ่มฟังก์ชันดึง Charger Wiring cable ตาม Power Authority และ Charger Wiring Type
@@ -844,102 +864,22 @@ export default function Home(): React.JSX.Element {
               trWireConduit: getTRWireConduit() || '',
               // Legacy MDB summary for backward compatibility
               mdb: (() => {
-                let trRowNum: number | undefined = undefined;
-                if (form.powerAuthority === 'MEA') {
-                  const steps = [
-                    { max: 320, row: 33 },
-                    { max: 400, row: 34 },
-                    { max: 504, row: 35 },
-                    { max: 640, row: 36 },
-                    { max: 800, row: 37 },
-                    { max: 1000, row: 38 },
-                    { max: 1200, row: 39 },
-                    { max: 1600, row: 40 },
-                    { max: 2000, row: 41 },
-                  ];
-                  const inAll = chargerTypeMode === 'any'
-                    ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
-                      return sum + extractPowerValue(chargerName);
-                    }, 0)
-                    : results?.kWAllCharger || 0;
-                  const found = steps.find(s => inAll <= s.max);
-                  trRowNum = found?.row;
-                } else if (form.powerAuthority === 'PEA') {
-                  const steps = [
-                    { max: 80, row: 76 },
-                    { max: 128, row: 77 },
-                    { max: 200, row: 78 },
-                    { max: 252, row: 79 },
-                    { max: 320, row: 80 },
-                    { max: 400, row: 81 },
-                    { max: 504, row: 82 },
-                    { max: 640, row: 83 },
-                    { max: 800, row: 84 },
-                    { max: 1000, row: 85 },
-                    { max: 1200, row: 86 },
-                    { max: 1600, row: 87 },
-                    { max: 2000, row: 88 },
-                  ];
-                  const inAll = chargerTypeMode === 'any'
-                    ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
-                      return sum + extractPowerValue(chargerName);
-                    }, 0)
-                    : results?.kWAllCharger || 0;
-                  const found = steps.find(s => inAll <= s.max);
-                  trRowNum = found?.row;
-                }
-                const trRow = excelData.find(r => r.__rowNum__ === trRowNum);
-                const mccbMain = trRow ? trRow.__EMPTY_11 : '-';
+                // ใช้ row number จาก TR Wiring Size CVs แทน Transformer Size
+                const trWiringRowNum = getTRWiringSizeCVsRowNumber();
+                const trRow = excelData.find(r => r.__rowNum__ === trWiringRowNum);
+                const mccbMain = trRow ? (trRow.__EMPTY_11 || trRow.__EMPTY_14) : '-';
+                console.log(`MDB (MCCB Main) Debug - Using TR Wiring Row ${trWiringRowNum}:`, trRow);
+                console.log(`MCCB Main value (__EMPTY_11 or __EMPTY_14): ${mccbMain}`);
                 return mccbMain ? `${mccbMain} A` : '-';
               })(),
               // New detailed MDB fields
               mdbMainAt: (() => {
-                let trRowNum: number | undefined = undefined;
-                if (form.powerAuthority === 'MEA') {
-                  const steps = [
-                    { max: 320, row: 33 },
-                    { max: 400, row: 34 },
-                    { max: 504, row: 35 },
-                    { max: 640, row: 36 },
-                    { max: 800, row: 37 },
-                    { max: 1000, row: 38 },
-                    { max: 1200, row: 39 },
-                    { max: 1600, row: 40 },
-                    { max: 2000, row: 41 },
-                  ];
-                  const inAll = chargerTypeMode === 'any'
-                    ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
-                      return sum + extractPowerValue(chargerName);
-                    }, 0)
-                    : results?.kWAllCharger || 0;
-                  const found = steps.find(s => inAll <= s.max);
-                  trRowNum = found?.row;
-                } else if (form.powerAuthority === 'PEA') {
-                  const steps = [
-                    { max: 80, row: 76 },
-                    { max: 128, row: 77 },
-                    { max: 200, row: 78 },
-                    { max: 252, row: 79 },
-                    { max: 320, row: 80 },
-                    { max: 400, row: 81 },
-                    { max: 504, row: 82 },
-                    { max: 640, row: 83 },
-                    { max: 800, row: 84 },
-                    { max: 1000, row: 85 },
-                    { max: 1200, row: 86 },
-                    { max: 1600, row: 87 },
-                    { max: 2000, row: 88 },
-                  ];
-                  const inAll = chargerTypeMode === 'any'
-                    ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
-                      return sum + extractPowerValue(chargerName);
-                    }, 0)
-                    : results?.kWAllCharger || 0;
-                  const found = steps.find(s => inAll <= s.max);
-                  trRowNum = found?.row;
-                }
-                const trRow = excelData.find(r => r.__rowNum__ === trRowNum);
-                const mccbMain = trRow ? trRow.__EMPTY_11 : '';
+                // ใช้ row number จาก TR Wiring Size CVs แทน Transformer Size
+                const trWiringRowNum = getTRWiringSizeCVsRowNumber();
+                const trRow = excelData.find(r => r.__rowNum__ === trWiringRowNum);
+                const mccbMain = trRow ? (trRow.__EMPTY_11 || trRow.__EMPTY_14) : '';
+                console.log(`MDB Main AT Debug - Using TR Wiring Row ${trWiringRowNum}:`, trRow);
+                console.log(`MCCB Main AT value (__EMPTY_11 or __EMPTY_14): ${mccbMain}`);
                 return mccbMain ? `${mccbMain} A` : '';
               })(),
               mdbMainAf: (() => {
@@ -1350,52 +1290,12 @@ export default function Home(): React.JSX.Element {
                     </div>
                     <div className="text-2xl font-bold text-yellow-700">
                       {(() => {
-                        let trRowNum: number | undefined = undefined;
-                        if (form.powerAuthority === 'MEA') {
-                          const steps = [
-                            { max: 444.1, row: 33 },
-                            { max: 555.1, row: 34 },
-                            { max: 699.4, row: 35 },
-                            { max: 888.2, row: 36 },
-                            { max: 1110.3, row: 37 },
-                            { max: 1387.8, row: 38 },
-                            { max: 1665.4, row: 39 },
-                            { max: 2220.6, row: 40 },
-                            { max: 2775.7, row: 41 },
-                          ];
-                          const inAll = chargerTypeMode === 'any'
-                            ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
-                              return sum + extractPowerValue(chargerName);
-                            }, 0)
-                            : results?.kWAllCharger || 0;
-                          const found = steps.find(s => inAll <= s.max);
-                          trRowNum = found?.row;
-                        } else if (form.powerAuthority === 'PEA') {
-                          const steps = [
-                            { max: 115.4, row: 76 },
-                            { max: 184.7, row: 77 },
-                            { max: 288.6, row: 78 },
-                            { max: 363.7, row: 79 },
-                            { max: 461.8, row: 80 },
-                            { max: 577.3, row: 81 },
-                            { max: 727.4, row: 82 },
-                            { max: 923.7, row: 83 },
-                            { max: 1154.7, row: 84 },
-                            { max: 1443.4, row: 85 },
-                            { max: 1732.1, row: 86 },
-                            { max: 2305.4, row: 87 },
-                            { max: 2886.8, row: 88 },
-                          ];
-                          const inAll = chargerTypeMode === 'any'
-                            ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
-                              return sum + extractPowerValue(chargerName);
-                            }, 0)
-                            : results?.kWAllCharger || 0;
-                          const found = steps.find(s => inAll <= s.max);
-                          trRowNum = found?.row;
-                        }
-                        const trRow = excelData.find(r => r.__rowNum__ === trRowNum);
-                        const mccbMain = trRow ? trRow.__EMPTY_11 : '-';
+                        // ใช้ row number จาก TR Wiring Size CVs แทน Transformer Size
+                        const trWiringRowNum = getTRWiringSizeCVsRowNumber();
+                        const trRow = excelData.find(r => r.__rowNum__ === trWiringRowNum);
+                        const mccbMain = trRow ? (trRow.__EMPTY_11 || trRow.__EMPTY_14) : '-';
+                        console.log(`MDB (MCCB Main) UI Debug - Using TR Wiring Row ${trWiringRowNum}:`, trRow);
+                        console.log(`MCCB Main UI value (__EMPTY_11 or __EMPTY_14): ${mccbMain}`);
                         return mccbMain ? `${mccbMain} A` : '-';
                       })()}
                     </div>
@@ -1555,52 +1455,12 @@ export default function Home(): React.JSX.Element {
                         <div className="flex flex-col items-end">
                           {/* ...existing MDB summary logic... */}
                           {(() => {
-                            let trRowNum: number | undefined = undefined;
-                            if (form.powerAuthority === 'MEA') {
-                              const steps = [
-                                { max: 444.1, row: 33 },
-                                { max: 555.1, row: 34 },
-                                { max: 699.4, row: 35 },
-                                { max: 888.2, row: 36 },
-                                { max: 1110.3, row: 37 },
-                                { max: 1387.8, row: 38 },
-                                { max: 1665.4, row: 39 },
-                                { max: 2220.6, row: 40 },
-                                { max: 2775.7, row: 41 },
-                              ];
-                              const inAll = chargerTypeMode === 'any'
-                                ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
-                                  return sum + extractPowerValue(chargerName);
-                                }, 0)
-                                : results?.kWAllCharger || 0;
-                              const found = steps.find(s => inAll <= s.max);
-                              trRowNum = found?.row;
-                            } else if (form.powerAuthority === 'PEA') {
-                              const steps = [
-                                { max: 115.4, row: 76 },
-                                { max: 184.7, row: 77 },
-                                { max: 288.6, row: 78 },
-                                { max: 363.7, row: 79 },
-                                { max: 461.8, row: 80 },
-                                { max: 577.3, row: 81 },
-                                { max: 727.4, row: 82 },
-                                { max: 923.7, row: 83 },
-                                { max: 1154.7, row: 84 },
-                                { max: 1443.4, row: 85 },
-                                { max: 1732.1, row: 86 },
-                                { max: 2305.4, row: 87 },
-                                { max: 2886.8, row: 88 },
-                              ];
-                              const inAll = chargerTypeMode === 'any'
-                                ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
-                                  return sum + extractPowerValue(chargerName);
-                                }, 0)
-                                : results?.kWAllCharger || 0;
-                              const found = steps.find(s => inAll <= s.max);
-                              trRowNum = found?.row;
-                            }
-                            const trRow = excelData.find(r => r.__rowNum__ === trRowNum);
-                            const mccbMain = trRow ? trRow.__EMPTY_11 : '-';
+                            // ใช้ row number จาก TR Wiring Size CVs แทน Transformer Size
+                            const trWiringRowNum = getTRWiringSizeCVsRowNumber();
+                            const trRow = excelData.find(r => r.__rowNum__ === trWiringRowNum);
+                            const mccbMain = trRow ? (trRow.__EMPTY_11 || trRow.__EMPTY_14) : '-';
+                            console.log(`MDB to Charger MDB Debug - Using TR Wiring Row ${trWiringRowNum}:`, trRow);
+                            console.log(`MCCB Main in MDB to Charger (__EMPTY_11 or __EMPTY_14): ${mccbMain}`);
                             const main2 = trRow ? trRow.__EMPTY_14 : '-';
                             // MCCB Sub
                             let mccbSubs: string[] = [];

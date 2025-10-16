@@ -35,12 +35,97 @@ function MoreDetailCard(props: any) {
   const [mdbRoofLength, setMdbRoofLength] = useState(props.mdbRoofLength || '');
   const [mdbRoofM2, setMdbRoofM2] = useState(props.mdbRoofM2 || '');
   const [chargerRoofType, setChargerRoofType] = useState(props.chargerRoofType || '');
-  const [travelCostType, setTravelCostType] = useState(props.travelCostType || '');
+  const [travelDistance, setTravelDistance] = useState(props.travelDistance || '');
+  const [trainingWork, setTrainingWork] = useState(props.trainingWork || 'no');
+  const [travelCostResult, setTravelCostResult] = useState(props.travelCostResult || 0);
   const [transformerSelection, setTransformerSelection] = useState(props.transformerSelection || 'no');
   const [trMdbSelection, setTrMdbSelection] = useState(props.trMdbSelection || 'no');
   const [mdbSelection, setMdbSelection] = useState(props.mdbSelection || 'no');
   const [chargerSelection, setChargerSelection] = useState(props.chargerSelection || 'no');
   const [additionalSelection, setAdditionalSelection] = useState(props.additionalSelection || 'no');
+
+  // ฟังก์ชันคำนวณค่าเดินทาง
+  const calculateTravelCost = () => {
+    const distance = parseFloat(travelDistance) || 0;
+    const numberOfChargers = parseInt(props.numberOfChargers) || 1;
+
+    // ตรวจสอบเงื่อนไข Extra
+    const hasTransformer = transformerSelection === 'yes';
+    const hasTrMdb = trMdbSelection === 'yes';
+    const hasMdb = mdbSelection === 'yes';
+    const hasCharger = chargerSelection === 'yes';
+
+    // Extra1: 62.5 x ระยะ + ค่าแรง 5000+3000 + ค่าที่พัก
+    if (!hasTransformer && !hasTrMdb && !hasMdb) {
+      const extra1Cost = (62.5 * distance) + 5000 + 3000;
+      setTravelCostResult(extra1Cost);
+      return extra1Cost;
+    }
+
+    // Extra2: งานติดตั้งเครื่องชาร์จอย่างเดียว
+    if (!hasTransformer && !hasTrMdb && !hasMdb && !hasCharger) {
+      const extra2Cost = (distance * 40) + 5000 + 3000;
+      setTravelCostResult(extra2Cost);
+      return extra2Cost;
+    }
+
+    // คำนวณตามจำนวน Charger และระยะทาง
+    let cost = 0;
+
+    if (numberOfChargers === 1) {
+      if (distance <= 80) {
+        cost = distance * 425;
+      } else {
+        cost = (distance * 156) + 3600 + 18000;
+      }
+    } else if (numberOfChargers === 2) {
+      if (distance <= 88) {
+        cost = distance * 715;
+      } else {
+        cost = (distance * 176) + 7200 + 40000;
+      }
+    } else if (numberOfChargers === 3) {
+      if (distance <= 78) {
+        cost = distance * 1075;
+      } else {
+        cost = (distance * 191) + 9000 + 60000;
+      }
+    } else if (numberOfChargers === 4) {
+      if (distance <= 101) {
+        cost = distance * 1290;
+      } else {
+        cost = (distance * 191) + 12000 + 100000;
+      }
+    } else if (numberOfChargers === 5) {
+      if (distance <= 102) {
+        cost = distance * 1565;
+      } else {
+        cost = (distance * 191) + 15000 + 125000;
+      }
+    } else if (numberOfChargers === 6) {
+      if (distance <= 102) {
+        cost = distance * 1840;
+      } else {
+        cost = (distance * 191) + 18000 + 150000;
+      }
+    }
+
+    // บวกเพิ่มงานฝึกอบรม (1วัน) ถ้าเลือก
+    if (trainingWork === 'yes') {
+      const trainingCost = (distance * 15) + 2600 + 1000;
+      cost += trainingCost;
+    }
+
+    setTravelCostResult(cost);
+    return cost;
+  };
+
+  // คำนวณเมื่อมีการเปลี่ยนแปลง
+  React.useEffect(() => {
+    if (travelDistance) {
+      calculateTravelCost();
+    }
+  }, [travelDistance, trainingWork, transformerSelection, trMdbSelection, mdbSelection, chargerSelection, props.numberOfChargers]);
 
   return (
     <div className="w-full max-w-6xl mx-auto">
@@ -602,9 +687,9 @@ function MoreDetailCard(props: any) {
                       <SelectValue placeholder="เลือกแบบทาสี" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="border">ทาสีเส้นขอบ</SelectItem>
-                      <SelectItem value="border-symbol">ทาสีเส้นขอบพร้อมสัญลักษณ์</SelectItem>
-                      <SelectItem value="border-symbol-logo">ทาสีเส้นขอบพร้อมสัญลักษณ์และโลโก้</SelectItem>
+                      <SelectItem value="no-grind-no-polish">ทาสีพื้นช่องจอดรถ แบบไม่ขัด ไม่โป้ว</SelectItem>
+                      <SelectItem value="grind-no-polish">ทาสีพื้นช่องจอดรถ แบบขัด แต่ไม่โป้ว</SelectItem>
+                      <SelectItem value="grind-and-polish">ทาสีพื้นช่องจอดรถ แบบขัด และโป้วให้เรียบ</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -860,41 +945,81 @@ function MoreDetailCard(props: any) {
               <Separator />
 
               {/* ค่าเดินทาง */}
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <Label className="text-sm font-medium text-gray-700 flex items-center gap-2">
                   <MapPin className="h-4 w-4" />
                   ค่าเดินทาง <span className="text-xs text-gray-400">(Travel Cost)</span>
                 </Label>
-                <div className="grid grid-cols-2 gap-3">
-                  <div
-                    className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-purple-50 cursor-pointer ${travelCostType === 'hotel' ? 'bg-purple-100 border-purple-300' : ''}`}
-                    onClick={() => setTravelCostType('hotel')}
-                  >
-                    <Checkbox
-                      id="hotel"
-                      checked={travelCostType === 'hotel'}
-                      onCheckedChange={(checked) => {
-                        if (checked) setTravelCostType('hotel');
-                      }}
-                      className="text-purple-500 border-purple-400 data-[state=checked]:bg-purple-500"
-                    />
-                    <Label htmlFor="hotel" className="font-medium cursor-pointer text-purple-700">พักโรงแรม</Label>
-                  </div>
-                  <div
-                    className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-indigo-50 cursor-pointer ${travelCostType === 'company-travel' ? 'bg-indigo-100 border-indigo-300' : ''}`}
-                    onClick={() => setTravelCostType('company-travel')}
-                  >
-                    <Checkbox
-                      id="company-travel"
-                      checked={travelCostType === 'company-travel'}
-                      onCheckedChange={(checked) => {
-                        if (checked) setTravelCostType('company-travel');
-                      }}
-                      className="text-indigo-500 border-indigo-400 data-[state=checked]:bg-indigo-500"
-                    />
-                    <Label htmlFor="company-travel" className="font-medium cursor-pointer text-indigo-700">เดินทางออกจากบริษัท</Label>
+
+                {/* ระยะทาง */}
+                <div className="space-y-2">
+                  <Label htmlFor="travelDistance" className="text-sm font-medium text-gray-700">
+                    ระยะทาง (กิโลเมตร)
+                  </Label>
+                  <Input
+                    id="travelDistance"
+                    type="number"
+                    placeholder="กรอกระยะทาง"
+                    value={travelDistance}
+                    onChange={(e) => setTravelDistance(e.target.value)}
+                    className="w-32"
+                  />
+                </div>
+
+                {/* งานฝึกอบรม */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium text-gray-700">
+                    งานฝึกอบรม <span className="text-xs text-gray-400">(Training Work)</span>
+                  </Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div
+                      className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-green-50 cursor-pointer ${trainingWork === 'yes' ? 'bg-green-100 border-green-300' : ''}`}
+                      onClick={() => setTrainingWork('yes')}
+                    >
+                      <Checkbox
+                        id="training-yes"
+                        checked={trainingWork === 'yes'}
+                        onCheckedChange={(checked) => {
+                          if (checked) setTrainingWork('yes');
+                        }}
+                        className="text-green-500 border-green-400 data-[state=checked]:bg-green-500"
+                      />
+                      <Label htmlFor="training-yes" className="font-medium cursor-pointer text-green-700">มีงานฝึกอบรม (1วัน)</Label>
+                    </div>
+                    <div
+                      className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer ${trainingWork === 'no' ? 'bg-gray-100 border-gray-300' : ''}`}
+                      onClick={() => setTrainingWork('no')}
+                    >
+                      <Checkbox
+                        id="training-no"
+                        checked={trainingWork === 'no'}
+                        onCheckedChange={(checked) => {
+                          if (checked) setTrainingWork('no');
+                        }}
+                        className="text-gray-500 border-gray-400 data-[state=checked]:bg-gray-500"
+                      />
+                      <Label htmlFor="training-no" className="font-medium cursor-pointer text-gray-700">ไม่มีงานฝึกอบรม</Label>
+                    </div>
                   </div>
                 </div>
+
+                {/* แสดงผลการคำนวณ */}
+                {travelDistance && (
+                  <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-gray-700">ค่าเดินทาง:</span>
+                      <span className="font-bold text-blue-600 text-lg">
+                        {travelCostResult.toLocaleString('th-TH')} บาท
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      ระยะทาง: {travelDistance} กม. | จำนวน Charger: {props.numberOfChargers} Unit
+                      {trainingWork === 'yes' && (
+                        <span className="text-green-600 font-medium"> | + งานฝึกอบรม (1วัน)</span>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
