@@ -39,6 +39,8 @@ function MoreDetailCard(props: any) {
   const [trainingWork, setTrainingWork] = useState(props.trainingWork || 'no');
   const [travelCostResult, setTravelCostResult] = useState(props.travelCostResult || 0);
   const [transformerSelection, setTransformerSelection] = useState(props.transformerSelection || 'no');
+  const [transformerType, setTransformerType] = useState(props.transformerType || '');
+  const [mccbMainBrand, setMccbMainBrand] = useState(props.mccbMainBrand || '');
   const [trMdbSelection, setTrMdbSelection] = useState(props.trMdbSelection || 'no');
   const [mdbSelection, setMdbSelection] = useState(props.mdbSelection || 'no');
   const [chargerSelection, setChargerSelection] = useState(props.chargerSelection || 'no');
@@ -161,19 +163,14 @@ function MoreDetailCard(props: any) {
       {/* Transformer Size Card */}
       <Card className="shadow-xl border-0 overflow-hidden mb-6">
         <CardHeader className="bg-gradient-to-r from-orange-50 to-red-50 border-b">
-          <CardTitle className="flex items-center gap-2 text-orange-800">
-            <Zap className="h-5 w-5" />
-            Transformer Size
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-6">
-          <div className="space-y-3">
-            <Label className="text-sm font-medium text-gray-700">
+          <CardTitle className="flex items-center justify-between text-orange-800">
+            <div className="flex items-center gap-2">
+              <Zap className="h-5 w-5" />
               Transformer Size <span className="text-xs text-gray-400">(ขนาดหม้อแปลง)</span>
-            </Label>
-            <div className="grid grid-cols-2 gap-3">
+            </div>
+            <div className="flex items-center gap-3">
               <div
-                className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-green-50 cursor-pointer ${transformerSelection === 'yes' ? 'bg-green-100 border-green-300' : ''}`}
+                className={`flex items-center space-x-2 px-3 py-1 rounded-lg border border-gray-200 hover:bg-green-50 cursor-pointer ${transformerSelection === 'yes' ? 'bg-green-100 border-green-300' : ''}`}
                 onClick={() => setTransformerSelection('yes')}
               >
                 <Checkbox
@@ -184,10 +181,10 @@ function MoreDetailCard(props: any) {
                   }}
                   className="text-green-500 border-green-400 data-[state=checked]:bg-green-500"
                 />
-                <Label htmlFor="transformer-yes" className="font-medium cursor-pointer text-green-700">มี</Label>
+                <Label htmlFor="transformer-yes" className="font-medium cursor-pointer text-green-700 text-sm">มี</Label>
               </div>
               <div
-                className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer ${transformerSelection === 'no' ? 'bg-gray-100 border-gray-300' : ''}`}
+                className={`flex items-center space-x-2 px-3 py-1 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer ${transformerSelection === 'no' ? 'bg-gray-100 border-gray-300' : ''}`}
                 onClick={() => setTransformerSelection('no')}
               >
                 <Checkbox
@@ -198,16 +195,73 @@ function MoreDetailCard(props: any) {
                   }}
                   className="text-gray-500 border-gray-400 data-[state=checked]:bg-gray-500"
                 />
-                <Label htmlFor="transformer-no" className="font-medium cursor-pointer text-gray-700">ไม่มี</Label>
+                <Label htmlFor="transformer-no" className="font-medium cursor-pointer text-gray-700 text-sm">ไม่มี</Label>
               </div>
             </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-6">
+          <div className="space-y-3">
 
-            {/* แสดงค่า Transformer เมื่อเลือก "มี" */}
+            {/* แสดงสเปค Transformer Size เมื่อเลือก "มี" */}
             {transformerSelection === 'yes' && (
-              <div className="mt-4 p-4 bg-green-50 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-gray-700">Transformer Size:</span>
-                  <span className="font-semibold text-gray-900">{props.transformer} <span className="text-sm text-gray-600">kVA</span></span>
+              <div className="mt-4 space-y-3">
+                {/* แสดงสเปค Transformer Size ก่อน */}
+                <div className="p-4 bg-green-50 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-gray-700">Transformer Size:</span>
+                    <span className="font-semibold text-gray-900">{props.transformer} <span className="text-sm text-gray-600">kVA</span></span>
+                  </div>
+                </div>
+
+                {/* แสดงตัวเลือก Transformer Type */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium text-gray-700">
+                    ประเภทหม้อแปลง <span className="text-xs text-gray-400">(Transformer Type)</span>
+                  </Label>
+                  <div className="grid grid-cols-1 gap-3">
+                    <div
+                      className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-blue-50 cursor-pointer ${transformerType === '22kv-416v' ? 'bg-blue-100 border-blue-300' : ''}`}
+                      onClick={() => setTransformerType('22kv-416v')}
+                    >
+                      <Checkbox
+                        id="transformer-22kv"
+                        checked={transformerType === '22kv-416v'}
+                        onCheckedChange={(checked) => {
+                          if (checked) setTransformerType('22kv-416v');
+                        }}
+                        className="text-blue-500 border-blue-400 data-[state=checked]:bg-blue-500"
+                      />
+                      <Label htmlFor="transformer-22kv" className="font-medium cursor-pointer text-blue-700">
+                        หม้อแปลง 22 (24) kV / 416 V
+                      </Label>
+                    </div>
+                    <div
+                      className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-purple-50 cursor-pointer ${transformerType === '33kv-316v' ? 'bg-purple-100 border-purple-300' : ''}`}
+                      onClick={() => setTransformerType('33kv-316v')}
+                    >
+                      <Checkbox
+                        id="transformer-33kv"
+                        checked={transformerType === '33kv-316v'}
+                        onCheckedChange={(checked) => {
+                          if (checked) setTransformerType('33kv-316v');
+                        }}
+                        className="text-purple-500 border-purple-400 data-[state=checked]:bg-purple-500"
+                      />
+                      <Label htmlFor="transformer-33kv" className="font-medium cursor-pointer text-purple-700">
+                        หม้อแปลง 33 kV / 316 V
+                      </Label>
+                    </div>
+                  </div>
+
+                  {/* แสดงประเภทที่เลือก */}
+                  {transformerType && (
+                    <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                      <div className="text-sm text-gray-600">
+                        <span className="font-medium">ประเภทที่เลือก:</span> {transformerType === '22kv-416v' ? 'หม้อแปลง 22 (24) kV / 416 V' : 'หม้อแปลง 33 kV / 316 V'}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -218,20 +272,14 @@ function MoreDetailCard(props: any) {
       {/* TR to MDB Configuration Card */}
       <Card className="shadow-xl border-0 overflow-hidden mb-6">
         <CardHeader className="bg-gradient-to-r from-gray-50 to-blue-50 border-b">
-          <CardTitle className="flex items-center gap-2 text-gray-800">
-            <Wrench className="h-5 w-5" />
-            TR to MDB Configuration
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-6">
-          {/* มี/ไม่มี Selection */}
-          <div className="space-y-3 mb-6">
-            <Label className="text-sm font-medium text-gray-700">
+          <CardTitle className="flex items-center justify-between text-gray-800">
+            <div className="flex items-center gap-2">
+              <Wrench className="h-5 w-5" />
               TR to MDB Configuration <span className="text-xs text-gray-400">(การตั้งค่า TR ไป MDB)</span>
-            </Label>
-            <div className="grid grid-cols-2 gap-3">
+            </div>
+            <div className="flex items-center gap-3">
               <div
-                className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-blue-50 cursor-pointer ${trMdbSelection === 'yes' ? 'bg-blue-100 border-blue-300' : ''}`}
+                className={`flex items-center space-x-2 px-3 py-1 rounded-lg border border-gray-200 hover:bg-blue-50 cursor-pointer ${trMdbSelection === 'yes' ? 'bg-blue-100 border-blue-300' : ''}`}
                 onClick={() => setTrMdbSelection('yes')}
               >
                 <Checkbox
@@ -242,10 +290,10 @@ function MoreDetailCard(props: any) {
                   }}
                   className="text-blue-500 border-blue-400 data-[state=checked]:bg-blue-500"
                 />
-                <Label htmlFor="trMdb-yes" className="font-medium cursor-pointer text-blue-700">มี</Label>
+                <Label htmlFor="trMdb-yes" className="font-medium cursor-pointer text-blue-700 text-sm">มี</Label>
               </div>
               <div
-                className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer ${trMdbSelection === 'no' ? 'bg-gray-100 border-gray-300' : ''}`}
+                className={`flex items-center space-x-2 px-3 py-1 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer ${trMdbSelection === 'no' ? 'bg-gray-100 border-gray-300' : ''}`}
                 onClick={() => setTrMdbSelection('no')}
               >
                 <Checkbox
@@ -256,10 +304,12 @@ function MoreDetailCard(props: any) {
                   }}
                   className="text-gray-500 border-gray-400 data-[state=checked]:bg-gray-500"
                 />
-                <Label htmlFor="trMdb-no" className="font-medium cursor-pointer text-gray-700">ไม่มี</Label>
+                <Label htmlFor="trMdb-no" className="font-medium cursor-pointer text-gray-700 text-sm">ไม่มี</Label>
               </div>
             </div>
-          </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-6">
 
           {/* แสดงเนื้อหาเมื่อเลือก "มี" */}
           {trMdbSelection === 'yes' && (
@@ -315,20 +365,14 @@ function MoreDetailCard(props: any) {
       {/* MDB Configuration Card */}
       <Card className="shadow-xl border-0 overflow-hidden mb-6">
         <CardHeader className="bg-gradient-to-r from-yellow-50 to-yellow-100 border-b">
-          <CardTitle className="flex items-center gap-2 text-yellow-800">
-            <Wrench className="h-5 w-5" />
-            MDB Configuration
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-6">
-          {/* มี/ไม่มี Selection */}
-          <div className="space-y-3 mb-6">
-            <Label className="text-sm font-medium text-gray-700">
+          <CardTitle className="flex items-center justify-between text-yellow-800">
+            <div className="flex items-center gap-2">
+              <Wrench className="h-5 w-5" />
               MDB Configuration <span className="text-xs text-gray-400">(การตั้งค่า MDB)</span>
-            </Label>
-            <div className="grid grid-cols-2 gap-3">
+            </div>
+            <div className="flex items-center gap-3">
               <div
-                className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-yellow-50 cursor-pointer ${mdbSelection === 'yes' ? 'bg-yellow-100 border-yellow-300' : ''}`}
+                className={`flex items-center space-x-2 px-3 py-1 rounded-lg border border-gray-200 hover:bg-yellow-50 cursor-pointer ${mdbSelection === 'yes' ? 'bg-yellow-100 border-yellow-300' : ''}`}
                 onClick={() => setMdbSelection('yes')}
               >
                 <Checkbox
@@ -339,10 +383,10 @@ function MoreDetailCard(props: any) {
                   }}
                   className="text-yellow-500 border-yellow-400 data-[state=checked]:bg-yellow-500"
                 />
-                <Label htmlFor="mdb-yes" className="font-medium cursor-pointer text-yellow-700">มี</Label>
+                <Label htmlFor="mdb-yes" className="font-medium cursor-pointer text-yellow-700 text-sm">มี</Label>
               </div>
               <div
-                className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer ${mdbSelection === 'no' ? 'bg-gray-100 border-gray-300' : ''}`}
+                className={`flex items-center space-x-2 px-3 py-1 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer ${mdbSelection === 'no' ? 'bg-gray-100 border-gray-300' : ''}`}
                 onClick={() => setMdbSelection('no')}
               >
                 <Checkbox
@@ -353,35 +397,108 @@ function MoreDetailCard(props: any) {
                   }}
                   className="text-gray-500 border-gray-400 data-[state=checked]:bg-gray-500"
                 />
-                <Label htmlFor="mdb-no" className="font-medium cursor-pointer text-gray-700">ไม่มี</Label>
+                <Label htmlFor="mdb-no" className="font-medium cursor-pointer text-gray-700 text-sm">ไม่มี</Label>
               </div>
             </div>
-          </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-6">
 
-          {/* แสดงเนื้อหาเมื่อเลือก "มี" */}
+          {/* แสดงสเปค MDB Configuration เมื่อเลือก "มี" */}
           {mdbSelection === 'yes' && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-600 min-w-[160px]">MCCB Main</span>
-                <span className="font-semibold text-gray-900">
-                  {props.mdbMainAt || '-'}
-                  {props.mdbMainAf ? <span className="mx-2">/</span> : null}
-                  {props.mdbMainAf || ''}
-                </span>
-              </div>
-              {Array.isArray(props.mdbSubs) && props.mdbSubs.map((val: string, idx: number) => (
-                <div key={idx} className="flex items-center gap-2">
-                  <span className="text-sm text-gray-600 min-w-[160px]">MCCB Sub C{idx + 1}</span>
-                  <span className="font-semibold text-gray-900">{val}</span>
+            <div className="space-y-3">
+              {/* แสดงสเปค MDB Configuration ก่อน */}
+              <div className="p-4 bg-yellow-50 rounded-lg">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600 min-w-[160px]">MCCB Main</span>
+                    <span className="font-semibold text-gray-900">
+                      {props.mdbMainAt || '-'}
+                      {props.mdbMainAf ? <span className="mx-2">/</span> : null}
+                      {props.mdbMainAf || ''}
+                    </span>
+                  </div>
+                  {Array.isArray(props.mdbSubs) && props.mdbSubs.map((val: string, idx: number) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600 min-w-[160px]">MCCB Sub C{idx + 1}</span>
+                      <span className="font-semibold text-gray-900">{val}</span>
+                    </div>
+                  ))}
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600 min-w-[160px]">MCCB for Lighting</span>
+                    <span className="font-semibold text-gray-900">{props.mdbLighting || '-'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600 min-w-[160px]">MCCB for Commu</span>
+                    <span className="font-semibold text-gray-900">{props.mdbCommu || '-'}</span>
+                  </div>
                 </div>
-              ))}
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-600 min-w-[160px]">MCCB for Lighting</span>
-                <span className="font-semibold text-gray-900">{props.mdbLighting || '-'}</span>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-600 min-w-[160px]">MCCB for Commu</span>
-                <span className="font-semibold text-gray-900">{props.mdbCommu || '-'}</span>
+
+              {/* แสดงตัวเลือกยี่ห้อ MCCB Main */}
+              <div className="space-y-3">
+                <Label className="text-sm font-medium text-gray-700">
+                  ยี่ห้อ MCCB Main <span className="text-xs text-gray-400">(MCCB Main Brand)</span>
+                </Label>
+                <div className="grid grid-cols-1 gap-3">
+                  <div
+                    className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-red-50 cursor-pointer ${mccbMainBrand === 'ABB' ? 'bg-red-100 border-red-300' : ''}`}
+                    onClick={() => setMccbMainBrand('ABB')}
+                  >
+                    <Checkbox
+                      id="mccb-abb"
+                      checked={mccbMainBrand === 'ABB'}
+                      onCheckedChange={(checked) => {
+                        if (checked) setMccbMainBrand('ABB');
+                      }}
+                      className="text-red-500 border-red-400 data-[state=checked]:bg-red-500"
+                    />
+                    <Label htmlFor="mccb-abb" className="font-medium cursor-pointer text-red-700">
+                      ABB
+                    </Label>
+                  </div>
+                  <div
+                    className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-green-50 cursor-pointer ${mccbMainBrand === 'EATON' ? 'bg-green-100 border-green-300' : ''}`}
+                    onClick={() => setMccbMainBrand('EATON')}
+                  >
+                    <Checkbox
+                      id="mccb-eaton"
+                      checked={mccbMainBrand === 'EATON'}
+                      onCheckedChange={(checked) => {
+                        if (checked) setMccbMainBrand('EATON');
+                      }}
+                      className="text-green-500 border-green-400 data-[state=checked]:bg-green-500"
+                    />
+                    <Label htmlFor="mccb-eaton" className="font-medium cursor-pointer text-green-700">
+                      EATON
+                    </Label>
+                  </div>
+                  <div
+                    className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-blue-50 cursor-pointer ${mccbMainBrand === 'LS' ? 'bg-blue-100 border-blue-300' : ''}`}
+                    onClick={() => setMccbMainBrand('LS')}
+                  >
+                    <Checkbox
+                      id="mccb-ls"
+                      checked={mccbMainBrand === 'LS'}
+                      onCheckedChange={(checked) => {
+                        if (checked) setMccbMainBrand('LS');
+                      }}
+                      className="text-blue-500 border-blue-400 data-[state=checked]:bg-blue-500"
+                    />
+                    <Label htmlFor="mccb-ls" className="font-medium cursor-pointer text-blue-700">
+                      LS
+                    </Label>
+                  </div>
+                </div>
+
+                {/* แสดงยี่ห้อที่เลือก */}
+                {mccbMainBrand && (
+                  <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                    <div className="text-sm text-gray-600">
+                      <span className="font-medium">ยี่ห้อที่เลือก:</span> {mccbMainBrand}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -391,20 +508,14 @@ function MoreDetailCard(props: any) {
       {/* MDB to Charger Configuration Card */}
       <Card className="shadow-xl border-0 overflow-hidden mb-6">
         <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 border-b">
-          <CardTitle className="flex items-center gap-2 text-green-800">
-            <Wrench className="h-5 w-5" />
-            MDB to Charger Configuration
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-6">
-          {/* มี/ไม่มี Selection */}
-          <div className="space-y-3 mb-6">
-            <Label className="text-sm font-medium text-gray-700">
+          <CardTitle className="flex items-center justify-between text-green-800">
+            <div className="flex items-center gap-2">
+              <Wrench className="h-5 w-5" />
               MDB to Charger Configuration <span className="text-xs text-gray-400">(การตั้งค่า MDB ไป Charger)</span>
-            </Label>
-            <div className="grid grid-cols-2 gap-3">
+            </div>
+            <div className="flex items-center gap-3">
               <div
-                className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-green-50 cursor-pointer ${chargerSelection === 'yes' ? 'bg-green-100 border-green-300' : ''}`}
+                className={`flex items-center space-x-2 px-3 py-1 rounded-lg border border-gray-200 hover:bg-green-50 cursor-pointer ${chargerSelection === 'yes' ? 'bg-green-100 border-green-300' : ''}`}
                 onClick={() => setChargerSelection('yes')}
               >
                 <Checkbox
@@ -415,10 +526,10 @@ function MoreDetailCard(props: any) {
                   }}
                   className="text-green-500 border-green-400 data-[state=checked]:bg-green-500"
                 />
-                <Label htmlFor="charger-yes" className="font-medium cursor-pointer text-green-700">มี</Label>
+                <Label htmlFor="charger-yes" className="font-medium cursor-pointer text-green-700 text-sm">มี</Label>
               </div>
               <div
-                className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer ${chargerSelection === 'no' ? 'bg-gray-100 border-gray-300' : ''}`}
+                className={`flex items-center space-x-2 px-3 py-1 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer ${chargerSelection === 'no' ? 'bg-gray-100 border-gray-300' : ''}`}
                 onClick={() => setChargerSelection('no')}
               >
                 <Checkbox
@@ -429,10 +540,12 @@ function MoreDetailCard(props: any) {
                   }}
                   className="text-gray-500 border-gray-400 data-[state=checked]:bg-gray-500"
                 />
-                <Label htmlFor="charger-no" className="font-medium cursor-pointer text-gray-700">ไม่มี</Label>
+                <Label htmlFor="charger-no" className="font-medium cursor-pointer text-gray-700 text-sm">ไม่มี</Label>
               </div>
             </div>
-          </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-6">
 
           {/* แสดงเนื้อหาเมื่อเลือก "มี" */}
           {chargerSelection === 'yes' && (
@@ -606,23 +719,14 @@ function MoreDetailCard(props: any) {
       {/* Additional Features Card */}
       <Card className="shadow-xl border-0 overflow-hidden">
         <CardHeader className="bg-gradient-to-r from-purple-50 to-indigo-50 border-b">
-          <CardTitle className="flex items-center gap-2 text-purple-800">
-            <Home className="h-5 w-5" />
-            Additional Features & Options
-          </CardTitle>
-          <CardDescription className="text-purple-600">
-            Parking, painting, roofing, and travel options
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-6">
-          {/* มี/ไม่มี Selection */}
-          <div className="space-y-3 mb-6">
-            <Label className="text-sm font-medium text-gray-700">
+          <CardTitle className="flex items-center justify-between text-purple-800">
+            <div className="flex items-center gap-2">
+              <Home className="h-5 w-5" />
               Additional Features & Options <span className="text-xs text-gray-400">(ฟีเจอร์และตัวเลือกเพิ่มเติม)</span>
-            </Label>
-            <div className="grid grid-cols-2 gap-3">
+            </div>
+            <div className="flex items-center gap-3">
               <div
-                className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-purple-50 cursor-pointer ${additionalSelection === 'yes' ? 'bg-purple-100 border-purple-300' : ''}`}
+                className={`flex items-center space-x-2 px-3 py-1 rounded-lg border border-gray-200 hover:bg-purple-50 cursor-pointer ${additionalSelection === 'yes' ? 'bg-purple-100 border-purple-300' : ''}`}
                 onClick={() => setAdditionalSelection('yes')}
               >
                 <Checkbox
@@ -633,10 +737,10 @@ function MoreDetailCard(props: any) {
                   }}
                   className="text-purple-500 border-purple-400 data-[state=checked]:bg-purple-500"
                 />
-                <Label htmlFor="additional-yes" className="font-medium cursor-pointer text-purple-700">มี</Label>
+                <Label htmlFor="additional-yes" className="font-medium cursor-pointer text-purple-700 text-sm">มี</Label>
               </div>
               <div
-                className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer ${additionalSelection === 'no' ? 'bg-gray-100 border-gray-300' : ''}`}
+                className={`flex items-center space-x-2 px-3 py-1 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer ${additionalSelection === 'no' ? 'bg-gray-100 border-gray-300' : ''}`}
                 onClick={() => setAdditionalSelection('no')}
               >
                 <Checkbox
@@ -647,10 +751,15 @@ function MoreDetailCard(props: any) {
                   }}
                   className="text-gray-500 border-gray-400 data-[state=checked]:bg-gray-500"
                 />
-                <Label htmlFor="additional-no" className="font-medium cursor-pointer text-gray-700">ไม่มี</Label>
+                <Label htmlFor="additional-no" className="font-medium cursor-pointer text-gray-700 text-sm">ไม่มี</Label>
               </div>
             </div>
-          </div>
+          </CardTitle>
+          <CardDescription className="text-purple-600">
+            Parking, painting, roofing, and travel options
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-6">
 
           {/* แสดงเนื้อหาเมื่อเลือก "มี" */}
           {additionalSelection === 'yes' && (
