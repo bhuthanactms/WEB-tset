@@ -33,6 +33,188 @@ interface CalculatorResults {
   inAllCharger: number
 }
 
+/** Charger data interface */
+interface ChargerData {
+  name: string
+  power: number
+  inOfCharger: number
+  inAllCharger: number
+  meaRow: number
+  peaRow: number
+  meaData: {
+    inOfCharger: number
+    inAllCharger: number
+    cableSize: string
+    cableSizeMm: string
+    conduitSize: string
+    conduitSizeMm: string
+    mccbMain: string
+    main2: string
+    cost: string
+  }
+  peaData: {
+    inOfCharger: number
+    inAllCharger: number
+    cableSize: string
+    cableSizeMm: string
+    conduitSize: string
+    conduitSizeMm: string
+    mccbMain: string
+    main2: string
+    cost: string
+  }
+}
+
+/** Transformer data interface */
+interface TransformerData {
+  mea: {
+    [key: string]: {
+      trSize: string
+      trWiringType: string
+      trWiringTypeUnit: string
+      trCableSize: string
+      trCableSizeUnit: string
+      mccbMain: string
+      main2: string
+    }
+  }
+  pea: {
+    [key: string]: {
+      trSize: string
+      trWiringType: string
+      trWiringTypeUnit: string
+      trCableSize: string
+      trCableSizeUnit: string
+      mccbMain: string
+      main2: string
+    }
+  }
+}
+
+/** Mapped Excel data interface */
+interface MappedExcelData {
+  chargers: ChargerData[]
+  transformers: TransformerData
+}
+
+// ==================== EXCEL MAPPING CONFIGURATION ====================
+// This section contains all Excel position mappings to decouple from hardcoded positions
+
+// Excel Column Mappings - Define which columns contain what data
+const EXCEL_COLUMNS = {
+  // Main data columns
+  IN_OF_CHARGER: '__EMPTY_2',
+  TRANSFORMER_SIZE: '__EMPTY',
+  
+  // MDB/MCCB columns
+  MCCB_MAIN_AT: '__EMPTY_11',
+  MCCB_MAIN_AF: '__EMPTY_14',
+  MDB_SUB_MEA: '__EMPTY_29',
+  MDB_SUB_PEA: '__EMPTY_27',
+  
+  // TR Wiring Size columns for different wiring types
+  TR_WIRING_AIR: ['__EMPTY_15', '__EMPTY_16', '__EMPTY_17', '__EMPTY_18', '__EMPTY_19', '__EMPTY_20', '__EMPTY_21', '__EMPTY_22', '__EMPTY_23', '__EMPTY_24'],
+  TR_WIRING_UNDERGROUND: ['__EMPTY_36', '__EMPTY_37', '__EMPTY_38', '__EMPTY_39', '__EMPTY_40', '__EMPTY_41', '__EMPTY_42', '__EMPTY_43', '__EMPTY_44', '__EMPTY_45'],
+  TR_WIRING_TRAY: ['__EMPTY_57', '__EMPTY_58', '__EMPTY_59', '__EMPTY_60', '__EMPTY_61', '__EMPTY_62', '__EMPTY_63', '__EMPTY_64', '__EMPTY_65', '__EMPTY_66'],
+  TR_WIRING_LADDER: ['__EMPTY_78', '__EMPTY_79', '__EMPTY_80', '__EMPTY_81', '__EMPTY_82', '__EMPTY_83', '__EMPTY_84', '__EMPTY_85', '__EMPTY_86', '__EMPTY_87'],
+  
+  // TR Wire Conduit columns
+  TR_CONDUIT_AIR: { cols: ['__EMPTY_32', '__EMPTY_33', '__EMPTY_34', '__EMPTY_35'], unit: 'นิ้ว' },
+  TR_CONDUIT_UNDERGROUND: { cols: ['__EMPTY_53', '__EMPTY_54', '__EMPTY_55'], unit: 'มม.' },
+  TR_CONDUIT_TRAY: { cols: ['__EMPTY_74'], unit: 'ซม.' },
+  TR_CONDUIT_LADDER: { cols: ['__EMPTY_95'], unit: 'ซม.' },
+  
+  // Charger Wiring Cable columns (MEA)
+  CHARGER_CABLE_MEA_AIR: ['__EMPTY_33', '__EMPTY_34', '__EMPTY_35', '__EMPTY_36', '__EMPTY_37', '__EMPTY_38', '__EMPTY_39', '__EMPTY_40', '__EMPTY_41', '__EMPTY_42', '__EMPTY_43', '__EMPTY_44', '__EMPTY_45'],
+  CHARGER_CABLE_MEA_UNDERGROUND: ['__EMPTY_57', '__EMPTY_58', '__EMPTY_59', '__EMPTY_60', '__EMPTY_61', '__EMPTY_62', '__EMPTY_63', '__EMPTY_64', '__EMPTY_65', '__EMPTY_66', '__EMPTY_67', '__EMPTY_68', '__EMPTY_69'],
+  
+  // Charger Wiring Cable columns (PEA)
+  CHARGER_CABLE_PEA_AIR: ['__EMPTY_31', '__EMPTY_32', '__EMPTY_33', '__EMPTY_34', '__EMPTY_35', '__EMPTY_36', '__EMPTY_37', '__EMPTY_38', '__EMPTY_39', '__EMPTY_40', '__EMPTY_41', '__EMPTY_42', '__EMPTY_43'],
+  CHARGER_CABLE_PEA_UNDERGROUND: ['__EMPTY_55', '__EMPTY_56', '__EMPTY_57', '__EMPTY_58', '__EMPTY_59', '__EMPTY_60', '__EMPTY_61', '__EMPTY_62', '__EMPTY_63', '__EMPTY_64', '__EMPTY_65', '__EMPTY_66', '__EMPTY_67'],
+  
+  // Charger Wire Conduit columns (MEA)
+  CHARGER_CONDUIT_MEA_AIR: { cols: ['__EMPTY_50', '__EMPTY_51', '__EMPTY_52', '__EMPTY_53', '__EMPTY_54', '__EMPTY_55'], unit: 'นิ้ว' },
+  CHARGER_CONDUIT_MEA_UNDERGROUND: { cols: ['__EMPTY_74', '__EMPTY_75', '__EMPTY_76', '__EMPTY_77', '__EMPTY_78', '__EMPTY_79'], unit: 'มม.' },
+  
+  // Charger Wire Conduit columns (PEA)
+  CHARGER_CONDUIT_PEA_AIR: { cols: ['__EMPTY_48', '__EMPTY_49', '__EMPTY_50', '__EMPTY_51', '__EMPTY_52', '__EMPTY_53'], unit: 'นิ้ว' },
+  CHARGER_CONDUIT_PEA_UNDERGROUND: { cols: ['__EMPTY_72', '__EMPTY_73', '__EMPTY_74', '__EMPTY_75', '__EMPTY_76', '__EMPTY_77'], unit: 'มม.' },
+} as const;
+
+// Transformer sizing thresholds - Maps current (A) to Excel row numbers
+const TRANSFORMER_SIZING = {
+  MEA: [
+    { maxCurrent: 444.1, row: 33 },
+    { maxCurrent: 555.1, row: 34 },
+    { maxCurrent: 699.4, row: 35 },
+    { maxCurrent: 888.2, row: 36 },
+    { maxCurrent: 1110.3, row: 37 },
+    { maxCurrent: 1387.8, row: 38 },
+    { maxCurrent: 1665.4, row: 39 },
+    { maxCurrent: 2220.6, row: 40 },
+    { maxCurrent: 2775.7, row: 41 },
+  ],
+  PEA: [
+    { maxCurrent: 115.4, row: 76 },
+    { maxCurrent: 184.7, row: 77 },
+    { maxCurrent: 288.6, row: 78 },
+    { maxCurrent: 363.7, row: 79 },
+    { maxCurrent: 461.8, row: 80 },
+    { maxCurrent: 577.3, row: 81 },
+    { maxCurrent: 727.4, row: 82 },
+    { maxCurrent: 923.7, row: 83 },
+    { maxCurrent: 1154.7, row: 84 },
+    { maxCurrent: 1443.4, row: 85 },
+    { maxCurrent: 1732.1, row: 86 },
+    { maxCurrent: 2305.4, row: 87 },
+    { maxCurrent: 2886.8, row: 88 },
+  ]
+} as const;
+
+// Wiring type name mappings to configuration keys
+const WIRING_TYPE_CONFIG = {
+  TR_WIRING: {
+    'ร้อยท่อเดินในอากาศ กลุ่ม 2': { size: 'TR_WIRING_AIR', conduit: 'TR_CONDUIT_AIR' },
+    'ร้อยท่อฝังใต้ดิน กลุ่ม 5': { size: 'TR_WIRING_UNDERGROUND', conduit: 'TR_CONDUIT_UNDERGROUND' },
+    'ราง TRAY ไม่มีฝา': { size: 'TR_WIRING_TRAY', conduit: 'TR_CONDUIT_TRAY' },
+    'ราง LADDER ไม่มีฝา': { size: 'TR_WIRING_LADDER', conduit: 'TR_CONDUIT_LADDER' },
+  },
+  CHARGER_WIRING: {
+    MEA: {
+      'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ': { cable: 'CHARGER_CABLE_MEA_AIR', conduit: 'CHARGER_CONDUIT_MEA_AIR' },
+      'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน': { cable: 'CHARGER_CABLE_MEA_UNDERGROUND', conduit: 'CHARGER_CONDUIT_MEA_UNDERGROUND' },
+    },
+    PEA: {
+      'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ': { cable: 'CHARGER_CABLE_PEA_AIR', conduit: 'CHARGER_CONDUIT_PEA_AIR' },
+      'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน': { cable: 'CHARGER_CABLE_PEA_UNDERGROUND', conduit: 'CHARGER_CONDUIT_PEA_UNDERGROUND' },
+    }
+  }
+} as const;
+
+// Helper function to get transformer row number based on current
+const getTransformerRow = (current: number, authority: 'MEA' | 'PEA'): number | undefined => {
+  const sizing = TRANSFORMER_SIZING[authority];
+  const found = sizing.find(s => current <= s.maxCurrent);
+  return found?.row;
+};
+
+// Helper function to get MDB Sub column based on authority
+const getMDBSubColumn = (authority: 'MEA' | 'PEA'): string => {
+  return authority === 'MEA' ? EXCEL_COLUMNS.MDB_SUB_MEA : EXCEL_COLUMNS.MDB_SUB_PEA;
+};
+
+// Helper function to get TR wiring configuration
+const getTRWiringConfig = (wiringType: string) => {
+  return WIRING_TYPE_CONFIG.TR_WIRING[wiringType as keyof typeof WIRING_TYPE_CONFIG.TR_WIRING];
+};
+
+// Helper function to get charger wiring configuration
+const getChargerWiringConfig = (authority: 'MEA' | 'PEA', wiringType: string) => {
+  return WIRING_TYPE_CONFIG.CHARGER_WIRING[authority][wiringType as keyof typeof WIRING_TYPE_CONFIG.CHARGER_WIRING.MEA];
+};
+
+// ==================== END OF CONFIGURATION ====================
+
 /**
  * Home component - Main EV Station Calculator interface
  */
@@ -51,6 +233,7 @@ export default function Home(): React.JSX.Element {
 
   const [results, setResults] = useState<CalculatorResults | null>(null)
   const [excelData, setExcelData] = useState<any[]>([]);
+  const [mappedData, setMappedData] = useState<MappedExcelData | null>(null);
   const navigate = useNavigate();
 
   /** Handle form input changes */
@@ -87,79 +270,181 @@ export default function Home(): React.JSX.Element {
     '800 kW Prime+': { mea: 'C23', pea: 'C71' },
   };
 
+  /** Map Excel data to structured format */
+  const mapExcelData = (data: any[]): MappedExcelData => {
+    const chargers: ChargerData[] = [];
+    const transformers: TransformerData = {
+      mea: {},
+      pea: {}
+    };
+
+    // Map charger data
+    Object.entries(chargerToExcelCell).forEach(([chargerName, cells]) => {
+      const power = extractPowerValue(chargerName);
+      const meaRow = cells.mea ? parseInt(cells.mea.replace('C', '')) : 0;
+      const peaRow = cells.pea ? parseInt(cells.pea.replace('C', '')) : 0;
+
+      const meaRowData = data.find(r => r.__rowNum__ === meaRow);
+      console.log('meaRowData', meaRowData);
+      const peaRowData = data.find(r => r.__rowNum__ === peaRow);
+      console.log('peaRowData', peaRowData);
+
+      const charger: ChargerData = {
+        name: chargerName,
+        power,
+        inOfCharger: 0,
+        inAllCharger: 0,
+        meaRow,
+        peaRow,
+        meaData: {
+          inOfCharger: meaRowData?.['__EMPTY_2'] || 0,
+          inAllCharger: meaRowData?.['__EMPTY_2'] || 0,
+          cableSize: meaRowData?.['__EMPTY_3'] || '',
+          cableSizeMm: meaRowData?.['__EMPTY_4'] || '',
+          conduitSize: meaRowData?.['__EMPTY_5'] || '',
+          conduitSizeMm: meaRowData?.['__EMPTY_6'] || '',
+          mccbMain: meaRowData?.['__EMPTY_11'] || '',
+          main2: meaRowData?.['__EMPTY_14'] || '',
+          cost: meaRowData?.['__EMPTY_29'] || ''
+        },
+        peaData: {
+          inOfCharger: peaRowData?.['__EMPTY_2'] || 0,
+          inAllCharger: peaRowData?.['__EMPTY_2'] || 0,
+          cableSize: peaRowData?.['__EMPTY_3'] || '',
+          cableSizeMm: peaRowData?.['__EMPTY_4'] || '',
+          conduitSize: peaRowData?.['__EMPTY_5'] || '',
+          conduitSizeMm: peaRowData?.['__EMPTY_6'] || '',
+          mccbMain: peaRowData?.['__EMPTY_11'] || '',
+          main2: peaRowData?.['__EMPTY_14'] || '',
+          cost: peaRowData?.['__EMPTY_27'] || ''
+        }
+      };
+
+      // Set the primary values based on current form selection
+      charger.inOfCharger = form.powerAuthority === 'MEA' ? charger.meaData.inOfCharger : charger.peaData.inOfCharger;
+      charger.inAllCharger = form.powerAuthority === 'MEA' ? charger.meaData.inAllCharger : charger.peaData.inAllCharger;
+
+      chargers.push(charger);
+    });
+
+    // Map transformer data for MEA (rows 33-41)
+    for (let i = 33; i <= 41; i++) {
+      const row = data.find(r => r.__rowNum__ === i);
+      if (row) {
+        const key = `row_${i}`;
+        transformers.mea[key] = {
+          trSize: row['__EMPTY'] || '',
+          trWiringType: row['__EMPTY_1'] || '',
+          trWiringTypeUnit: row['__EMPTY_2'] || '',
+          trCableSize: row['__EMPTY_3'] || '',
+          trCableSizeUnit: row['__EMPTY_4'] || '',
+          mccbMain: row['__EMPTY_11'] || '',
+          main2: row['__EMPTY_14'] || ''
+        };
+      }
+    }
+
+    // Map transformer data for PEA (rows 76-88)
+    for (let i = 76; i <= 88; i++) {
+      const row = data.find(r => r.__rowNum__ === i);
+      if (row) {
+        const key = `row_${i}`;
+        transformers.pea[key] = {
+          trSize: row['__EMPTY'] || '',
+          trWiringType: row['__EMPTY_1'] || '',
+          trWiringTypeUnit: row['__EMPTY_2'] || '',
+          trCableSize: row['__EMPTY_3'] || '',
+          trCableSizeUnit: row['__EMPTY_4'] || '',
+          mccbMain: row['__EMPTY_11'] || '',
+          main2: row['__EMPTY_14'] || ''
+        };
+      }
+    }
+
+    return { chargers, transformers };
+  };
+
+  /** Helper functions to access mapped data */
+  const getChargerData = (chargerName: string): ChargerData | undefined => {
+    return mappedData?.chargers.find(c => c.name === chargerName);
+  };
+
+  const getChargerDataByAuthority = (chargerName: string, authority: 'MEA' | 'PEA') => {
+    const charger = getChargerData(chargerName);
+    if (!charger) return null;
+    return authority === 'MEA' ? charger.meaData : charger.peaData;
+  };
+
+  const getTransformerData = (authority: 'MEA' | 'PEA', rowKey: string) => {
+    return mappedData?.transformers[authority.toLowerCase() as keyof TransformerData]?.[rowKey];
+  };
+
+  const findTransformerByPower = (authority: 'MEA' | 'PEA', power: number) => {
+    const transformerData = mappedData?.transformers[authority.toLowerCase() as keyof TransformerData];
+    if (!transformerData) return null;
+
+    // This is a simplified approach - you might need to adjust based on your actual transformer selection logic
+    const entries = Object.entries(transformerData);
+    return entries.find(([_, data]) => {
+      // Add your transformer selection logic here based on power requirements
+      return data.trSize && data.trSize !== '';
+    })?.[1];
+  };
+
+  /**
+   * USAGE EXAMPLES - How to use the new mapped data structure:
+   * 
+   * // Get charger data by name
+   * const charger30kW = getChargerData('30 kW');
+   * console.log(charger30kW?.power); // 30
+   * console.log(charger30kW?.meaData.cableSize); // Cable size for MEA
+   * console.log(charger30kW?.peaData.cableSize); // Cable size for PEA
+   * 
+   * // Get charger data by authority
+   * const meaData = getChargerDataByAuthority('30 kW', 'MEA');
+   * console.log(meaData?.inOfCharger); // In value for MEA
+   * console.log(meaData?.cableSize); // Cable size for MEA
+   * console.log(meaData?.mccbMain); // MCCB main for MEA
+   * 
+   * // Get transformer data
+   * const trData = getTransformerData('MEA', 'row_33');
+   * console.log(trData?.trSize); // Transformer size
+   * console.log(trData?.mccbMain); // MCCB main
+   * 
+   * // Access all chargers
+   * mappedData?.chargers.forEach(charger => {
+   *   console.log(`${charger.name}: ${charger.power}kW`);
+   *   console.log(`MEA In: ${charger.meaData.inOfCharger}`);
+   *   console.log(`PEA In: ${charger.peaData.inOfCharger}`);
+   * });
+   * 
+   * // Access transformer data by authority
+   * Object.entries(mappedData?.transformers.mea || {}).forEach(([key, data]) => {
+   *   console.log(`${key}: ${data.trSize} - ${data.mccbMain}A`);
+   * });
+   */
+
   // ดึงค่าจาก Excel ตาม Power Authority และ Charger Type
   const getInFromExcel = (type: 'inOfCharger' | 'inAllCharger') => {
     const charger = form.charger;
     const numberOfChargers = parseInt(form.numberOfChargers) || 1;
-    const cell = chargerToExcelCell[charger];
-    if (!cell) return undefined;
-
-    // ดึงเลข row จาก cell เช่น 'C7' => 7
-    let rowNum: number | undefined;
-    if (form.powerAuthority === 'MEA' && cell.mea) {
-      rowNum = parseInt(cell.mea.replace('C', ''));
-    }
-    if (form.powerAuthority === 'PEA' && cell.pea) {
-      rowNum = parseInt(cell.pea.replace('C', ''));
-    }
-    if (rowNum === undefined) return undefined;
-
-    // หา row ที่ __rowNum__ === rowNum
-    const row = excelData.find((r) => r.__rowNum__ === rowNum);
-    if (!row) return undefined;
-    const colKey = '__EMPTY_2'; // ทั้ง MEA และ PEA ใช้ __EMPTY_2
-    const value = row[colKey];
-
-    if (typeof value !== 'number' || isNaN(value)) return undefined;
-    if (type === 'inOfCharger') return value;
-    if (type === 'inAllCharger') return value * numberOfChargers;
+    
+    // Use mapped data instead of raw Excel data
+    const chargerData = getChargerDataByAuthority(charger, form.powerAuthority);
+    if (!chargerData) return undefined;
+    
+    if (type === 'inOfCharger') return chargerData.inOfCharger;
+    if (type === 'inAllCharger') return chargerData.inAllCharger * numberOfChargers;
     return undefined;
   };
 
   // ฟังก์ชันเลือก TR size ตาม Power Authority และผลรวม In all charger
   const getTRSizeFromExcel = (inAllCharger: number) => {
-    if (form.powerAuthority === 'MEA') {
-      const steps = [
-        { max: 444.1, row: 33 },
-        { max: 555.1, row: 34 },
-        { max: 699.4, row: 35 },
-        { max: 888.2, row: 36 },
-        { max: 1110.3, row: 37 },
-        { max: 1387.8, row: 38 },
-        { max: 1665.4, row: 39 },
-        { max: 2220.6, row: 40 },
-        { max: 2775.7, row: 41 },
-      ];
-      const found = steps.find(s => inAllCharger <= s.max); // ใช้ <=
-      if (found) {
-        const row = excelData.find(r => r.__rowNum__ === found.row);
-        return row ? row.__EMPTY : '-';
-      }
-      return '-';
-    } else if (form.powerAuthority === 'PEA') {
-      const steps = [
-        { max: 115.4, row: 76 },
-        { max: 184.7, row: 77 },
-        { max: 288.6, row: 78 },
-        { max: 363.7, row: 79 },
-        { max: 461.8, row: 80 },
-        { max: 577.3, row: 81 },
-        { max: 727.4, row: 82 },
-        { max: 923.7, row: 83 },
-        { max: 1154.7, row: 84 },
-        { max: 1443.4, row: 85 },
-        { max: 1732.1, row: 86 },
-        { max: 2305.4, row: 87 },
-        { max: 2886.8, row: 88 },
-      ];
-      const found = steps.find(s => inAllCharger <= s.max); // ใช้ <=
-      if (found) {
-        const row = excelData.find(r => r.__rowNum__ === found.row);
-        return row ? row.__EMPTY : '-';
-      }
-      return '-';
-    }
-    return '-';
+    const trRowNum = getTransformerRow(inAllCharger, form.powerAuthority);
+    if (!trRowNum) return '-';
+    
+    const transformerData = getTransformerData(form.powerAuthority, `row_${trRowNum}`);
+    return transformerData ? transformerData.trSize : '-';
   };
 
   /** Calculate EV station requirements */
@@ -261,8 +546,33 @@ export default function Home(): React.JSX.Element {
       const response = await axios.get(excelFileUrl, { responseType: 'arraybuffer' });
       const workbook = XLSX.read(response.data, { type: 'array' });
       const sheetName = workbook.SheetNames[0];
+      console.log('sheetName', sheetName);
       const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
-      setExcelData(jsonData);
+      console.log('jsonData', jsonData);
+      
+      // Normalize all column names to __EMPTY_X format
+      const normalizedData = jsonData.map((row: any) => {
+        const normalizedRow: any = {};
+        const keys = Object.keys(row);
+        
+        keys.forEach((key, index) => {
+          if (key === '__rowNum__') {
+            normalizedRow[key] = row[key];
+          } else {
+            // Convert all other columns to __EMPTY_X format
+            normalizedRow[`__EMPTY_${index}`] = row[key];
+          }
+        });
+        
+        return normalizedRow;
+      });
+      setExcelData(normalizedData);
+      console.log('normalizedData', normalizedData);
+      
+      // Map the data to structured format
+      const mapped = mapExcelData(normalizedData);
+      console.log('mapped', mapped);
+      setMappedData(mapped);
     } catch (error) {
       console.error("Error fetching Excel file:", error);
     }
@@ -298,6 +608,19 @@ export default function Home(): React.JSX.Element {
       }
     }
   }, [excelData]);
+
+  // Debug mapped data structure
+  useEffect(() => {
+    if (mappedData) {
+      console.log('=== MAPPED DATA STRUCTURE ===');
+      console.log('Chargers:', mappedData.chargers);
+      console.log('Sample charger (30 kW):', getChargerData('30 kW'));
+      console.log('Sample MEA data for 30 kW:', getChargerDataByAuthority('30 kW', 'MEA'));
+      console.log('Sample PEA data for 30 kW:', getChargerDataByAuthority('30 kW', 'PEA'));
+      console.log('MEA Transformers:', mappedData.transformers.mea);
+      console.log('PEA Transformers:', mappedData.transformers.pea);
+    }
+  }, [mappedData]);
 
   // เมื่อเลือก Number of Chargers ใหม่ ถ้าเลือก Any type kW ให้ reset multiChargers
   useEffect(() => {
@@ -343,21 +666,10 @@ export default function Home(): React.JSX.Element {
     return multiChargers
       .filter((chargerName) => typeof chargerName === 'string' && chargerName !== '')
       .map((chargerName) => {
-        const cell = chargerToExcelCell[chargerName];
-        if (!cell) return { name: chargerName, in: 0 };
-        let rowNum: number | undefined;
-        if (form.powerAuthority === 'MEA' && cell.mea) {
-          rowNum = parseInt(cell.mea.replace('C', ''));
-        }
-        if (form.powerAuthority === 'PEA' && cell.pea) {
-          rowNum = parseInt(cell.pea.replace('C', ''));
-        }
-        if (rowNum === undefined) return { name: chargerName, in: 0 };
-        const row = excelData.find((r) => r.__rowNum__ === rowNum);
-        if (!row) return { name: chargerName, in: 0 };
-        const colKey = '__EMPTY_2'; // ทั้ง MEA และ PEA ใช้ __EMPTY_2
-        const value = row[colKey];
-
+        const chargerData = getChargerDataByAuthority(chargerName, form.powerAuthority);
+        if (!chargerData) return { name: chargerName, in: 0 };
+        
+        const value = chargerData.inOfCharger;
         if (typeof value !== 'number' || isNaN(value)) return { name: chargerName, in: 0 };
         return { name: chargerName, in: value };
       });
@@ -365,70 +677,22 @@ export default function Home(): React.JSX.Element {
 
   // ฟังก์ชันดึง TR Wiring Size (CV) ตาม Power Authority และ TR Wiring Type
   const getTRWiringSizeCV = () => {
-    // หา rowNum ของ Transformer ที่เลือก
-    let trRowNum: number | undefined = undefined;
-    if (form.powerAuthority === 'MEA') {
-      const steps = [
-        { max: 444.1, row: 33 },
-        { max: 555.1, row: 34 },
-        { max: 699.4, row: 35 },
-        { max: 888.2, row: 36 },
-        { max: 1110.3, row: 37 },
-        { max: 1387.8, row: 38 },
-        { max: 1665.4, row: 39 },
-        { max: 2220.6, row: 40 },
-        { max: 2775.7, row: 41 },
-      ];
-      const inAll = chargerTypeMode === 'any'
-        ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
-        : results?.inAllCharger || 0;
-      const found = steps.find(s => inAll <= s.max);
-      trRowNum = found?.row;
-    } else if (form.powerAuthority === 'PEA') {
-      const steps = [
-        { max: 115.4, row: 76 },
-        { max: 184.7, row: 77 },
-        { max: 288.6, row: 78 },
-        { max: 363.7, row: 79 },
-        { max: 461.8, row: 80 },
-        { max: 577.3, row: 81 },
-        { max: 727.4, row: 82 },
-        { max: 923.7, row: 83 },
-        { max: 1154.7, row: 84 },
-        { max: 1443.4, row: 85 },
-        { max: 1732.1, row: 86 },
-        { max: 2305.4, row: 87 },
-        { max: 2886.8, row: 88 },
-      ];
-      const inAll = chargerTypeMode === 'any'
-        ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
-        : results?.inAllCharger || 0;
-      const found = steps.find(s => inAll <= s.max);
-      trRowNum = found?.row;
-    }
+    const inAll = chargerTypeMode === 'any'
+      ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
+      : results?.inAllCharger || 0;
+    
+    const trRowNum = getTransformerRow(inAll, form.powerAuthority);
     if (!trRowNum) return '';
 
     const trRow = excelData.find(r => r.__rowNum__ === trRowNum);
     if (!trRow) return '';
 
-    // Mapping TR Wiring Type to columns
-    const wiringTypeToCols: Record<string, string[]> = {
-      'ร้อยท่อเดินในอากาศ กลุ่ม 2': [
-        '__EMPTY_15', '__EMPTY_16', '__EMPTY_17', '__EMPTY_18', '__EMPTY_19', '__EMPTY_20', '__EMPTY_21', '__EMPTY_22', '__EMPTY_23', '__EMPTY_24'
-      ], // P-Y
-      'ร้อยท่อฝังใต้ดิน กลุ่ม 5': [
-        '__EMPTY_36', '__EMPTY_37', '__EMPTY_38', '__EMPTY_39', '__EMPTY_40', '__EMPTY_41', '__EMPTY_42', '__EMPTY_43', '__EMPTY_44', '__EMPTY_45'
-      ], // AK-AT
-      'ราง TRAY ไม่มีฝา': [
-        '__EMPTY_57', '__EMPTY_58', '__EMPTY_59', '__EMPTY_60', '__EMPTY_61', '__EMPTY_62', '__EMPTY_63', '__EMPTY_64', '__EMPTY_65', '__EMPTY_66'
-      ], // BF-BO
-      'ราง LADDER ไม่มีฝา': [
-        '__EMPTY_78', '__EMPTY_79', '__EMPTY_80', '__EMPTY_81', '__EMPTY_82', '__EMPTY_83', '__EMPTY_84', '__EMPTY_85', '__EMPTY_86', '__EMPTY_87'
-      ], // CA-CJ
-    };
-
-    const cols = wiringTypeToCols[form.trWiringType];
-    if (!cols) return '';
+    // Get column configuration using helper function
+    const config = getTRWiringConfig(form.trWiringType);
+    if (!config) return '';
+    
+    const cols = EXCEL_COLUMNS[config.size as keyof typeof EXCEL_COLUMNS] as readonly string[] | string[];
+    if (!cols || typeof cols === 'string') return '';
 
     // Debug: ดูข้อมูลที่ดึงมา
     console.log(`TR Wiring Size Debug - Row ${trRowNum}:`, trRow);
@@ -448,146 +712,46 @@ export default function Home(): React.JSX.Element {
 
   // เพิ่มฟังก์ชันดึง TR Wire conduit ตาม Power Authority และ TR Wiring Type
   const getTRWireConduit = () => {
-    // หา rowNum ของ Transformer ที่เลือก (เหมือน getTRWiringSizeCV)
-    let trRowNum: number | undefined = undefined;
-    if (form.powerAuthority === 'MEA') {
-      const steps = [
-        { max: 444.1, row: 33 },
-        { max: 555.1, row: 34 },
-        { max: 699.4, row: 35 },
-        { max: 888.2, row: 36 },
-        { max: 1110.3, row: 37 },
-        { max: 1387.8, row: 38 },
-        { max: 1665.4, row: 39 },
-        { max: 2220.6, row: 40 },
-        { max: 2775.7, row: 41 },
-      ];
-      const inAll = chargerTypeMode === 'any'
-        ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
-        : results?.inAllCharger || 0;
-      const found = steps.find(s => inAll <= s.max);
-      trRowNum = found?.row;
-    } else if (form.powerAuthority === 'PEA') {
-      const steps = [
-        { max: 115.4, row: 76 },
-        { max: 184.7, row: 77 },
-        { max: 288.6, row: 78 },
-        { max: 363.7, row: 79 },
-        { max: 461.8, row: 80 },
-        { max: 577.3, row: 81 },
-        { max: 727.4, row: 82 },
-        { max: 923.7, row: 83 },
-        { max: 1154.7, row: 84 },
-        { max: 1443.4, row: 85 },
-        { max: 1732.1, row: 86 },
-        { max: 2305.4, row: 87 },
-        { max: 2886.8, row: 88 },
-      ];
-      const inAll = chargerTypeMode === 'any'
-        ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
-        : results?.inAllCharger || 0;
-      const found = steps.find(s => inAll <= s.max);
-      trRowNum = found?.row;
-    }
+    const inAll = chargerTypeMode === 'any'
+      ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
+      : results?.inAllCharger || 0;
+    
+    const trRowNum = getTransformerRow(inAll, form.powerAuthority);
     if (!trRowNum) return '';
 
     const trRow = excelData.find(r => r.__rowNum__ === trRowNum);
     if (!trRow) return '';
 
-    // Mapping TR Wiring Type to columns and units
-    const wiringTypeToColsAndUnit: Record<string, { cols: string[]; unit: string }> = {
-      'ร้อยท่อเดินในอากาศ กลุ่ม 2': {
-        cols: ['__EMPTY_32', '__EMPTY_33', '__EMPTY_34', '__EMPTY_35'], // AG-AJ
-        unit: 'นิ้ว'
-      },
-      'ร้อยท่อฝังใต้ดิน กลุ่ม 5': {
-        cols: ['__EMPTY_53', '__EMPTY_54', '__EMPTY_55'], // BB-BD
-        unit: 'มม.'
-      },
-      'ราง TRAY ไม่มีฝา': {
-        cols: ['__EMPTY_74'], // BW
-        unit: 'ซม.'
-      },
-      'ราง LADDER ไม่มีฝา': {
-        cols: ['__EMPTY_95'], // CR
-        unit: 'ซม.'
-      },
-    };
+    // Get column configuration using helper function
+    const wiringConfig = getTRWiringConfig(form.trWiringType);
+    if (!wiringConfig) return '';
+    
+    const conduitConfig = EXCEL_COLUMNS[wiringConfig.conduit as keyof typeof EXCEL_COLUMNS] as { cols: readonly string[] | string[]; unit: string };
+    if (!conduitConfig || typeof conduitConfig === 'string' || Array.isArray(conduitConfig)) return '';
 
-    const config = wiringTypeToColsAndUnit[form.trWiringType];
-    if (!config) return '';
-
-    const values = config.cols.map(col => trRow[col]).filter(Boolean).join(' ');
+    const values = conduitConfig.cols.map(col => trRow[col]).filter(Boolean).join(' ');
     if (!values) return '';
-    return `${values} ${config.unit}`;
+    return `${values} ${conduitConfig.unit}`;
   };
 
   // เพิ่มฟังก์ชันดึง TR Wiring Size (CV) แยกแต่ละ Charger
   const getTRWiringSizeCVs = () => {
-    // Mapping TR Wiring Type to columns
-    const wiringTypeToCols: Record<string, string[]> = {
-      'ร้อยท่อเดินในอากาศ กลุ่ม 2': [
-        '__EMPTY_15', '__EMPTY_16', '__EMPTY_17', '__EMPTY_18', '__EMPTY_19', '__EMPTY_20', '__EMPTY_21', '__EMPTY_22', '__EMPTY_23', '__EMPTY_24'
-      ], // P-Y
-      'ร้อยท่อฝังใต้ดิน กลุ่ม 5': [
-        '__EMPTY_36', '__EMPTY_37', '__EMPTY_38', '__EMPTY_39', '__EMPTY_40', '__EMPTY_41', '__EMPTY_42', '__EMPTY_43', '__EMPTY_44', '__EMPTY_45'
-      ], // AK-AT
-      'ราง TRAY ไม่มีฝา': [
-        '__EMPTY_57', '__EMPTY_58', '__EMPTY_59', '__EMPTY_60', '__EMPTY_61', '__EMPTY_62', '__EMPTY_63', '__EMPTY_64', '__EMPTY_65', '__EMPTY_66'
-      ], // BF-BO
-      'ราง LADDER ไม่มีฝา': [
-        '__EMPTY_78', '__EMPTY_79', '__EMPTY_80', '__EMPTY_81', '__EMPTY_82', '__EMPTY_83', '__EMPTY_84', '__EMPTY_85', '__EMPTY_86', '__EMPTY_87'
-      ], // CA-CJ
-    };
+    // Get column configuration using helper function
+    const config = getTRWiringConfig(form.trWiringType);
+    if (!config) return [];
+    
+    const cols = EXCEL_COLUMNS[config.size as keyof typeof EXCEL_COLUMNS] as readonly string[] | string[];
+    if (!cols || typeof cols === 'string') return [];
 
-    const cols = wiringTypeToCols[form.trWiringType];
-    if (!cols) return [];
-
-    // หา rowNum ของ Transformer ที่เลือก
-    let trRowNum: number | undefined = undefined;
-    if (form.powerAuthority === 'MEA') {
-      const steps = [
-        { max: 444.1, row: 33 },
-        { max: 555.1, row: 34 },
-        { max: 699.4, row: 35 },
-        { max: 888.2, row: 36 },
-        { max: 1110.3, row: 37 },
-        { max: 1387.8, row: 38 },
-        { max: 1665.4, row: 39 },
-        { max: 2220.6, row: 40 },
-        { max: 2775.7, row: 41 },
-      ];
-      const inAll = chargerTypeMode === 'any'
-        ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
-        : results?.inAllCharger || 0;
-      const found = steps.find(s => inAll <= s.max);
-      trRowNum = found?.row;
-    } else if (form.powerAuthority === 'PEA') {
-      const steps = [
-        { max: 115.4, row: 76 },
-        { max: 184.7, row: 77 },
-        { max: 288.6, row: 78 },
-        { max: 363.7, row: 79 },
-        { max: 461.8, row: 80 },
-        { max: 577.3, row: 81 },
-        { max: 727.4, row: 82 },
-        { max: 923.7, row: 83 },
-        { max: 1154.7, row: 84 },
-        { max: 1443.4, row: 85 },
-        { max: 1732.1, row: 86 },
-        { max: 2305.4, row: 87 },
-        { max: 2886.8, row: 88 },
-      ];
-      const inAll = chargerTypeMode === 'any'
-        ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
-        : results?.inAllCharger || 0;
-      const found = steps.find(s => inAll <= s.max);
-      trRowNum = found?.row;
-    }
-    if (!trRowNum) return '';
+    const inAll = chargerTypeMode === 'any'
+      ? getMultiChargersIn().reduce((sum, item) => sum + item.in, 0)
+      : results?.inAllCharger || 0;
+    
+    const trRowNum = getTransformerRow(inAll, form.powerAuthority);
+    if (!trRowNum) return [];
 
     const trRow = excelData.find(r => r.__rowNum__ === trRowNum);
-    if (!trRow) return '';
+    if (!trRow) return [];
 
     // Debug: ดูข้อมูลที่ดึงมา
     console.log(`TR Wiring Size CVs Debug - Row ${trRowNum}:`, trRow);
@@ -610,27 +774,12 @@ export default function Home(): React.JSX.Element {
 
   // เพิ่มฟังก์ชันดึง Charger Wiring cable ตาม Power Authority และ Charger Wiring Type
   const getChargerWiringCable = () => {
-    // Mapping Charger Wiring Type to columns
-    const wiringTypeToCols: Record<string, string[]> = form.powerAuthority === 'MEA'
-      ? {
-        'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ': [
-          '__EMPTY_33', '__EMPTY_34', '__EMPTY_35', '__EMPTY_36', '__EMPTY_37', '__EMPTY_38', '__EMPTY_39', '__EMPTY_40', '__EMPTY_41', '__EMPTY_42', '__EMPTY_43', '__EMPTY_44', '__EMPTY_45'
-        ], // AH-AT
-        'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน': [
-          '__EMPTY_57', '__EMPTY_58', '__EMPTY_59', '__EMPTY_60', '__EMPTY_61', '__EMPTY_62', '__EMPTY_63', '__EMPTY_64', '__EMPTY_65', '__EMPTY_66', '__EMPTY_67', '__EMPTY_68', '__EMPTY_69'
-        ], // BF-BR
-      }
-      : {
-        'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ': [
-          '__EMPTY_31', '__EMPTY_32', '__EMPTY_33', '__EMPTY_34', '__EMPTY_35', '__EMPTY_36', '__EMPTY_37', '__EMPTY_38', '__EMPTY_39', '__EMPTY_40', '__EMPTY_41', '__EMPTY_42', '__EMPTY_43'
-        ], // AF-AR
-        'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน': [
-          '__EMPTY_55', '__EMPTY_56', '__EMPTY_57', '__EMPTY_58', '__EMPTY_59', '__EMPTY_60', '__EMPTY_61', '__EMPTY_62', '__EMPTY_63', '__EMPTY_64', '__EMPTY_65', '__EMPTY_66', '__EMPTY_67'
-        ], // BD-BP
-      };
-
-    const cols = wiringTypeToCols[form.chargerWiringType];
-    if (!cols) return '';
+    // Get column configuration using helper function
+    const wiringConfig = getChargerWiringConfig(form.powerAuthority, form.chargerWiringType);
+    if (!wiringConfig) return '';
+    
+    const cols = EXCEL_COLUMNS[wiringConfig.cable as keyof typeof EXCEL_COLUMNS] as readonly string[] | string[];
+    if (!cols || typeof cols === 'string') return '';
 
     // หา row ของแต่ละ In of charger (แต่ละเครื่อง)
     if (chargerTypeMode === 'any') {
@@ -674,133 +823,51 @@ export default function Home(): React.JSX.Element {
 
   // ฟังก์ชันดึง Charger Wire conduit ตาม Power Authority และ Charger Wiring Type
   const getChargerWireConduit = () => {
-    // เงื่อนไข MEA
-    if (form.powerAuthority === 'MEA') {
-      if (form.chargerWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ') {
-        // คอลัมน์ AY-BD (index 50-55) = ['__EMPTY_50', '__EMPTY_51', '__EMPTY_52', '__EMPTY_53', '__EMPTY_54', '__EMPTY_55']
-        const cols = ['__EMPTY_50', '__EMPTY_51', '__EMPTY_52', '__EMPTY_53', '__EMPTY_54', '__EMPTY_55'];
-        if (chargerTypeMode === 'any') {
-          return multiChargers
-            .filter(name => name !== '')
-            .map((chargerName, idx) => {
-              const cell = chargerToExcelCell[chargerName];
-              let rowNum: number | undefined;
-              if (cell?.mea) rowNum = parseInt(cell.mea.replace('C', ''));
-              if (!rowNum) return `Charger${idx + 1}: -`;
-              const row = excelData.find(r => r.__rowNum__ === rowNum);
-              if (!row) return `Charger${idx + 1}: -`;
-              const value = cols.map(col => row[col]).filter(Boolean).join(' ');
-              return `Charger${idx + 1}: ${value} นิ้ว`;
-            });
-        } else {
-          const cell = chargerToExcelCell[form.charger];
+    // Get column configuration using helper function
+    const wiringConfig = getChargerWiringConfig(form.powerAuthority, form.chargerWiringType);
+    if (!wiringConfig) return null;
+    
+    const conduitConfig = EXCEL_COLUMNS[wiringConfig.conduit as keyof typeof EXCEL_COLUMNS] as { cols: readonly string[] | string[]; unit: string };
+    if (!conduitConfig || typeof conduitConfig === 'string' || Array.isArray(conduitConfig)) return null;
+
+    const { cols, unit } = conduitConfig;
+
+    if (chargerTypeMode === 'any') {
+      return multiChargers
+        .filter(name => name !== '')
+        .map((chargerName, idx) => {
+          const cell = chargerToExcelCell[chargerName];
           let rowNum: number | undefined;
-          if (cell?.mea) rowNum = parseInt(cell.mea.replace('C', ''));
-          if (!rowNum) return [];
+          if (form.powerAuthority === 'MEA' && cell?.mea) {
+            rowNum = parseInt(cell.mea.replace('C', ''));
+          }
+          if (form.powerAuthority === 'PEA' && cell?.pea) {
+            rowNum = parseInt(cell.pea.replace('C', ''));
+          }
+          if (!rowNum) return `Charger${idx + 1}: -`;
           const row = excelData.find(r => r.__rowNum__ === rowNum);
-          if (!row) return [];
+          if (!row) return `Charger${idx + 1}: -`;
           const value = cols.map(col => row[col]).filter(Boolean).join(' ');
-          const numChargers = parseInt(form.numberOfChargers) || 1;
-          return Array(numChargers).fill(`Charger1: ${value} นิ้ว`).map((v, i) =>
-            `Charger${i + 1}: ${value} นิ้ว`
-          );
-        }
+          return `Charger${idx + 1}: ${value} ${unit}`;
+        });
+    } else {
+      const cell = chargerToExcelCell[form.charger];
+      let rowNum: number | undefined;
+      if (form.powerAuthority === 'MEA' && cell?.mea) {
+        rowNum = parseInt(cell.mea.replace('C', ''));
       }
-      if (form.chargerWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน') {
-        // คอลัมน์ BW-CB (index 74-79) = ['__EMPTY_74', '__EMPTY_75', '__EMPTY_76', '__EMPTY_77', '__EMPTY_78', '__EMPTY_79']
-        const cols = ['__EMPTY_74', '__EMPTY_75', '__EMPTY_76', '__EMPTY_77', '__EMPTY_78', '__EMPTY_79'];
-        if (chargerTypeMode === 'any') {
-          return multiChargers
-            .filter(name => name !== '')
-            .map((chargerName, idx) => {
-              const cell = chargerToExcelCell[chargerName];
-              let rowNum: number | undefined;
-              if (cell?.mea) rowNum = parseInt(cell.mea.replace('C', ''));
-              if (!rowNum) return `Charger${idx + 1}: -`;
-              const row = excelData.find(r => r.__rowNum__ === rowNum);
-              if (!row) return `Charger${idx + 1}: -`;
-              const value = cols.map(col => row[col]).filter(Boolean).join(' ');
-              return `Charger${idx + 1}: ${value} มม.`;
-            });
-        } else {
-          const cell = chargerToExcelCell[form.charger];
-          let rowNum: number | undefined;
-          if (cell?.mea) rowNum = parseInt(cell.mea.replace('C', ''));
-          if (!rowNum) return [];
-          const row = excelData.find(r => r.__rowNum__ === rowNum);
-          if (!row) return [];
-          const value = cols.map(col => row[col]).filter(Boolean).join(' ');
-          const numChargers = parseInt(form.numberOfChargers) || 1;
-          return Array(numChargers).fill(`Charger1: ${value} มม.`).map((v, i) =>
-            `Charger${i + 1}: ${value} มม.`
-          );
-        }
+      if (form.powerAuthority === 'PEA' && cell?.pea) {
+        rowNum = parseInt(cell.pea.replace('C', ''));
       }
+      if (!rowNum) return [];
+      const row = excelData.find(r => r.__rowNum__ === rowNum);
+      if (!row) return [];
+      const value = cols.map(col => row[col]).filter(Boolean).join(' ');
+      const numChargers = parseInt(form.numberOfChargers) || 1;
+      return Array(numChargers).fill(`Charger1: ${value} ${unit}`).map((v, i) =>
+        `Charger${i + 1}: ${value} ${unit}`
+      );
     }
-    // เงื่อนไข PEA
-    if (form.powerAuthority === 'PEA') {
-      if (form.chargerWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ') {
-        // คอลัมน์ AW-BB (index 48-53) = ['__EMPTY_48', '__EMPTY_49', '__EMPTY_50', '__EMPTY_51', '__EMPTY_52', '__EMPTY_53']
-        const cols = ['__EMPTY_48', '__EMPTY_49', '__EMPTY_50', '__EMPTY_51', '__EMPTY_52', '__EMPTY_53'];
-        if (chargerTypeMode === 'any') {
-          return multiChargers
-            .filter(name => name !== '')
-            .map((chargerName, idx) => {
-              const cell = chargerToExcelCell[chargerName];
-              let rowNum: number | undefined;
-              if (cell?.pea) rowNum = parseInt(cell.pea.replace('C', ''));
-              if (!rowNum) return `Charger${idx + 1}: -`;
-              const row = excelData.find(r => r.__rowNum__ === rowNum);
-              if (!row) return `Charger${idx + 1}: -`;
-              const value = cols.map(col => row[col]).filter(Boolean).join(' ');
-              return `Charger${idx + 1}: ${value} นิ้ว`;
-            });
-        } else {
-          const cell = chargerToExcelCell[form.charger];
-          let rowNum: number | undefined;
-          if (cell?.pea) rowNum = parseInt(cell.pea.replace('C', ''));
-          if (!rowNum) return [];
-          const row = excelData.find(r => r.__rowNum__ === rowNum);
-          if (!row) return [];
-          const value = cols.map(col => row[col]).filter(Boolean).join(' ');
-          const numChargers = parseInt(form.numberOfChargers) || 1;
-          return Array(numChargers).fill(`Charger1: ${value} นิ้ว`).map((v, i) =>
-            `Charger${i + 1}: ${value} นิ้ว`
-          );
-        }
-      }
-      if (form.chargerWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน') {
-        // คอลัมน์ BU-BZ (index 72-77) = ['__EMPTY_72', '__EMPTY_73', '__EMPTY_74', '__EMPTY_75', '__EMPTY_76', '__EMPTY_77']
-        const cols = ['__EMPTY_72', '__EMPTY_73', '__EMPTY_74', '__EMPTY_75', '__EMPTY_76', '__EMPTY_77'];
-        if (chargerTypeMode === 'any') {
-          return multiChargers
-            .filter(name => name !== '')
-            .map((chargerName, idx) => {
-              const cell = chargerToExcelCell[chargerName];
-              let rowNum: number | undefined;
-              if (cell?.pea) rowNum = parseInt(cell.pea.replace('C', ''));
-              if (!rowNum) return `Charger${idx + 1}: -`;
-              const row = excelData.find(r => r.__rowNum__ === rowNum);
-              if (!row) return `Charger${idx + 1}: -`;
-              const value = cols.map(col => row[col]).filter(Boolean).join(' ');
-              return `Charger${idx + 1}: ${value} มม.`;
-            });
-        } else {
-          const cell = chargerToExcelCell[form.charger];
-          let rowNum: number | undefined;
-          if (cell?.pea) rowNum = parseInt(cell.pea.replace('C', ''));
-          if (!rowNum) return [];
-          const row = excelData.find(r => r.__rowNum__ === rowNum);
-          if (!row) return [];
-          const value = cols.map(col => row[col]).filter(Boolean).join(' ');
-          const numChargers = parseInt(form.numberOfChargers) || 1;
-          return Array(numChargers).fill(`Charger1: ${value} มม.`).map((v, i) =>
-            `Charger${i + 1}: ${value} มม.`
-          );
-        }
-      }
-    }
-    return null;
   };
 
   // เพิ่มฟังก์ชันสำหรับเปลี่ยน label
