@@ -27,6 +27,7 @@ import axios from 'axios'
 
 
 function MoreDetailCard(props: any) {
+  const { stationEquipmentPriceMapping, roofCostMapping, getParkingRoofData } = props;
 
   const [trDistance, setTrDistance] = useState(props.trDistance || '');
 
@@ -97,6 +98,31 @@ function MoreDetailCard(props: any) {
   const [chargerSelection, setChargerSelection] = useState(props.chargerSelection || 'no');
 
   const [additionalSelection, setAdditionalSelection] = useState(props.additionalSelection || 'no');
+
+  // New state variables for restructured Additional Features
+  // Section 1: อุปกรณ์ประกอบสถานี
+  const [bumperPoles, setBumperPoles] = useState(props.bumperPoles || 'no');
+  const [wheelStops, setWheelStops] = useState(props.wheelStops || 'no');
+  const [fireExtinguisherCabinet, setFireExtinguisherCabinet] = useState(props.fireExtinguisherCabinet || 'no');
+  const [signage, setSignage] = useState(props.signage || 'no');
+
+  // Section 2: ระบบสื่อสาร
+  const [wifi4gHub, setWifi4gHub] = useState(props.wifi4gHub || 'no');
+  const [cctv, setCctv] = useState(props.cctv || 'no');
+  const [lighting, setLighting] = useState(props.lighting || 'no');
+  const [accSystem, setAccSystem] = useState(props.accSystem || 'no');
+
+  // Section 3: งานปูน
+  const [mdbConcreteBase, setMdbConcreteBase] = useState(props.mdbConcreteBase || 'no');
+  const [chargerConcreteBase, setChargerConcreteBase] = useState(props.chargerConcreteBase || 'no');
+  const [parkingConcreteFloor, setParkingConcreteFloor] = useState(props.parkingConcreteFloor || 'no');
+  const [generalConcreteFloor, setGeneralConcreteFloor] = useState(props.generalConcreteFloor || 'no');
+  const [generalConcreteFloorArea, setGeneralConcreteFloorArea] = useState(props.generalConcreteFloorArea || '');
+
+  // Section 4: งานทาสีช่องจอด
+  const [parkingPaintType, setParkingPaintType] = useState(props.parkingPaintType || '');
+  const [sideLineMarking, setSideLineMarking] = useState(props.sideLineMarking || 'no');
+  const [centerPattern, setCenterPattern] = useState(props.centerPattern || '');
 
 
 
@@ -342,25 +368,25 @@ function MoreDetailCard(props: any) {
 
             <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
 
-              <span className="font-medium text-gray-700">Power Authority:</span>
+              <span className="font-medium ">Power Authority:</span>
 
-              <span className="font-semibold text-gray-900">{props.powerAuthority}</span>
-
-            </div>
-
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-
-              <span className="font-medium text-gray-700">Number of Chargers:</span>
-
-              <span className="font-semibold text-gray-900">{props.numberOfChargers} <span className="text-sm text-gray-600">Units</span></span>
+              <span className="font-semibold ">{props.powerAuthority}</span>
 
             </div>
 
             <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
 
-              <span className="font-medium text-gray-700">Transformer Size:</span>
+              <span className="font-medium ">Number of Chargers:</span>
 
-              <span className="font-semibold text-gray-900">{props.transformer} <span className="text-sm text-gray-600">kVA</span></span>
+              <span className="font-semibold ">{props.numberOfChargers} <span className="text-sm ">Units</span></span>
+
+            </div>
+
+            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+
+              <span className="font-medium ">Transformer Size:</span>
+
+              <span className="font-semibold ">{props.transformer} <span className="text-sm ">kVA</span></span>
 
             </div>
 
@@ -384,7 +410,7 @@ function MoreDetailCard(props: any) {
 
               <Zap className="h-5 w-5" />
 
-              Transformer Size <span className="text-xs text-gray-400">(ขนาดหม้อแปลง)</span>
+              Transformer Size <span className="text-xs ">(ขนาดหม้อแปลง)</span>
 
             </div>
 
@@ -438,11 +464,11 @@ function MoreDetailCard(props: any) {
 
                   }}
 
-                  className="text-gray-500 border-gray-400 data-[state=checked]:bg-gray-500"
+                  className=" border-gray-400 data-[state=checked]:bg-gray-500"
 
                 />
 
-                <Label htmlFor="transformer-no" className="font-medium cursor-pointer text-gray-700 text-sm">ไม่มี</Label>
+                <Label htmlFor="transformer-no" className="font-medium cursor-pointer  text-sm">ไม่มี</Label>
 
               </div>
 
@@ -470,9 +496,9 @@ function MoreDetailCard(props: any) {
 
                   <div className="flex items-center justify-between">
 
-                    <span className="font-medium text-gray-700">Transformer Size:</span>
+                    <span className="font-medium ">Transformer Size:</span>
 
-                    <span className="font-semibold text-gray-900">{props.transformer} <span className="text-sm text-gray-600">kVA</span></span>
+                    <span className="font-semibold ">{props.transformer} <span className="text-sm ">kVA</span></span>
 
                   </div>
 
@@ -484,9 +510,9 @@ function MoreDetailCard(props: any) {
 
                 <div className="space-y-3">
 
-                  <Label className="text-sm font-medium text-gray-700">
+                  <Label className="text-sm font-medium ">
 
-                    ประเภทหม้อแปลง <span className="text-xs text-gray-400">(Transformer Type)</span>
+                    ประเภทหม้อแปลง <span className="text-xs ">(Transformer Type)</span>
 
                   </Label>
 
@@ -566,7 +592,7 @@ function MoreDetailCard(props: any) {
 
                     <div className="mt-3 p-3 bg-gray-50 rounded-lg">
 
-                      <div className="text-sm text-gray-600">
+                      <div className="text-sm ">
 
                         <span className="font-medium">ประเภทที่เลือก:</span> {transformerType === '22kv-416v' ? 'หม้อแปลง 22 (24) kV / 416 V' : 'หม้อแปลง 33 kV / 316 V'}
 
@@ -600,7 +626,7 @@ function MoreDetailCard(props: any) {
 
                           </div>
 
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs ">
 
                             ข้อมูลจาก: column "{transformerPrice.column}" __rowNum__{transformerPrice.rowNum} (ราคาหม้อแปลง)
 
@@ -628,7 +654,7 @@ function MoreDetailCard(props: any) {
 
                           </div>
 
-                          <div className="text-xs text-gray-500">บาท</div>
+                          <div className="text-xs ">บาท</div>
 
                         </div>
 
@@ -676,13 +702,13 @@ function MoreDetailCard(props: any) {
 
         <CardHeader className="bg-gradient-to-r from-gray-50 to-blue-50 border-b">
 
-          <CardTitle className="flex items-center justify-between text-gray-800">
+          <CardTitle className="flex items-center justify-between ">
 
             <div className="flex items-center gap-2">
 
               <Wrench className="h-5 w-5" />
 
-              TR to MDB Configuration <span className="text-xs text-gray-400">(การตั้งค่า TR ไป MDB)</span>
+              TR to MDB Configuration <span className="text-xs ">(การตั้งค่า TR ไป MDB)</span>
 
             </div>
 
@@ -736,11 +762,11 @@ function MoreDetailCard(props: any) {
 
                   }}
 
-                  className="text-gray-500 border-gray-400 data-[state=checked]:bg-gray-500"
+                  className=" border-gray-400 data-[state=checked]:bg-gray-500"
 
                 />
 
-                <Label htmlFor="trMdb-no" className="font-medium cursor-pointer text-gray-700 text-sm">ไม่มี</Label>
+                <Label htmlFor="trMdb-no" className="font-medium cursor-pointer  text-sm">ไม่มี</Label>
 
               </div>
 
@@ -764,25 +790,25 @@ function MoreDetailCard(props: any) {
 
                 <div className="flex items-center gap-2">
 
-                  <span className="text-sm text-gray-600">ประเภท:</span>
+                  <span className="text-sm ">ประเภท:</span>
 
-                  <span className="font-semibold text-gray-900">{props.trWiringType}</span>
-
-                </div>
-
-                <div className="flex items-center gap-2">
-
-                  <span className="text-sm text-gray-600">ขนาดสาย (CV/THW):</span>
-
-                  <span className="font-semibold text-gray-900">{props.trWiringSize}</span>
+                  <span className="font-semibold ">{props.trWiringType}</span>
 
                 </div>
 
                 <div className="flex items-center gap-2">
 
-                  <span className="text-sm text-gray-600">ท่อ:</span>
+                  <span className="text-sm ">ขนาดสาย (CV/THW):</span>
 
-                  <span className="font-semibold text-gray-900">{props.trWireConduit}</span>
+                  <span className="font-semibold ">{props.trWiringSize}</span>
+
+                </div>
+
+                <div className="flex items-center gap-2">
+
+                  <span className="text-sm ">ท่อ:</span>
+
+                  <span className="font-semibold ">{props.trWireConduit}</span>
 
                 </div>
 
@@ -798,7 +824,7 @@ function MoreDetailCard(props: any) {
 
                 <div className="flex items-center gap-3">
 
-                  <Label htmlFor="trDistance" className="text-gray-700 font-medium min-w-[100px]">ระยะ (เมตร):</Label>
+                  <Label htmlFor="trDistance" className=" font-medium min-w-[100px]">ระยะ (เมตร):</Label>
 
                   <Input
 
@@ -820,7 +846,7 @@ function MoreDetailCard(props: any) {
 
                   <div className="flex items-center gap-3">
 
-                    <Label htmlFor="trWiringGroup2" className="text-gray-700 font-medium min-w-[100px]">เลือกท่อ:</Label>
+                    <Label htmlFor="trWiringGroup2" className=" font-medium min-w-[100px]">เลือกท่อ:</Label>
 
                     <Select value={trWiringGroup2} onValueChange={setTrWiringGroup2}>
 
@@ -868,7 +894,7 @@ function MoreDetailCard(props: any) {
 
               <Wrench className="h-5 w-5" />
 
-              MDB Configuration <span className="text-xs text-gray-400">(การตั้งค่า MDB)</span>
+              MDB Configuration <span className="text-xs ">(การตั้งค่า MDB)</span>
 
             </div>
 
@@ -922,11 +948,11 @@ function MoreDetailCard(props: any) {
 
                   }}
 
-                  className="text-gray-500 border-gray-400 data-[state=checked]:bg-gray-500"
+                  className=" border-gray-400 data-[state=checked]:bg-gray-500"
 
                 />
 
-                <Label htmlFor="mdb-no" className="font-medium cursor-pointer text-gray-700 text-sm">ไม่มี</Label>
+                <Label htmlFor="mdb-no" className="font-medium cursor-pointer  text-sm">ไม่มี</Label>
 
               </div>
 
@@ -954,9 +980,9 @@ function MoreDetailCard(props: any) {
 
                   <div className="flex items-center gap-2">
 
-                    <span className="text-sm text-gray-600 min-w-[160px]">MCCB Main</span>
+                    <span className="text-sm  min-w-[160px]">MCCB Main</span>
 
-                    <span className="font-semibold text-gray-900">
+                    <span className="font-semibold ">
 
                       {props.mdbMainAt || '-'}
 
@@ -972,9 +998,9 @@ function MoreDetailCard(props: any) {
 
                     <div key={idx} className="flex items-center gap-2">
 
-                      <span className="text-sm text-gray-600 min-w-[160px]">MCCB Sub C{idx + 1}</span>
+                      <span className="text-sm  min-w-[160px]">MCCB Sub C{idx + 1}</span>
 
-                      <span className="font-semibold text-gray-900">{val}</span>
+                      <span className="font-semibold ">{val}</span>
 
                     </div>
 
@@ -982,17 +1008,17 @@ function MoreDetailCard(props: any) {
 
                   <div className="flex items-center gap-2">
 
-                    <span className="text-sm text-gray-600 min-w-[160px]">MCCB for Lighting</span>
+                    <span className="text-sm  min-w-[160px]">MCCB for Lighting</span>
 
-                    <span className="font-semibold text-gray-900">{props.mdbLighting || '-'}</span>
+                    <span className="font-semibold ">{props.mdbLighting || '-'}</span>
 
                   </div>
 
                   <div className="flex items-center gap-2">
 
-                    <span className="text-sm text-gray-600 min-w-[160px]">MCCB for Commu</span>
+                    <span className="text-sm  min-w-[160px]">MCCB for Commu</span>
 
-                    <span className="font-semibold text-gray-900">{props.mdbCommu || '-'}</span>
+                    <span className="font-semibold ">{props.mdbCommu || '-'}</span>
 
                   </div>
 
@@ -1006,9 +1032,9 @@ function MoreDetailCard(props: any) {
 
               <div className="space-y-3">
 
-                <Label className="text-sm font-medium text-gray-700">
+                <Label className="text-sm font-medium ">
 
-                  ยี่ห้อ MCCB Main <span className="text-xs text-gray-400">(MCCB Main Brand)</span>
+                  ยี่ห้อ MCCB Main <span className="text-xs ">(MCCB Main Brand)</span>
 
                 </Label>
 
@@ -1120,7 +1146,7 @@ function MoreDetailCard(props: any) {
 
                   <div className="mt-3 p-3 bg-gray-50 rounded-lg">
 
-                    <div className="text-sm text-gray-600">
+                    <div className="text-sm ">
 
                       <span className="font-medium">ยี่ห้อที่เลือก:</span> {mccbMainBrand}
 
@@ -1168,7 +1194,7 @@ function MoreDetailCard(props: any) {
 
                           <div className="flex items-center gap-3">
 
-                            <span className="text-xs text-gray-500">Row {product.rowNum}</span>
+                            <span className="text-xs ">Row {product.rowNum}</span>
 
                             <span className="font-medium">{product.name}</span>
 
@@ -1232,7 +1258,7 @@ function MoreDetailCard(props: any) {
 
               <Wrench className="h-5 w-5" />
 
-              MDB to Charger Configuration <span className="text-xs text-gray-400">(การตั้งค่า MDB ไป Charger)</span>
+              MDB to Charger Configuration <span className="text-xs ">(การตั้งค่า MDB ไป Charger)</span>
 
             </div>
 
@@ -1286,11 +1312,11 @@ function MoreDetailCard(props: any) {
 
                   }}
 
-                  className="text-gray-500 border-gray-400 data-[state=checked]:bg-gray-500"
+                  className=" border-gray-400 data-[state=checked]:bg-gray-500"
 
                 />
 
-                <Label htmlFor="charger-no" className="font-medium cursor-pointer text-gray-700 text-sm">ไม่มี</Label>
+                <Label htmlFor="charger-no" className="font-medium cursor-pointer  text-sm">ไม่มี</Label>
 
               </div>
 
@@ -1430,25 +1456,25 @@ function MoreDetailCard(props: any) {
 
                           <div className="flex items-center gap-2">
 
-                            <span className="text-sm text-gray-600">ประเภท:</span>
+                            <span className="text-sm ">ประเภท:</span>
 
-                            <span className="font-semibold text-gray-900">{props.chargerWiringType}</span>
-
-                          </div>
-
-                          <div className="flex items-center gap-2">
-
-                            <span className="text-sm text-gray-600">ขนาดสาย (CV/THW):</span>
-
-                            <span className="font-semibold text-gray-900">{cable}</span>
+                            <span className="font-semibold ">{props.chargerWiringType}</span>
 
                           </div>
 
                           <div className="flex items-center gap-2">
 
-                            <span className="text-sm text-gray-600">ท่อ:</span>
+                            <span className="text-sm ">ขนาดสาย (CV/THW):</span>
 
-                            <span className="font-semibold text-gray-900">{conduits[idx] ?? conduits[conduits.length - 1] ?? ''}</span>
+                            <span className="font-semibold ">{cable}</span>
+
+                          </div>
+
+                          <div className="flex items-center gap-2">
+
+                            <span className="text-sm ">ท่อ:</span>
+
+                            <span className="font-semibold ">{conduits[idx] ?? conduits[conduits.length - 1] ?? ''}</span>
 
                           </div>
 
@@ -1458,7 +1484,7 @@ function MoreDetailCard(props: any) {
 
                           <div className="flex items-center gap-3">
 
-                            <Label htmlFor={`chargerDistance_${idx}`} className="text-gray-700 font-medium min-w-[100px]">ระยะ (เมตร):</Label>
+                            <Label htmlFor={`chargerDistance_${idx}`} className=" font-medium min-w-[100px]">ระยะ (เมตร):</Label>
 
                             <Input
 
@@ -1480,7 +1506,7 @@ function MoreDetailCard(props: any) {
 
                             <div className="flex items-center gap-3">
 
-                              <Label className="text-gray-700 font-medium min-w-[100px]">เลือกท่อ:</Label>
+                              <Label className=" font-medium min-w-[100px]">เลือกท่อ:</Label>
 
                               <Select value={group2Selected} onValueChange={setConduitChoiceAt}>
 
@@ -1550,25 +1576,25 @@ function MoreDetailCard(props: any) {
 
                         <div className="flex items-center gap-2">
 
-                          <span className="text-sm text-gray-600">ประเภท:</span>
+                          <span className="text-sm ">ประเภท:</span>
 
-                          <span className="font-semibold text-gray-900">{props.chargerWiringType}</span>
-
-                        </div>
-
-                        <div className="flex items-center gap-2">
-
-                          <span className="text-sm text-gray-600">ขนาดสาย (CV/THW):</span>
-
-                          <span className="font-semibold text-gray-900">{cable} <span className="text-gray-500 text-xs">({idxs.length} Units)</span></span>
+                          <span className="font-semibold ">{props.chargerWiringType}</span>
 
                         </div>
 
                         <div className="flex items-center gap-2">
 
-                          <span className="text-sm text-gray-600">ท่อ:</span>
+                          <span className="text-sm ">ขนาดสาย (CV/THW):</span>
 
-                          <span className="font-semibold text-gray-900">{conduitDisplay || '-'}</span>
+                          <span className="font-semibold ">{cable} <span className=" text-xs">({idxs.length} Units)</span></span>
+
+                        </div>
+
+                        <div className="flex items-center gap-2">
+
+                          <span className="text-sm ">ท่อ:</span>
+
+                          <span className="font-semibold ">{conduitDisplay || '-'}</span>
 
                         </div>
 
@@ -1578,7 +1604,7 @@ function MoreDetailCard(props: any) {
 
                         <div className="flex items-center gap-3">
 
-                          <Label className="text-gray-700 font-medium min-w-[100px]">ระยะ (เมตร):</Label>
+                          <Label className=" font-medium min-w-[100px]">ระยะ (เมตร):</Label>
 
                           <Input
 
@@ -1598,7 +1624,7 @@ function MoreDetailCard(props: any) {
 
                           <div className="flex items-center gap-3">
 
-                            <Label className="text-gray-700 font-medium min-w-[100px]">เลือกท่อ:</Label>
+                            <Label className=" font-medium min-w-[100px]">เลือกท่อ:</Label>
 
                             <Select value={groupConduitChoice} onValueChange={setGroupConduitChoice}>
 
@@ -1646,15 +1672,15 @@ function MoreDetailCard(props: any) {
 
       <Card className="shadow-xl border-0 overflow-hidden">
 
-        <CardHeader className="bg-gradient-to-r from-purple-50 to-indigo-50 border-b">
+        <CardHeader className="border-b">
 
-          <CardTitle className="flex items-center justify-between text-purple-800">
+          <CardTitle className="flex items-center justify-between">
 
             <div className="flex items-center gap-2">
 
               <Home className="h-5 w-5" />
 
-              Additional Features & Options <span className="text-xs text-gray-400">(ฟีเจอร์และตัวเลือกเพิ่มเติม)</span>
+              Additional Features & Options <span className="text-xs ">(ฟีเจอร์และตัวเลือกเพิ่มเติม)</span>
 
             </div>
 
@@ -1662,7 +1688,7 @@ function MoreDetailCard(props: any) {
 
               <div
 
-                className={`flex items-center space-x-2 px-3 py-1 rounded-lg border border-gray-200 hover:bg-purple-50 cursor-pointer ${additionalSelection === 'yes' ? 'bg-purple-100 border-purple-300' : ''}`}
+                className={`flex items-center space-x-2 px-3 py-1 rounded-lg border cursor-pointer ${additionalSelection === 'yes' ? 'bg-gray-100' : ''}`}
 
                 onClick={() => setAdditionalSelection('yes')}
 
@@ -1680,17 +1706,17 @@ function MoreDetailCard(props: any) {
 
                   }}
 
-                  className="text-purple-500 border-purple-400 data-[state=checked]:bg-purple-500"
+                  className=""
 
                 />
 
-                <Label htmlFor="additional-yes" className="font-medium cursor-pointer text-purple-700 text-sm">มี</Label>
+                <Label htmlFor="additional-yes" className="font-medium cursor-pointer text-sm">มี</Label>
 
               </div>
 
               <div
 
-                className={`flex items-center space-x-2 px-3 py-1 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer ${additionalSelection === 'no' ? 'bg-gray-100 border-gray-300' : ''}`}
+                className={`flex items-center space-x-2 px-3 py-1 rounded-lg border cursor-pointer ${additionalSelection === 'no' ? 'bg-gray-100' : ''}`}
 
                 onClick={() => setAdditionalSelection('no')}
 
@@ -1708,11 +1734,11 @@ function MoreDetailCard(props: any) {
 
                   }}
 
-                  className="text-gray-500 border-gray-400 data-[state=checked]:bg-gray-500"
+                  className=""
 
                 />
 
-                <Label htmlFor="additional-no" className="font-medium cursor-pointer text-gray-700 text-sm">ไม่มี</Label>
+                <Label htmlFor="additional-no" className="font-medium cursor-pointer text-sm">ไม่มี</Label>
 
               </div>
 
@@ -1720,9 +1746,9 @@ function MoreDetailCard(props: any) {
 
           </CardTitle>
 
-          <CardDescription className="text-purple-600">
+          <CardDescription>
 
-            Parking, painting, roofing, and travel options
+            อุปกรณ์ประกอบสถานี, ระบบสื่อสาร, งานปูน, และงานทาสี
 
           </CardDescription>
 
@@ -1730,71 +1756,457 @@ function MoreDetailCard(props: any) {
 
         <CardContent className="p-6">
 
-
-
           {/* แสดงเนื้อหาเมื่อเลือก "มี" */}
 
           {additionalSelection === 'yes' && (
 
             <div className="space-y-6">
 
-              {/* Parking and Painting Section */}
+              {/* จำนวนช่องจอด - อยู่บนสุด */}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-3">
 
-                {/* 1. จำนวนช่องจอด */}
+                <Label htmlFor="parkingSlots" className="font-medium flex items-center gap-2">
 
-                <div className="space-y-3">
+                  <Car className="h-4 w-4" />
 
-                  <Label htmlFor="parkingSlots" className="text-gray-700 font-medium flex items-center gap-2">
+                  จำนวนช่องจอด:
 
-                    <Car className="h-4 w-4" />
+                </Label>
 
-                    จำนวนช่องจอด:
+                <Select value={parkingSlots} onValueChange={setParkingSlots}>
 
-                  </Label>
+                  <SelectTrigger className="w-32">
 
-                  <Select value={parkingSlots} onValueChange={setParkingSlots}>
+                    <SelectValue placeholder="เลือกจำนวน" />
 
-                    <SelectTrigger className="w-32">
+                  </SelectTrigger>
 
-                      <SelectValue placeholder="เลือกจำนวน" />
+                  <SelectContent>
 
-                    </SelectTrigger>
+                    {Array.from({ length: 24 }, (_, i) => i + 1).map(num => (
 
-                    <SelectContent>
+                      <SelectItem key={num} value={num.toString()}>{num}</SelectItem>
 
-                      {Array.from({ length: 24 }, (_, i) => i + 1).map(num => (
+                    ))}
 
-                        <SelectItem key={num} value={num.toString()}>{num}</SelectItem>
+                  </SelectContent>
 
-                      ))}
+                </Select>
 
-                    </SelectContent>
+                <span className="text-sm">ช่องจอด</span>
 
-                  </Select>
+              </div>
 
-                  <span className="text-sm text-gray-600">ช่องจอด</span>
+              <Separator />
+
+              {/* 1. อุปกรณ์ประกอบสถานี */}
+
+              <div className="space-y-4">
+
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+
+                  <Wrench className="h-5 w-5" />
+
+                  1. อุปกรณ์ประกอบสถานี
+
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                  {/* 1.1 เสากันชน */}
+
+                  <div className="space-y-2">
+
+                    <div className="flex items-center justify-between p-3 rounded-lg border">
+
+                      <span className="font-medium">เสากันชน</span>
+
+                      <span className="font-semibold">
+
+                        {parseInt(parkingSlots) * 2} <span className="text-sm">ชิ้น</span>
+
+                      </span>
+
+                      {stationEquipmentPriceMapping['bumper-poles'] && (
+                        <div className="text-xs mt-1 space-y-1">
+                          <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['bumper-poles'].productCode}</div>
+                          <div><span className="font-medium">ราคาค่าของ:</span> {stationEquipmentPriceMapping['bumper-poles'].materialPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคาค่าแรง:</span> {stationEquipmentPriceMapping['bumper-poles'].laborPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคารวม:</span> {stationEquipmentPriceMapping['bumper-poles'].totalPrice.toLocaleString('th-TH')} บาท</div>
+                        </div>
+                      )}
+
+                    </div>
+
+                    <p className="text-xs">เงื่อนไข: ต้องใช้ 2 ชิ้นต่อ 1 ช่องจอด</p>
+
+                  </div>
+
+                  {/* 1.2 ยางกั้นล้อ (ปูน) */}
+
+                  <div className="space-y-2">
+
+                    <div className="flex items-center justify-between p-3 rounded-lg border">
+
+                      <span className="font-medium">ยางกั้นล้อ (ปูน)</span>
+
+                      <span className="font-semibold">
+
+                        {parseInt(parkingSlots)} <span className="text-sm">ชิ้น</span>
+
+                      </span>
+
+                      {stationEquipmentPriceMapping['wheel-stops'] && (
+                        <div className="text-xs mt-1 space-y-1">
+                          <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['wheel-stops'].productCode}</div>
+                          <div><span className="font-medium">ราคาค่าของ:</span> {stationEquipmentPriceMapping['wheel-stops'].materialPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคาค่าแรง:</span> {stationEquipmentPriceMapping['wheel-stops'].laborPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคารวม:</span> {stationEquipmentPriceMapping['wheel-stops'].totalPrice.toLocaleString('th-TH')} บาท</div>
+                        </div>
+                      )}
+
+                    </div>
+
+                    <p className="text-xs">เงื่อนไข: ต้องใช้ 1 ชิ้นต่อ 1 ช่องจอด</p>
+
+                  </div>
+
+                  {/* 1.3 ถังดับเพลิง+ตู้ */}
+
+                  <div className="space-y-2">
+
+                    <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200">
+
+                      <span className="font-medium ">ถังดับเพลิง+ตู้</span>
+
+                      <span className="font-semibold text-red-600">
+
+                        {props.numberOfChargers} <span className="text-sm ">ชิ้น</span>
+
+                      </span>
+
+                      {stationEquipmentPriceMapping['fire-extinguisher'] && (
+                        <div className="text-xs mt-1 space-y-1">
+                          <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['fire-extinguisher'].productCode}</div>
+                          <div><span className="font-medium">ราคาค่าของ:</span> {stationEquipmentPriceMapping['fire-extinguisher'].materialPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคาค่าแรง:</span> {stationEquipmentPriceMapping['fire-extinguisher'].laborPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคารวม:</span> {stationEquipmentPriceMapping['fire-extinguisher'].totalPrice.toLocaleString('th-TH')} บาท</div>
+                        </div>
+                      )}
+
+                    </div>
+
+                    <p className="text-xs ">เงื่อนไข: ต้องใช้ 1 ชิ้นต่อ Charger 1 unit</p>
+
+                  </div>
+
+                  {/* 1.4 ป้ายสูง + วิธีใช้งาน */}
+
+                  <div className="space-y-2">
+
+                    <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg border border-purple-200">
+
+                      <span className="font-medium ">ป้ายสูง + วิธีใช้งาน</span>
+
+                      <span className="font-semibold text-purple-600">
+
+                        {props.numberOfChargers} <span className="text-sm ">ชิ้น</span>
+
+                      </span>
+
+                      {stationEquipmentPriceMapping['signage'] && (
+                        <div className="text-xs mt-1 space-y-1">
+                          <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['signage'].productCode}</div>
+                          <div><span className="font-medium">ราคาค่าของ:</span> {stationEquipmentPriceMapping['signage'].materialPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคาค่าแรง:</span> {stationEquipmentPriceMapping['signage'].laborPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคารวม:</span> {stationEquipmentPriceMapping['signage'].totalPrice.toLocaleString('th-TH')} บาท</div>
+                        </div>
+                      )}
+
+                    </div>
+
+                    <p className="text-xs ">เงื่อนไข: ต้องใช้ 1 ชิ้นต่อ Charger 1 unit</p>
+
+                  </div>
 
                 </div>
 
+              </div>
 
+              <Separator />
 
-                {/* 2. ทาสีพื้น */}
+              {/* 2. ระบบสื่อสาร */}
+
+              <div className="space-y-4">
+
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+
+                  <Zap className="h-5 w-5" />
+
+                  2. ระบบสื่อสาร
+
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                  {/* 2.1 WIFI + 4G + HUB */}
+
+                  <div className="space-y-2">
+
+                    <div className="flex items-center justify-between p-3 rounded-lg border">
+
+                      <span className="font-medium ">WIFI + 4G + HUB</span>
+
+                      <span className="font-semibold">1 <span className="text-sm ">ชิ้น</span></span>
+
+                      {stationEquipmentPriceMapping['wifi-4g-hub'] && (
+                        <div className="text-xs mt-1 space-y-1">
+                          <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['wifi-4g-hub'].productCode}</div>
+                          <div><span className="font-medium">ราคาค่าของ:</span> {stationEquipmentPriceMapping['wifi-4g-hub'].materialPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคาค่าแรง:</span> {stationEquipmentPriceMapping['wifi-4g-hub'].laborPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคารวม:</span> {stationEquipmentPriceMapping['wifi-4g-hub'].totalPrice.toLocaleString('th-TH')} บาท</div>
+                        </div>
+                      )}
+
+                    </div>
+
+                    <p className="text-xs ">เงื่อนไข: 1 ชิ้น</p>
+
+                  </div>
+
+                  {/* 2.2 กล้อง CCTV */}
+
+                  <div className="space-y-2">
+
+                    <div className="flex items-center justify-between p-3 rounded-lg border">
+
+                      <span className="font-medium ">กล้อง CCTV</span>
+
+                      <span className="font-semibold">4 <span className="text-sm ">ชิ้น</span></span>
+
+                      {stationEquipmentPriceMapping['cctv'] && (
+                        <div className="text-xs mt-1 space-y-1">
+                          <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['cctv'].productCode}</div>
+                          <div><span className="font-medium">ราคาค่าของ:</span> {stationEquipmentPriceMapping['cctv'].materialPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคาค่าแรง:</span> {stationEquipmentPriceMapping['cctv'].laborPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคารวม:</span> {stationEquipmentPriceMapping['cctv'].totalPrice.toLocaleString('th-TH')} บาท</div>
+                        </div>
+                      )}
+
+                    </div>
+
+                    <p className="text-xs ">เงื่อนไข: 4 ชิ้น</p>
+
+                  </div>
+
+                  {/* 2.3 หลอดไฟ */}
+
+                  <div className="space-y-2">
+
+                    <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+
+                      <span className="font-medium ">หลอดไฟ</span>
+
+                      <span className="font-semibold text-yellow-600">3 <span className="text-sm ">ชิ้น</span></span>
+
+                      {stationEquipmentPriceMapping['lighting'] && (
+                        <div className="text-xs mt-1 space-y-1">
+                          <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['lighting'].productCode}</div>
+                          <div><span className="font-medium">ราคาค่าของ:</span> {stationEquipmentPriceMapping['lighting'].materialPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคาค่าแรง:</span> {stationEquipmentPriceMapping['lighting'].laborPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคารวม:</span> {stationEquipmentPriceMapping['lighting'].totalPrice.toLocaleString('th-TH')} บาท</div>
+                        </div>
+                      )}
+
+                    </div>
+
+                    <p className="text-xs ">เงื่อนไข: 3 ชิ้น</p>
+
+                  </div>
+
+                  {/* 2.4 ACC (สาย + รางสาย + ตู้outdoor + อื่นๆ) */}
+
+                  <div className="space-y-2">
+
+                    <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg border border-purple-200">
+
+                      <span className="font-medium ">ACC (สาย + รางสาย + ตู้outdoor + อื่นๆ)</span>
+
+                      <span className="font-semibold text-purple-600">1 <span className="text-sm ">ชิ้น</span></span>
+
+                      {stationEquipmentPriceMapping['acc-system'] && (
+                        <div className="text-xs mt-1 space-y-1">
+                          <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['acc-system'].productCode}</div>
+                          <div><span className="font-medium">ราคาค่าของ:</span> {stationEquipmentPriceMapping['acc-system'].materialPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคาค่าแรง:</span> {stationEquipmentPriceMapping['acc-system'].laborPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคารวม:</span> {stationEquipmentPriceMapping['acc-system'].totalPrice.toLocaleString('th-TH')} บาท</div>
+                        </div>
+                      )}
+
+                    </div>
+
+                    <p className="text-xs ">เงื่อนไข: 1 ชิ้น</p>
+
+                  </div>
+
+                </div>
+
+              </div>
+
+              <Separator />
+
+              {/* 3. งานปูน */}
+
+              <div className="space-y-4">
+
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+
+                  <Home className="h-5 w-5" />
+
+                  3. งานปูน
+
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                  {/* 3.1 ฐานปูน MDB */}
+
+                  <div className="space-y-2">
+
+                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+
+                      <span className="font-medium ">ฐานปูน MDB 200 x 200 x 20 ซม.</span>
+
+                      <span className="font-semibold ">1 <span className="text-sm ">ชิ้น</span></span>
+
+                      {stationEquipmentPriceMapping['mdb-concrete-base'] && (
+                        <div className="text-xs mt-1 space-y-1">
+                          <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['mdb-concrete-base'].productCode}</div>
+                          <div><span className="font-medium">ราคาค่าของ:</span> {stationEquipmentPriceMapping['mdb-concrete-base'].materialPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคาค่าแรง:</span> {stationEquipmentPriceMapping['mdb-concrete-base'].laborPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคารวม:</span> {stationEquipmentPriceMapping['mdb-concrete-base'].totalPrice.toLocaleString('th-TH')} บาท</div>
+                        </div>
+                      )}
+
+                    </div>
+
+                    <p className="text-xs ">เงื่อนไข: 1 ชิ้น</p>
+
+                  </div>
+
+                  {/* 3.2 ฐานปูน CHARGER */}
+
+                  <div className="space-y-2">
+
+                    <div className="flex items-center justify-between p-3 rounded-lg border">
+
+                      <span className="font-medium ">ฐานปูน CHARGER 150 x 150 x 20 ซม.</span>
+
+                      <span className="font-semibold">
+
+                        {props.numberOfChargers} <span className="text-sm ">ชิ้น</span>
+
+                      </span>
+
+                      {stationEquipmentPriceMapping['charger-concrete-base'] && (
+                        <div className="text-xs mt-1 space-y-1">
+                          <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['charger-concrete-base'].productCode}</div>
+                          <div><span className="font-medium">ราคาค่าของ:</span> {stationEquipmentPriceMapping['charger-concrete-base'].materialPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคาค่าแรง:</span> {stationEquipmentPriceMapping['charger-concrete-base'].laborPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคารวม:</span> {stationEquipmentPriceMapping['charger-concrete-base'].totalPrice.toLocaleString('th-TH')} บาท</div>
+                        </div>
+                      )}
+
+                    </div>
+
+                    <p className="text-xs ">เงื่อนไข: ต้องใช้ 1 ชิ้นต่อ Charger 1 unit</p>
+
+                  </div>
+
+                  {/* 3.3 พื้นปูน ลานจอดรถ */}
+
+                  <div className="space-y-2">
+
+                    <div className="flex items-center justify-between p-3 rounded-lg border">
+
+                      <span className="font-medium ">พื้นปูน ลานจอดรถ 300 x 600 x 10 ซม.</span>
+
+                      <span className="font-semibold">
+
+                        {parseInt(parkingSlots)} <span className="text-sm">ชิ้น</span>
+
+                      </span>
+
+                      {stationEquipmentPriceMapping['parking-concrete-floor'] && (
+                        <div className="text-xs mt-1 space-y-1">
+                          <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['parking-concrete-floor'].productCode}</div>
+                          <div><span className="font-medium">ราคาค่าของ:</span> {stationEquipmentPriceMapping['parking-concrete-floor'].materialPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคาค่าแรง:</span> {stationEquipmentPriceMapping['parking-concrete-floor'].laborPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคารวม:</span> {stationEquipmentPriceMapping['parking-concrete-floor'].totalPrice.toLocaleString('th-TH')} บาท</div>
+                        </div>
+                      )}
+
+                    </div>
+
+                    <p className="text-xs">เงื่อนไข: ต้องใช้ 1 ชิ้นต่อ 1 ช่องจอด</p>
+
+                  </div>
+
+                  {/* 3.4 เทพื้นปูนทั่วไป */}
+
+                  <div className="space-y-2">
+
+                    <div className="flex items-center justify-between p-3 rounded-lg border">
+
+                      <span className="font-medium">เทพื้นปูนทั่วไป 100 x 100 x 10 ซม.</span>
+
+                      <span className="font-semibold">แล้วแต่กำหนด</span>
+
+                      {stationEquipmentPriceMapping['general-concrete-floor'] && (
+                        <div className="text-xs mt-1 space-y-1">
+                          <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['general-concrete-floor'].productCode}</div>
+                          <div><span className="font-medium">ราคาค่าของ:</span> {stationEquipmentPriceMapping['general-concrete-floor'].materialPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคาค่าแรง:</span> {stationEquipmentPriceMapping['general-concrete-floor'].laborPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคารวม:</span> {stationEquipmentPriceMapping['general-concrete-floor'].totalPrice.toLocaleString('th-TH')} บาท</div>
+                        </div>
+                      )}
+
+                    </div>
+
+                    <p className="text-xs">เงื่อนไข: แล้วแต่กำหนด</p>
+
+                  </div>
+
+                </div>
+
+              </div>
+
+              <Separator />
+
+              {/* 4. งานทาสีช่องจอด */}
+
+              <div className="space-y-4">
+
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+
+                  <Paintbrush className="h-5 w-5" />
+
+                  4. งานทาสีช่องจอด
+
+                </h3>
 
                 <div className="space-y-3">
 
-                  <Label htmlFor="floorPainting" className="text-gray-700 font-medium flex items-center gap-2">
+                  <Label className="text-sm font-medium ">
 
-                    <Paintbrush className="h-4 w-4" />
-
-                    ทาสีพื้น:
+                    เลือกแบบทาสี (เงื่อนไข: ต้องใช้ 1 ชิ้นต่อ 1 ช่องจอด)
 
                   </Label>
 
-                  <Select value={floorPainting} onValueChange={setFloorPainting}>
+                  <Select value={parkingPaintType} onValueChange={setParkingPaintType}>
 
-                    <SelectTrigger className="w-80">
+                    <SelectTrigger className="w-full">
 
                       <SelectValue placeholder="เลือกแบบทาสี" />
 
@@ -1802,57 +2214,180 @@ function MoreDetailCard(props: any) {
 
                     <SelectContent>
 
-                      <SelectItem value="no-grind-no-polish">ทาสีพื้นช่องจอดรถ แบบไม่ขัด ไม่โป้ว</SelectItem>
+                      <SelectItem value="no-grind-no-polish">4.1 ทาสีพื้นช่องจอดรถ แบบไม่ขัด ไม่โป้ว</SelectItem>
 
-                      <SelectItem value="grind-no-polish">ทาสีพื้นช่องจอดรถ แบบขัด แต่ไม่โป้ว</SelectItem>
+                      <SelectItem value="grind-no-polish">4.2 ทาสีพื้นช่องจอดรถ แบบขัด แต่ไม่โป้ว</SelectItem>
 
-                      <SelectItem value="grind-and-polish">ทาสีพื้นช่องจอดรถ แบบขัด และโป้วให้เรียบ</SelectItem>
+                      <SelectItem value="grind-and-polish">4.3 ทาสีพื้นช่องจอดรถ แบบขัด และโป้วให้เรียบ</SelectItem>
 
                     </SelectContent>
 
                   </Select>
 
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+
+                    {/* 4.4 ตีเส้นด้านข้าง */}
+
+                    <div className="space-y-2">
+
+                      <div className="flex items-center justify-between p-3 rounded-lg border">
+
+                        <span className="font-medium ">4.4 ตีเส้นด้านข้าง</span>
+
+                        <span className="font-semibold">
+
+                          {parseInt(parkingSlots)} <span className="text-sm ">ช่องจอด</span>
+
+                        </span>
+
+                      </div>
+
+                    </div>
+
+                    {/* 4.5 ทำลายกลางช่องจอด ใช้ลายเดิม */}
+
+                    <div className="space-y-2">
+
+                      <div className="flex items-center justify-between p-3 rounded-lg border">
+
+                        <span className="font-medium ">4.5 ทำลายกลางช่องจอด ใช้ลายเดิม</span>
+
+                        <span className="font-semibold">
+
+                          {parseInt(parkingSlots)} <span className="text-sm ">ช่องจอด</span>
+
+                        </span>
+
+                      </div>
+
+                    </div>
+
+                    {/* 4.6 ทำลายกลางช่องจอด ออกแบบลายใหม่ */}
+
+                    <div className="space-y-2">
+
+                      <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg border border-purple-200">
+
+                        <span className="font-medium ">4.6 ทำลายกลางช่องจอด ออกแบบลายใหม่</span>
+
+                        <span className="font-semibold text-purple-600">
+
+                          {parseInt(parkingSlots)} <span className="text-sm ">ช่องจอด</span>
+
+                        </span>
+
+                      </div>
+
+                    </div>
+
+                  </div>
+
+                  {/* แสดงผลลัพธ์งานทาสีช่องจอด */}
+                  {parkingPaintType && (
+                    <div className="mt-4 p-4 bg-gradient-to-r from-pink-50 to-purple-50 rounded-lg border border-pink-200">
+                      <h4 className="font-semibold text-pink-800 mb-3 flex items-center gap-2">
+                        <Paintbrush className="h-4 w-4" />
+                        ผลลัพธ์งานทาสีช่องจอด
+                      </h4>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between p-2 bg-white rounded border">
+                          <span className="font-medium ">แบบทาสีที่เลือก:</span>
+                          <span className="font-semibold text-pink-600">
+                            {parkingPaintType === 'no-grind-no-polish' && '4.1 ทาสีพื้นช่องจอดรถ แบบไม่ขัด ไม่โป้ว'}
+                            {parkingPaintType === 'grind-no-polish' && '4.2 ทาสีพื้นช่องจอดรถ แบบขัด แต่ไม่โป้ว'}
+                            {parkingPaintType === 'grind-and-polish' && '4.3 ทาสีพื้นช่องจอดรถ แบบขัด และโป้วให้เรียบ'}
+                          </span>
+                        </div>
+
+                        {parkingPaintType && stationEquipmentPriceMapping[`paint-${parkingPaintType}`] && (
+                          <div className="p-2 bg-white rounded border space-y-1">
+                            <div className="font-medium">ข้อมูลราคาทาสี:</div>
+                            <div className="text-xs space-y-1">
+                              <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping[`paint-${parkingPaintType}`].productCode}</div>
+                              <div><span className="font-medium">ราคาค่าของ:</span> {stationEquipmentPriceMapping[`paint-${parkingPaintType}`].materialPrice.toLocaleString('th-TH')} บาท</div>
+                              <div><span className="font-medium">ราคาค่าแรง:</span> {stationEquipmentPriceMapping[`paint-${parkingPaintType}`].laborPrice.toLocaleString('th-TH')} บาท</div>
+                              <div><span className="font-medium">ราคารวม:</span> {stationEquipmentPriceMapping[`paint-${parkingPaintType}`].totalPrice.toLocaleString('th-TH')} บาท</div>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between p-2 bg-white rounded border">
+                          <span className="font-medium ">จำนวนช่องจอด:</span>
+                          <span className="font-semibold">{parseInt(parkingSlots)} ช่องจอด</span>
+                        </div>
+
+                        <div className="flex items-center justify-between p-2 bg-white rounded border">
+                          <span className="font-medium ">ตีเส้นด้านข้าง:</span>
+                          <span className="font-semibold">{parseInt(parkingSlots)} ช่องจอด</span>
+                        </div>
+
+                        {stationEquipmentPriceMapping['side-line-marking'] && (
+                          <div className="p-2 bg-white rounded border space-y-1">
+                            <div className="font-medium">ข้อมูลราคาตีเส้น:</div>
+                            <div className="text-xs space-y-1">
+                              <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['side-line-marking'].productCode}</div>
+                              <div><span className="font-medium">ราคาค่าของ:</span> {stationEquipmentPriceMapping['side-line-marking'].materialPrice.toLocaleString('th-TH')} บาท</div>
+                              <div><span className="font-medium">ราคาค่าแรง:</span> {stationEquipmentPriceMapping['side-line-marking'].laborPrice.toLocaleString('th-TH')} บาท</div>
+                              <div><span className="font-medium">ราคารวม:</span> {stationEquipmentPriceMapping['side-line-marking'].totalPrice.toLocaleString('th-TH')} บาท</div>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between p-2 bg-white rounded border">
+                          <span className="font-medium ">ทำลายกลางช่องจอด:</span>
+                          <span className="font-semibold">{parseInt(parkingSlots)} ช่องจอด</span>
+                        </div>
+
+                        {stationEquipmentPriceMapping['center-pattern-original'] && (
+                          <div className="p-2 bg-white rounded border space-y-1">
+                            <div className="font-medium">ข้อมูลราคาทำลายลายเดิม:</div>
+                            <div className="text-xs space-y-1">
+                              <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['center-pattern-original'].productCode}</div>
+                              <div><span className="font-medium">ราคาค่าของ:</span> {stationEquipmentPriceMapping['center-pattern-original'].materialPrice.toLocaleString('th-TH')} บาท</div>
+                              <div><span className="font-medium">ราคาค่าแรง:</span> {stationEquipmentPriceMapping['center-pattern-original'].laborPrice.toLocaleString('th-TH')} บาท</div>
+                              <div><span className="font-medium">ราคารวม:</span> {stationEquipmentPriceMapping['center-pattern-original'].totalPrice.toLocaleString('th-TH')} บาท</div>
+                            </div>
+                          </div>
+                        )}
+
+                        {stationEquipmentPriceMapping['center-pattern-new'] && (
+                          <div className="p-2 bg-white rounded border space-y-1">
+                            <div className="font-medium">ข้อมูลราคาทำลายลายใหม่:</div>
+                            <div className="text-xs space-y-1">
+                              <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['center-pattern-new'].productCode}</div>
+                              <div><span className="font-medium">ราคาค่าของ:</span> {stationEquipmentPriceMapping['center-pattern-new'].materialPrice.toLocaleString('th-TH')} บาท</div>
+                              <div><span className="font-medium">ราคาค่าแรง:</span> {stationEquipmentPriceMapping['center-pattern-new'].laborPrice.toLocaleString('th-TH')} บาท</div>
+                              <div><span className="font-medium">ราคารวม:</span> {stationEquipmentPriceMapping['center-pattern-new'].totalPrice.toLocaleString('th-TH')} บาท</div>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="p-2 bg-pink-100 rounded border border-pink-300">
+                          <p className="text-sm text-pink-700">
+                            <span className="font-medium">สรุป:</span> งานทาสีช่องจอดทั้งหมด {parseInt(parkingSlots)} ช่องจอด
+                            พร้อมตีเส้นและทำลายกลางช่องจอด
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                 </div>
 
               </div>
 
-
-
               <Separator />
 
-
-
-              {/* Fire Extinguisher */}
-
-              <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
-
-                <span className="font-medium text-gray-700 flex items-center gap-2">
-
-                  <Shield className="h-4 w-4" />
-
-                  ถังดับเพลิง:
-
-                </span>
-
-                <span className="font-semibold text-gray-900">{props.numberOfChargers} <span className="text-sm text-gray-600">เครื่อง</span></span>
-
-              </div>
-
-
-
-              <Separator />
-
-
-
-              {/* Roof Cover Section */}
+              {/* หลังคาคุมช่องจอด (ยังเหมือนเดิม) */}
 
               <div className="space-y-3">
 
-                <Label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                <Label className="text-sm font-medium  flex items-center gap-2">
 
                   <Home className="h-4 w-4" />
 
-                  หลังคาคุมช่องจอด <span className="text-xs text-gray-400">(Roof Cover for Parking)</span>
+                  หลังคาคุมช่องจอด <span className="text-xs ">(Roof Cover for Parking)</span>
 
                 </Label>
 
@@ -1860,139 +2395,74 @@ function MoreDetailCard(props: any) {
 
                   <div
 
-                    className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-orange-50 cursor-pointer ${roofCoverType === 'width-length' ? 'bg-orange-100 border-orange-300' : ''}`}
+                    className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-blue-50 cursor-pointer ${roofCoverType === 'yes' ? 'bg-blue-100 border-blue-300' : ''}`}
 
-                    onClick={() => setRoofCoverType('width-length')}
+                    onClick={() => setRoofCoverType(roofCoverType === 'yes' ? 'no' : 'yes')}
 
                   >
 
                     <Checkbox
 
-                      id="width-length"
+                      id="roofCover-yes"
 
-                      checked={roofCoverType === 'width-length'}
+                      checked={roofCoverType === 'yes'}
 
                       onCheckedChange={(checked) => {
 
-                        if (checked) setRoofCoverType('width-length');
+                        if (checked) setRoofCoverType('yes');
 
                       }}
 
-                      className="text-orange-500 border-orange-400 data-[state=checked]:bg-orange-500"
+                      className="text-blue-500 border-blue-400 data-[state=checked]:bg-blue-500"
 
                     />
 
-                    <Label htmlFor="width-length" className="font-medium cursor-pointer text-orange-700">กว้าง x ยาว</Label>
+                    <Label htmlFor="roofCover-yes" className="font-medium cursor-pointer text-blue-700">มี</Label>
 
                   </div>
 
                   <div
 
-                    className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-violet-50 cursor-pointer ${roofCoverType === 'm2' ? 'bg-violet-100 border-violet-300' : ''}`}
+                    className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer ${roofCoverType === 'no' ? 'bg-gray-100 border-gray-300' : ''}`}
 
-                    onClick={() => setRoofCoverType('m2')}
+                    onClick={() => setRoofCoverType(roofCoverType === 'no' ? 'yes' : 'no')}
 
                   >
 
                     <Checkbox
 
-                      id="m2"
+                      id="roofCover-no"
 
-                      checked={roofCoverType === 'm2'}
+                      checked={roofCoverType === 'no'}
 
                       onCheckedChange={(checked) => {
 
-                        if (checked) setRoofCoverType('m2');
+                        if (checked) setRoofCoverType('no');
 
                       }}
 
-                      className="text-violet-500 border-violet-400 data-[state=checked]:bg-violet-500"
+                      className="border-gray-400 data-[state=checked]:bg-gray-500"
 
                     />
 
-                    <Label htmlFor="m2" className="font-medium cursor-pointer text-violet-700">ตารางเมตร</Label>
+                    <Label htmlFor="roofCover-no" className="font-medium cursor-pointer">ไม่มี</Label>
 
                   </div>
 
                 </div>
 
-
-
-                {roofCoverType === 'width-length' && (
-
-                  <div className="flex items-center gap-3 p-3 bg-orange-50 rounded-lg">
-
-                    <Input
-
-                      type="number"
-
-                      placeholder="กว้าง"
-
-                      className="w-24"
-
-                      value={roofCoverWidth}
-
-                      onChange={(e) => setRoofCoverWidth(e.target.value)}
-
-                    />
-
-                    <span>x</span>
-
-                    <Input
-
-                      type="number"
-
-                      placeholder="ยาว"
-
-                      className="w-24"
-
-                      value={roofCoverLength}
-
-                      onChange={(e) => setRoofCoverLength(e.target.value)}
-
-                    />
-
-                    <span className="text-sm text-gray-600">เมตร</span>
-
-                    {roofCoverWidth && roofCoverLength && (
-
-                      <span className="ml-4 font-semibold text-orange-600">
-
-                        = {parseFloat(roofCoverWidth) * parseFloat(roofCoverLength)} ตร.ม.
-
-                      </span>
-
-                    )}
-
+                {/* แสดงข้อมูลราคาหลังคาคุมช่องจอดเมื่อเลือก "มี" */}
+                {roofCoverType === 'yes' && getParkingRoofData && getParkingRoofData(parseInt(parkingSlots)) && (
+                  <div className="p-3 rounded-lg border space-y-2">
+                    <div className="font-medium">ข้อมูลราคาหลังคาคุมช่องจอด ({getParkingRoofData(parseInt(parkingSlots)).slots} ช่องจอด):</div>
+                    <div className="text-xs space-y-1">
+                      <div><span className="font-medium">ราคาค่าของ:</span> {getParkingRoofData(parseInt(parkingSlots)).materialPrice.toLocaleString('th-TH')} บาท</div>
+                      <div><span className="font-medium">ราคาค่าแรง:</span> {getParkingRoofData(parseInt(parkingSlots)).laborPrice.toLocaleString('th-TH')} บาท</div>
+                      <div><span className="font-medium">ราคารวม:</span> {getParkingRoofData(parseInt(parkingSlots)).totalPrice.toLocaleString('th-TH')} บาท</div>
+                    </div>
                   </div>
-
                 )}
 
-
-
-                {roofCoverType === 'm2' && (
-
-                  <div className="flex items-center gap-3 p-3 bg-violet-50 rounded-lg">
-
-                    <Input
-
-                      type="number"
-
-                      placeholder="ตารางเมตร"
-
-                      className="w-32"
-
-                      value={roofCoverM2}
-
-                      onChange={(e) => setRoofCoverM2(e.target.value)}
-
-                    />
-
-                    <span className="text-sm text-gray-600">ตารางเมตร</span>
-
-                  </div>
-
-                )}
 
               </div>
 
@@ -2000,15 +2470,13 @@ function MoreDetailCard(props: any) {
 
               <Separator />
 
-
-
-              {/* หลังคาเฉพาะ MDB */}
+              {/* หลังคาเฉพาะ MDB (ยังเหมือนเดิม) */}
 
               <div className="space-y-3">
 
-                <Label className="text-sm font-medium text-gray-700">
+                <Label className="text-sm font-medium ">
 
-                  หลังคาเฉพาะ MDB <span className="text-xs text-gray-400">(Roof for MDB only)</span>
+                  หลังคาเฉพาะ MDB <span className="text-xs ">(Roof for MDB only)</span>
 
                 </Label>
 
@@ -2062,172 +2530,26 @@ function MoreDetailCard(props: any) {
 
                       }}
 
-                      className="text-gray-500 border-gray-400 data-[state=checked]:bg-gray-500"
+                      className="border-gray-400 data-[state=checked]:bg-gray-500"
 
                     />
 
-                    <Label htmlFor="mdbRoof-no" className="font-medium cursor-pointer text-gray-700">ไม่มี</Label>
+                    <Label htmlFor="mdbRoof-no" className="font-medium cursor-pointer">ไม่มี</Label>
 
                   </div>
 
                 </div>
 
-
-
-                {/* MDB Roof Details - แสดงเมื่อเลือก "มี" */}
-
-                {mdbRoof === 'yes' && (
-
-                  <div className="space-y-3 mt-4 p-4 bg-blue-50 rounded-lg">
-
-                    <Label className="text-sm font-medium text-gray-700">
-
-                      รายละเอียดหลังคาเฉพาะ MDB <span className="text-xs text-gray-400">(MDB Roof Details)</span>
-
-                    </Label>
-
-                    <div className="grid grid-cols-2 gap-3">
-
-                      <div
-
-                        className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-orange-50 cursor-pointer ${mdbRoofType === 'width-length' ? 'bg-orange-100 border-orange-300' : ''}`}
-
-                        onClick={() => setMdbRoofType('width-length')}
-
-                      >
-
-                        <Checkbox
-
-                          id="mdbRoof-width-length"
-
-                          checked={mdbRoofType === 'width-length'}
-
-                          onCheckedChange={(checked) => {
-
-                            if (checked) setMdbRoofType('width-length');
-
-                          }}
-
-                          className="text-orange-500 border-orange-400 data-[state=checked]:bg-orange-500"
-
-                        />
-
-                        <Label htmlFor="mdbRoof-width-length" className="font-medium cursor-pointer text-orange-700">กว้าง x ยาว</Label>
-
-                      </div>
-
-                      <div
-
-                        className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-violet-50 cursor-pointer ${mdbRoofType === 'm2' ? 'bg-violet-100 border-violet-300' : ''}`}
-
-                        onClick={() => setMdbRoofType('m2')}
-
-                      >
-
-                        <Checkbox
-
-                          id="mdbRoof-m2"
-
-                          checked={mdbRoofType === 'm2'}
-
-                          onCheckedChange={(checked) => {
-
-                            if (checked) setMdbRoofType('m2');
-
-                          }}
-
-                          className="text-violet-500 border-violet-400 data-[state=checked]:bg-violet-500"
-
-                        />
-
-                        <Label htmlFor="mdbRoof-m2" className="font-medium cursor-pointer text-violet-700">ตารางเมตร</Label>
-
-                      </div>
-
+                {/* แสดงข้อมูลราคาหลังคาเฉพาะ MDB เมื่อเลือก "มี" */}
+                {mdbRoof === 'yes' && roofCostMapping && roofCostMapping['mdb-roof'] && (
+                  <div className="p-4 bg-blue-50 rounded-lg border space-y-2">
+                    <div className="font-medium">{roofCostMapping['mdb-roof'].name}:</div>
+                    <div className="text-xs space-y-1">
+                      <div><span className="font-medium">ราคาค่าของ:</span> {roofCostMapping['mdb-roof'].materialPrice.toLocaleString('th-TH')} บาท</div>
+                      <div><span className="font-medium">ราคาค่าแรง:</span> {roofCostMapping['mdb-roof'].laborPrice.toLocaleString('th-TH')} บาท</div>
+                      <div><span className="font-medium">ราคารวม:</span> {roofCostMapping['mdb-roof'].totalPrice.toLocaleString('th-TH')} บาท</div>
                     </div>
-
-
-
-                    {/* Input fields */}
-
-                    {mdbRoofType === 'width-length' && (
-
-                      <div className="flex items-center gap-3 p-3 bg-orange-50 rounded-lg">
-
-                        <Input
-
-                          type="number"
-
-                          placeholder="กว้าง"
-
-                          className="w-24"
-
-                          value={mdbRoofWidth}
-
-                          onChange={(e) => setMdbRoofWidth(e.target.value)}
-
-                        />
-
-                        <span>x</span>
-
-                        <Input
-
-                          type="number"
-
-                          placeholder="ยาว"
-
-                          className="w-24"
-
-                          value={mdbRoofLength}
-
-                          onChange={(e) => setMdbRoofLength(e.target.value)}
-
-                        />
-
-                        <span className="text-sm text-gray-600">เมตร</span>
-
-                        {mdbRoofWidth && mdbRoofLength && (
-
-                          <span className="ml-4 font-semibold text-orange-600">
-
-                            = {parseFloat(mdbRoofWidth) * parseFloat(mdbRoofLength)} ตร.ม.
-
-                          </span>
-
-                        )}
-
-                      </div>
-
-                    )}
-
-
-
-                    {mdbRoofType === 'm2' && (
-
-                      <div className="flex items-center gap-3 p-3 bg-violet-50 rounded-lg">
-
-                        <Input
-
-                          type="number"
-
-                          placeholder="ตารางเมตร"
-
-                          className="w-32"
-
-                          value={mdbRoofM2}
-
-                          onChange={(e) => setMdbRoofM2(e.target.value)}
-
-                        />
-
-                        <span className="text-sm text-gray-600">ตารางเมตร</span>
-
-                      </div>
-
-                    )}
-
                   </div>
-
                 )}
 
               </div>
@@ -2238,13 +2560,13 @@ function MoreDetailCard(props: any) {
 
 
 
-              {/* หลังคาเครื่องชาร์จ */}
+              {/* หลังคาเครื่องชาร์จ (ยังเหมือนเดิม) */}
 
               <div className="space-y-3">
 
-                <Label className="text-sm font-medium text-gray-700">
+                <Label className="text-sm font-medium ">
 
-                  หลังคาเครื่องชาร์จ <span className="text-xs text-gray-400">(Charger Roof Type)</span>
+                  หลังคาเครื่องชาร์จ <span className="text-xs ">(Charger Roof Type)</span>
 
                 </Label>
 
@@ -2298,174 +2620,40 @@ function MoreDetailCard(props: any) {
 
                       }}
 
-                      className="text-gray-500 border-gray-400 data-[state=checked]:bg-gray-500"
+                      className=" border-gray-400 data-[state=checked]:bg-gray-500"
 
                     />
 
-                    <Label htmlFor="normal" className="font-medium cursor-pointer text-gray-700">ธรรมดา</Label>
+                    <Label htmlFor="normal" className="font-medium cursor-pointer ">ธรรมดา</Label>
 
                   </div>
 
                 </div>
 
-              </div>
-
-
-
-              <Separator />
-
-
-
-              {/* ค่าเดินทาง */}
-
-              <div className="space-y-4">
-
-                <Label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-
-                  <MapPin className="h-4 w-4" />
-
-                  ค่าเดินทาง <span className="text-xs text-gray-400">(Travel Cost)</span>
-
-                </Label>
-
-
-
-                {/* ระยะทาง */}
-
-                <div className="space-y-2">
-
-                  <Label htmlFor="travelDistance" className="text-sm font-medium text-gray-700">
-
-                    ระยะทาง (กิโลเมตร)
-
-                  </Label>
-
-                  <Input
-
-                    id="travelDistance"
-
-                    type="number"
-
-                    placeholder="กรอกระยะทาง"
-
-                    value={travelDistance}
-
-                    onChange={(e) => setTravelDistance(e.target.value)}
-
-                    className="w-32"
-
-                  />
-
-                </div>
-
-
-
-                {/* งานฝึกอบรม */}
-
-                <div className="space-y-3">
-
-                  <Label className="text-sm font-medium text-gray-700">
-
-                    งานฝึกอบรม <span className="text-xs text-gray-400">(Training Work)</span>
-
-                  </Label>
-
-                  <div className="grid grid-cols-2 gap-3">
-
-                    <div
-
-                      className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-green-50 cursor-pointer ${trainingWork === 'yes' ? 'bg-green-100 border-green-300' : ''}`}
-
-                      onClick={() => setTrainingWork('yes')}
-
-                    >
-
-                      <Checkbox
-
-                        id="training-yes"
-
-                        checked={trainingWork === 'yes'}
-
-                        onCheckedChange={(checked) => {
-
-                          if (checked) setTrainingWork('yes');
-
-                        }}
-
-                        className="text-green-500 border-green-400 data-[state=checked]:bg-green-500"
-
-                      />
-
-                      <Label htmlFor="training-yes" className="font-medium cursor-pointer text-green-700">มีงานฝึกอบรม (1วัน)</Label>
-
-                    </div>
-
-                    <div
-
-                      className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer ${trainingWork === 'no' ? 'bg-gray-100 border-gray-300' : ''}`}
-
-                      onClick={() => setTrainingWork('no')}
-
-                    >
-
-                      <Checkbox
-
-                        id="training-no"
-
-                        checked={trainingWork === 'no'}
-
-                        onCheckedChange={(checked) => {
-
-                          if (checked) setTrainingWork('no');
-
-                        }}
-
-                        className="text-gray-500 border-gray-400 data-[state=checked]:bg-gray-500"
-
-                      />
-
-                      <Label htmlFor="training-no" className="font-medium cursor-pointer text-gray-700">ไม่มีงานฝึกอบรม</Label>
-
-                    </div>
-
+                {/* แสดงข้อมูลราคาหลังคาเครื่องชาร์จ */}
+                {chargerRoofType && roofCostMapping && (
+                  <div className="p-3 rounded-lg border space-y-2">
+                    {chargerRoofType === 'normal' && roofCostMapping['charger-roof-normal'] && (
+                      <>
+                        <div className="font-medium">{roofCostMapping['charger-roof-normal'].name}:</div>
+                        <div className="text-xs space-y-1">
+                          <div><span className="font-medium">ราคาค่าของ:</span> {roofCostMapping['charger-roof-normal'].materialPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคาค่าแรง:</span> {roofCostMapping['charger-roof-normal'].laborPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคารวม:</span> {roofCostMapping['charger-roof-normal'].totalPrice.toLocaleString('th-TH')} บาท</div>
+                        </div>
+                      </>
+                    )}
+                    {chargerRoofType === 'composite' && roofCostMapping['charger-roof-composite'] && (
+                      <>
+                        <div className="font-medium">{roofCostMapping['charger-roof-composite'].name}:</div>
+                        <div className="text-xs space-y-1">
+                          <div><span className="font-medium">ราคาค่าของ:</span> {roofCostMapping['charger-roof-composite'].materialPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคาค่าแรง:</span> {roofCostMapping['charger-roof-composite'].laborPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคารวม:</span> {roofCostMapping['charger-roof-composite'].totalPrice.toLocaleString('th-TH')} บาท</div>
+                        </div>
+                      </>
+                    )}
                   </div>
-
-                </div>
-
-
-
-                {/* แสดงผลการคำนวณ */}
-
-                {travelDistance && (
-
-                  <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-
-                    <div className="flex items-center justify-between">
-
-                      <span className="font-medium text-gray-700">ค่าเดินทาง:</span>
-
-                      <span className="font-bold text-blue-600 text-lg">
-
-                        {travelCostResult.toLocaleString('th-TH')} บาท
-
-                      </span>
-
-                    </div>
-
-                    <div className="text-xs text-gray-500 mt-1">
-
-                      ระยะทาง: {travelDistance} กม. | จำนวน Charger: {props.numberOfChargers} Unit
-
-                      {trainingWork === 'yes' && (
-
-                        <span className="text-green-600 font-medium"> | + งานฝึกอบรม (1วัน)</span>
-
-                      )}
-
-                    </div>
-
-                  </div>
-
                 )}
 
               </div>
@@ -2478,7 +2666,183 @@ function MoreDetailCard(props: any) {
 
       </Card>
 
-    </div>
+
+
+      {/* Travel Cost Card - แยกออกมาเป็นหัวข้อแยก */}
+
+      <Card className="shadow-xl border-0 overflow-hidden">
+
+        <CardHeader className="bg-gradient-to-r from-blue-50 to-cyan-50 border-b">
+
+          <CardTitle className="flex items-center text-blue-800">
+
+            <div className="flex items-center gap-2">
+
+              <MapPin className="h-5 w-5" />
+
+              ค่าเดินทาง <span className="text-xs ">(Travel Cost)</span>
+
+            </div>
+
+          </CardTitle>
+
+          <CardDescription className="text-blue-600">
+
+            คำนวณค่าเดินทางตามระยะทางและจำนวนเครื่องชาร์จ
+
+          </CardDescription>
+
+        </CardHeader>
+
+        <CardContent className="p-6">
+
+          <div className="space-y-4">
+
+            {/* ระยะทาง */}
+
+            <div className="space-y-2">
+
+              <Label htmlFor="travelDistance" className="text-sm font-medium ">
+
+                ระยะทาง (กิโลเมตร)
+
+              </Label>
+
+              <Input
+
+                id="travelDistance"
+
+                type="number"
+
+                placeholder="กรอกระยะทาง"
+
+                value={travelDistance}
+
+                onChange={(e) => setTravelDistance(e.target.value)}
+
+                className="w-32"
+
+              />
+
+            </div>
+
+
+
+            {/* งานฝึกอบรม */}
+
+            <div className="space-y-3">
+
+              <Label className="text-sm font-medium ">
+
+                งานฝึกอบรม <span className="text-xs ">(Training Work)</span>
+
+              </Label>
+
+              <div className="grid grid-cols-2 gap-3">
+
+                <div
+
+                  className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-green-50 cursor-pointer ${trainingWork === 'yes' ? 'bg-green-100 border-green-300' : ''}`}
+
+                  onClick={() => setTrainingWork('yes')}
+
+                >
+
+                  <Checkbox
+
+                    id="training-yes"
+
+                    checked={trainingWork === 'yes'}
+
+                    onCheckedChange={(checked) => {
+
+                      if (checked) setTrainingWork('yes');
+
+                    }}
+
+                    className="text-green-500 border-green-400 data-[state=checked]:bg-green-500"
+
+                  />
+
+                  <Label htmlFor="training-yes" className="font-medium cursor-pointer text-green-700">มีงานฝึกอบรม (1วัน)</Label>
+
+                </div>
+
+                <div
+
+                  className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer ${trainingWork === 'no' ? 'bg-gray-100 border-gray-300' : ''}`}
+
+                  onClick={() => setTrainingWork('no')}
+
+                >
+
+                  <Checkbox
+
+                    id="training-no"
+
+                    checked={trainingWork === 'no'}
+
+                    onCheckedChange={(checked) => {
+
+                      if (checked) setTrainingWork('no');
+
+                    }}
+
+                    className=" border-gray-400 data-[state=checked]:bg-gray-500"
+
+                  />
+
+                  <Label htmlFor="training-no" className="font-medium cursor-pointer ">ไม่มีงานฝึกอบรม</Label>
+
+                </div>
+
+              </div>
+
+            </div>
+
+
+
+            {/* แสดงผลการคำนวณ */}
+
+            {travelDistance && (
+
+              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+
+                <div className="flex items-center justify-between">
+
+                  <span className="font-medium ">ค่าเดินทาง:</span>
+
+                  <span className="font-bold text-blue-600 text-lg">
+
+                    {travelCostResult.toLocaleString('th-TH')} บาท
+
+                  </span>
+
+                </div>
+
+                <div className="text-xs  mt-1">
+
+                  ระยะทาง: {travelDistance} กม. | จำนวน Charger: {props.numberOfChargers} Unit
+
+                  {trainingWork === 'yes' && (
+
+                    <span className="text-green-600 font-medium"> | + งานฝึกอบรม (1วัน)</span>
+
+                  )}
+
+                </div>
+
+              </div>
+
+            )}
+
+          </div>
+
+        </CardContent>
+
+      </Card>
+
+    </div >
 
   )
 
@@ -2503,31 +2867,33 @@ function StationAccessory() {
   const [error, setError] = useState<string | null>(null);
 
 
+
   // State สำหรับเก็บข้อมูล mapping จาก Excel
+
   const [transformerPriceMapping, setTransformerPriceMapping] = useState<{ [key: string]: any }>({});
+
   const [mdbConfigurationMapping, setMdbConfigurationMapping] = useState<{ [key: string]: any }>({});
+  const [stationEquipmentPriceMapping, setStationEquipmentPriceMapping] = useState<{ [key: string]: any }>({});
+  const [roofCostMapping, setRoofCostMapping] = useState<{ [key: string]: any }>({});
 
   // State สำหรับแสดง/ซ่อน mapping details
+
   const [showTransformerMapping, setShowTransformerMapping] = useState(false);
+
   const [showMdbMapping, setShowMdbMapping] = useState(false);
 
   // State สำหรับค้นหาและกรองข้อมูล
+
   const [transformerSearchTerm, setTransformerSearchTerm] = useState('');
+
   const [mdbSearchTerm, setMdbSearchTerm] = useState('');
 
-
   // ฟังก์ชันสำหรับดึงข้อมูลจาก Google Sheets
-
   const fetchExcelData = async () => {
-
     setLoading(true);
-
     setError(null);
 
-
-
     try {
-
       // Google Sheets URL ใหม่
 
       const googleSheetsUrl = 'https://docs.google.com/spreadsheets/d/1fl4SLnm7_1iIBwzoT2BXAh6RbL9Gixe7/edit?usp=sharing&ouid=111737986991833013743&rtpof=true&sd=true';
@@ -2592,9 +2958,11 @@ function StationAccessory() {
 
 
 
-      // สร้าง mapping สำหรับ Transformer Price และ MDB Configuration
+      // สร้าง mapping สำหรับ Transformer Price, MDB Configuration, Station Equipment Price และ Roof Cost
       createTransformerPriceMapping(allSheetsData);
       createMdbConfigurationMapping(allSheetsData);
+      createStationEquipmentPriceMapping(allSheetsData);
+      createRoofCostMapping(allSheetsData);
 
     } catch (error) {
 
@@ -2702,6 +3070,134 @@ function StationAccessory() {
     console.log('Transformer Price Mapping Values:', Object.values(mapping));
   };
 
+  // ฟังก์ชันสร้าง mapping สำหรับราคาอุปกรณ์ประกอบสถานี
+  const createStationEquipmentPriceMapping = (allSheetsData: { [sheetName: string]: any[] }) => {
+    const equipmentSheet = allSheetsData['ราคาอุปกรณ์ประกอบสถานี'];
+    if (!equipmentSheet || equipmentSheet.length === 0) {
+      console.warn('ไม่พบข้อมูลใน Sheet "ราคาอุปกรณ์ประกอบสถานี" สำหรับสร้าง mapping');
+      return;
+    }
+
+    const mapping: { [key: string]: any } = {};
+
+    // สร้าง mapping สำหรับแต่ละรายการตาม row number
+    const equipmentItems = [
+      { key: 'bumper-poles', rowNum: 2, name: 'เสากันชน' },
+      { key: 'wheel-stops', rowNum: 3, name: 'ยางกั้นล้อ (ปูน)' },
+      { key: 'fire-extinguisher', rowNum: 4, name: 'ถังดับเพลิง+ตู้' },
+      { key: 'signage', rowNum: 5, name: 'ป้ายสูง + วิธีใช้งาน' },
+      { key: 'wifi-4g-hub', rowNum: 8, name: 'WIFI + 4G + HUB' },
+      { key: 'cctv', rowNum: 9, name: 'กล้อง CCTV' },
+      { key: 'lighting', rowNum: 10, name: 'หลอดไฟ' },
+      { key: 'acc-system', rowNum: 11, name: 'ACC (สาย + รางสาย + ตู้outdoor + อื่นๆ)' },
+      { key: 'mdb-concrete-base', rowNum: 14, name: 'ฐานปูน MDB 200 x 200 x 20 ซม.' },
+      { key: 'charger-concrete-base', rowNum: 15, name: 'ฐานปูน CHARGER 150 x 150 x 20 ซม.' },
+      { key: 'parking-concrete-floor', rowNum: 16, name: 'พื้นปูน ลานจอดรถ 300 x 600 x 10 ซม.' },
+      { key: 'general-concrete-floor', rowNum: 17, name: 'เทพื้นปูนทั่วไป 100 x 100 x 10 ซม.' },
+      { key: 'paint-no-grind-no-polish', rowNum: 20, name: 'ทาสีพื้นช่องจอดรถ แบบไม่ขัด ไม่โป้ว' },
+      { key: 'paint-grind-no-polish', rowNum: 21, name: 'ทาสีพื้นช่องจอดรถ แบบขัด แต่ไม่โป้ว' },
+      { key: 'paint-grind-and-polish', rowNum: 22, name: 'ทาสีพื้นช่องจอดรถ แบบขัด และโป้วให้เรียบ' },
+      { key: 'side-line-marking', rowNum: 23, name: 'ตีเส้นด้านข้าง' },
+      { key: 'center-pattern-original', rowNum: 24, name: 'ทำลายกลางช่องจอด ใช้ลายเดิม' },
+      { key: 'center-pattern-new', rowNum: 25, name: 'ทำลายกลางช่องจอด ออกแบบลายใหม่' }
+    ];
+
+    equipmentItems.forEach(item => {
+      const rowData = equipmentSheet.find(row => row.__rowNum__ === item.rowNum);
+      if (rowData) {
+        mapping[item.key] = {
+          name: item.name,
+          rowNum: item.rowNum,
+          productCode: rowData.__EMPTY_1 || '',
+          materialPrice: rowData.__EMPTY_2 || 0,
+          laborPrice: rowData.__EMPTY_3 || 0,
+          totalPrice: rowData.__EMPTY_4 || 0,
+          rowData: rowData
+        };
+      }
+    });
+
+    setStationEquipmentPriceMapping(mapping);
+    console.log('Station Equipment Price Mapping สร้างเสร็จ:', mapping);
+  };
+
+  // ฟังก์ชันสร้าง mapping สำหรับราคาหลังคาสถานี
+  const createRoofCostMapping = (allSheetsData: { [sheetName: string]: any[] }) => {
+    const roofSheet = allSheetsData['ตารางต้นทุนหลังคาสถานี'];
+    if (!roofSheet || roofSheet.length === 0) {
+      console.warn('ไม่พบข้อมูลใน Sheet "ตารางต้นทุนหลังคาสถานี" สำหรับสร้าง mapping');
+      return;
+    }
+
+    const mapping: { [key: string]: any } = {};
+
+    // สร้าง mapping สำหรับหลังคาคุมช่องจอดตามจำนวนช่องจอด
+    const parkingRoofRows = [
+      { key: 'parking-roof-1-2', rowNum: 3, slots: '1-2' },
+      { key: 'parking-roof-3-4', rowNum: 6, slots: '3-4' },
+      { key: 'parking-roof-5-6', rowNum: 9, slots: '5-6' },
+      { key: 'parking-roof-7-8', rowNum: 12, slots: '7-8' },
+      { key: 'parking-roof-9-10', rowNum: 15, slots: '9-10' },
+      { key: 'parking-roof-11-12', rowNum: 17, slots: '11-12' }
+    ];
+
+    parkingRoofRows.forEach(item => {
+      const rowData = roofSheet.find(row => row.__rowNum__ === item.rowNum);
+      if (rowData) {
+        mapping[item.key] = {
+          slots: item.slots,
+          rowNum: item.rowNum,
+          materialPrice: rowData.__EMPTY_4 || 0,
+          laborPrice: rowData.__EMPTY_5 || 0,
+          totalPrice: rowData.__EMPTY_6 || 0,
+          rowData: rowData
+        };
+      }
+    });
+
+    // สร้าง mapping สำหรับหลังคาเฉพาะ MDB
+    const mdbRoofRow = roofSheet.find(row => row.__rowNum__ === 20);
+    if (mdbRoofRow) {
+      mapping['mdb-roof'] = {
+        name: 'หลังคาคลุม MDB 3ม. X 3ม.',
+        rowNum: 20,
+        materialPrice: mdbRoofRow.__EMPTY_4 || 0,
+        laborPrice: mdbRoofRow.__EMPTY_5 || 0,
+        totalPrice: mdbRoofRow.__EMPTY_6 || 0,
+        rowData: mdbRoofRow
+      };
+    }
+
+    // สร้าง mapping สำหรับหลังคาเครื่องชาร์จ ธรรมดา
+    const chargerNormalRow = roofSheet.find(row => row.__rowNum__ === 22);
+    if (chargerNormalRow) {
+      mapping['charger-roof-normal'] = {
+        name: 'หลังคาคลุม Charger 3ม. X 3ม.',
+        rowNum: 22,
+        materialPrice: chargerNormalRow.__EMPTY_4 || 0,
+        laborPrice: chargerNormalRow.__EMPTY_5 || 0,
+        totalPrice: chargerNormalRow.__EMPTY_6 || 0,
+        rowData: chargerNormalRow
+      };
+    }
+
+    // สร้าง mapping สำหรับหลังคาเครื่องชาร์จ Composite
+    const chargerCompositeRow = roofSheet.find(row => row.__rowNum__ === 24);
+    if (chargerCompositeRow) {
+      mapping['charger-roof-composite'] = {
+        name: 'หลังคาcompositeคลุม Charger 3ม. X 3ม.',
+        rowNum: 24,
+        materialPrice: chargerCompositeRow.__EMPTY_4 || 0,
+        laborPrice: chargerCompositeRow.__EMPTY_5 || 0,
+        totalPrice: chargerCompositeRow.__EMPTY_6 || 0,
+        rowData: chargerCompositeRow
+      };
+    }
+
+    setRoofCostMapping(mapping);
+    console.log('Roof Cost Mapping สร้างเสร็จ:', mapping);
+  };
+
   // ฟังก์ชันสร้าง mapping สำหรับ MDB Configuration
   const createMdbConfigurationMapping = (allSheetsData: { [sheetName: string]: any[] }) => {
     const mdbSheet = allSheetsData['ตารางแสดงราคา MAIN MCCB ของ MDB'];
@@ -2721,7 +3217,7 @@ function StationAccessory() {
       if (brand === 'EATON') {
         startRow = 10;
       } else if (brand === 'LS') {
-        startRow = 16;
+        startRow = 17;
       }
 
       transformerSizes.forEach(size => {
@@ -2946,6 +3442,19 @@ function StationAccessory() {
   };
 
   // ฟังก์ชันดึงข้อมูล Transformer Price จาก mapping (แทนการอ่าน Excel โดยตรง)
+  // ฟังก์ชันหาข้อมูลหลังคาคุมช่องจอดตามจำนวนช่องจอด
+  const getParkingRoofData = (parkingSlots: number) => {
+    let key = '';
+    if (parkingSlots <= 2) key = 'parking-roof-1-2';
+    else if (parkingSlots <= 4) key = 'parking-roof-3-4';
+    else if (parkingSlots <= 6) key = 'parking-roof-5-6';
+    else if (parkingSlots <= 8) key = 'parking-roof-7-8';
+    else if (parkingSlots <= 10) key = 'parking-roof-9-10';
+    else if (parkingSlots <= 12) key = 'parking-roof-11-12';
+
+    return roofCostMapping[key] || null;
+  };
+
   const getTransformerPrice = (transformerSize: number, transformerType: string) => {
     // ใช้ข้อมูลจาก mapping แทนการอ่าน Excel โดยตรง
     const key = `${transformerType}-${transformerSize}`;
@@ -2991,11 +3500,11 @@ function StationAccessory() {
 
             </div>
 
-            <h1 className="text-4xl font-bold text-gray-900">EV Station Calculator</h1>
+            <h1 className="text-4xl font-bold ">EV Station Calculator</h1>
 
           </div>
 
-          <p className="text-lg text-gray-600">
+          <p className="text-lg ">
 
             Detailed configuration and additional features for electric vehicle charging stations
 
@@ -3199,7 +3708,7 @@ function StationAccessory() {
                             </div>
                           ))}
                           {Object.keys(getFilteredTransformerMapping()).length === 0 && (
-                            <div className="col-span-full text-center text-gray-500 py-4">
+                            <div className="col-span-full text-center  py-4">
                               ไม่พบข้อมูลที่ตรงกับคำค้นหา
                             </div>
                           )}
@@ -3218,7 +3727,7 @@ function StationAccessory() {
                           </div>
                         ))}
                         {Object.keys(transformerPriceMapping).length > 6 && (
-                          <div className="text-gray-500 text-sm p-2">
+                          <div className=" text-sm p-2">
                             และอีก {Object.keys(transformerPriceMapping).length - 6} รายการ...
                           </div>
                         )}
@@ -3286,7 +3795,7 @@ function StationAccessory() {
                             </div>
                           ))}
                           {Object.keys(getFilteredMdbMapping()).length === 0 && (
-                            <div className="col-span-full text-center text-gray-500 py-4">
+                            <div className="col-span-full text-center  py-4">
                               ไม่พบข้อมูลที่ตรงกับคำค้นหา
                             </div>
                           )}
@@ -3305,7 +3814,7 @@ function StationAccessory() {
                           </div>
                         ))}
                         {Object.keys(mdbConfigurationMapping).length > 6 && (
-                          <div className="text-gray-500 text-sm p-2">
+                          <div className=" text-sm p-2">
                             และอีก {Object.keys(mdbConfigurationMapping).length - 6} รายการ...
                           </div>
                         )}
@@ -3407,7 +3916,7 @@ function StationAccessory() {
 
                         {data.length > 5 && (
 
-                          <div className="text-sm text-gray-500 mt-2">
+                          <div className="text-sm  mt-2">
 
                             แสดง 5 แถวแรกจากทั้งหมด {data.length} แถว
 
@@ -3629,7 +4138,7 @@ function StationAccessory() {
 
                     <p>• <span className="font-medium">EATON:</span> Header Row __rowNum__ 10, Product Rows 11-15</p>
 
-                    <p>• <span className="font-medium">LS:</span> Header Row __rowNum__ 16, Product Rows 17-21</p>
+                    <p>• <span className="font-medium">LS:</span> Header Row __rowNum__ 17, Product Rows 18-22</p>
 
                     <p>• Column mapping ตามขนาดหม้อแปลง (100-1200 kVA)</p>
 
@@ -3745,9 +4254,9 @@ function StationAccessory() {
 
                     <div className="text-sm text-blue-700 space-y-1">
 
-                      <p>Header: __rowNum__ 16</p>
+                      <p>Header: __rowNum__ 17</p>
 
-                      <p>Products: __rowNum__ 17-21</p>
+                      <p>Products: __rowNum__ 18-22</p>
 
                       <p>Columns: __EMPTY_1, __EMPTY_6, __EMPTY_X</p>
 
@@ -3770,6 +4279,9 @@ function StationAccessory() {
         <MoreDetailCard
 
           {...state}
+          stationEquipmentPriceMapping={stationEquipmentPriceMapping}
+          roofCostMapping={roofCostMapping}
+          getParkingRoofData={getParkingRoofData}
 
           excelData={excelData}
 
