@@ -985,6 +985,33 @@ export default function Home(): React.JSX.Element {
               })(),
               chargerDistance: 0, // เพิ่มช่องกรอกในหน้า StationAccessory
               trDistance: 0, // เพิ่มช่องกรอกในหน้า StationAccessory
+              // ข้อมูลจาก Summary for Charger
+              chargerSummary: (() => {
+                if (chargerTypeMode === 'any') {
+                  return multiChargers.filter(name => name !== '').map((chargerName, idx) => {
+                    const cableArr = getChargerWiringCable();
+                    const cable = Array.isArray(cableArr) ? cableArr[idx] || '-' : (typeof cableArr === 'string' ? cableArr : '-');
+                    const conduitArr = getChargerWireConduit();
+                    const conduit = Array.isArray(conduitArr) ? conduitArr[idx] || '-' : (typeof conduitArr === 'string' ? conduitArr : '-');
+                    return {
+                      name: chargerName,
+                      kw: extractPowerValue(chargerName),
+                      cable: cable.replace(/^Charger\d+:\s*/, ''),
+                      conduit: conduit.replace(/^Charger\d+:\s*/, '')
+                    };
+                  });
+                } else {
+                  const num = parseInt(form.numberOfChargers) || 1;
+                  const cableArr = getChargerWiringCable();
+                  const conduitArr = getChargerWireConduit();
+                  return Array.from({ length: num }).map((_, idx) => ({
+                    name: form.charger,
+                    kw: extractPowerValue(form.charger),
+                    cable: Array.isArray(cableArr) ? (cableArr[idx] ? cableArr[idx].replace(/^Charger\d+:\s*/, '') : '-') : (typeof cableArr === 'string' ? cableArr : '-'),
+                    conduit: Array.isArray(conduitArr) ? (conduitArr[idx] ? conduitArr[idx].replace(/^Charger\d+:\s*/, '') : '-') : (typeof conduitArr === 'string' ? conduitArr : '-')
+                  }));
+                }
+              })()
             }
           });
         }}
