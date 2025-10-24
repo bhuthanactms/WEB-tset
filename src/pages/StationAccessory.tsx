@@ -17,12 +17,10 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-
-// Add xlsx and axios imports
-
+import axios from 'axios'
 import * as XLSX from 'xlsx'
 
-import axios from 'axios'
+
 
 
 
@@ -208,22 +206,15 @@ function MoreDetailCard(props: any) {
   // ฟังก์ชันคำนวณราคา MDB to Charger Configuration
   const getMdbToChargerConfig = async (chargerName: string, wiringType: string, conduitType: string, distance: number) => {
     try {
-      // ใช้ลิงก์ Google Sheets จาก StationAccessory.tsx
-      const googleSheetsUrl = 'https://docs.google.com/spreadsheets/d/1fl4SLnm7_1iIBwzoT2BXAh6RbL9Gixe7/edit?usp=sharing&ouid=111737986991833013743&rtpof=true&sd=true';
-      const fileId = googleSheetsUrl.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1];
-      const excelFileUrl = `https://docs.google.com/spreadsheets/d/${fileId}/export?format=xlsx&usp=sharing`;
+      // ใช้ข้อมูลจาก props.excelData ที่ถูก cache ไว้แล้ว (เหมือน TR to MDB)
+      const data = props.excelData;
 
-      const response = await axios.get(excelFileUrl, { responseType: 'arraybuffer' });
-      const workbook = XLSX.read(response.data, { type: 'array' });
+      if (!data) {
+        console.error('ไม่มีข้อมูล Excel');
+        return null;
+      }
 
-      // สร้าง object เก็บข้อมูลจากทุก sheets
-      const data: { [sheetName: string]: any[] } = {};
-
-      workbook.SheetNames.forEach(sheetName => {
-        const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet);
-        data[sheetName] = jsonData;
-      });
+      console.log('ใช้ข้อมูลจาก props.excelData (cache) สำหรับ MDB to Charger');
 
       // Find the correct sheet based on wiring type and conduit type
       let sheetName = '';
@@ -240,11 +231,6 @@ function MoreDetailCard(props: any) {
         return null;
       }
 
-      const sheet = data[sheetName];
-      if (!sheet) {
-        console.error(`Sheet ${sheetName} not found`);
-        return null;
-      }
 
       // Extract kW from charger name
       const kwMatch = chargerName.match(/(\d+)\s*kW/i);
@@ -262,9 +248,16 @@ function MoreDetailCard(props: any) {
         return null;
       }
 
-      const row = sheet[rowNum];
+      // ใช้ข้อมูลจาก props.excelData ที่ถูก cache ไว้แล้ว
+      const sheetData = data[sheetName];
+      if (!sheetData) {
+        console.error(`Sheet ${sheetName} not found in cached data`);
+        return null;
+      }
+
+      const row = sheetData.find((r: any) => r.__rowNum__ === rowNum);
       if (!row) {
-        console.error(`Row ${rowNum} not found in sheet ${sheetName}`);
+        console.error(`Row ${rowNum} not found in sheet ${sheetName} in cached data`);
         return null;
       }
 
@@ -1159,7 +1152,7 @@ function MoreDetailCard(props: any) {
 
                     type="number"
 
-                    className="w-32"
+                    className="w-32 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
 
                     value={trDistance}
 
@@ -1204,17 +1197,6 @@ function MoreDetailCard(props: any) {
                 <div className="mt-4 p-4 bg-blue-50 rounded-lg border">
                   <div className="font-medium mb-2">ข้อมูลราคา TR to MDB Configuration:</div>
 
-                  {/* Debug Information */}
-                  <div className="mb-3 p-2 bg-yellow-50 rounded text-xs">
-                    <div><strong>Debug Info:</strong></div>
-                    <div>ระยะทาง: {trDistance}</div>
-                    <div>ประเภท: {props.trWiringType}</div>
-                    <div>ท่อ: {props.trWiringType === 'ร้อยท่อเดินในอากาศ กลุ่ม 2' ? trWiringGroup2 : 'N/A'}</div>
-                    <div>Power Authority: {props.powerAuthority}</div>
-                    <div>Transformer Size: {props.transformer} kVA</div>
-                    <div>TR to MDB Mapping: {trToMdbMapping ? 'มี' : 'ไม่มี'}</div>
-                  </div>
-
 
                   {(() => {
                     const priceData = getTrToMdbPrice(
@@ -1236,73 +1218,17 @@ function MoreDetailCard(props: any) {
 
                       return (
                         <div className="text-sm space-y-3">
-                          {/* ข้อมูลหลัก */}
-                          <div className="bg-blue-50 p-3 rounded-lg border">
-                            <div className="font-semibold text-blue-800 mb-2">ข้อมูลราคา TR to MDB Configuration</div>
-                            <div className="space-y-1">
-                              <div><span className="font-medium">ประเภท:</span> {wiringTypeDisplay}</div>
-                              <div><span className="font-medium">Power Authority:</span> {props.powerAuthority}</div>
-                              <div><span className="font-medium">Transformer Size:</span> {props.transformer} kVA</div>
-                              <div><span className="font-medium">ระยะทาง:</span> {priceData.distance} เมตร</div>
-                            </div>
-                          </div>
-
-                          {/* ผลลัพธ์ที่ต้องการโชว์ */}
+                          {/* ราคาสายไฟ จากหม้อแปลงเข้าMDB */}
                           <div className="bg-green-50 p-3 rounded-lg border">
-                            <div className="font-semibold text-green-800 mb-2">ผลลัพธ์ที่ต้องการโชว์</div>
+                            <div className="font-semibold text-green-800 mb-2">ราคาสายไฟ จากหม้อแปลงเข้าMDB</div>
                             <div className="space-y-1">
                               <div><span className="font-medium">รหัส:</span> {priceData.productCode}</div>
+                              <div><span className="font-medium">ระยะทาง:</span> {priceData.distance} เมตร</div>
                               <div><span className="font-medium">ค่าของ:</span> {priceData.materialPrice.toLocaleString('th-TH')} บาท</div>
                               <div><span className="font-medium">ค่าแรง:</span> {priceData.laborPrice.toLocaleString('th-TH')} บาท</div>
                               <div><span className="font-medium">รวมค่าใช้จ่าย:</span> {priceData.totalPrice.toLocaleString('th-TH')} บาท</div>
                             </div>
-
-                            {/* แสดงข้อมูลดิบจาก Excel ตามเงื่อนไขที่เลือก */}
-                            <div className="mt-3 pt-3 border-t border-green-200">
-                              <div className="text-xs text-green-700 font-medium mb-2">ข้อมูลดิบจาก Excel:</div>
-                              {props.trWiringType === 'ร้อยท่อเดินในอากาศ กลุ่ม 2' && trWiringGroup2 === 'IMC' && (
-                                <div className="text-xs space-y-1">
-                                  <div>รหัส (__EMPTY): {priceData.rawData?.__EMPTY || 'N/A'}</div>
-                                  <div>ค่าของ (__EMPTY_14): {priceData.rawData?.__EMPTY_14 || 'N/A'}</div>
-                                  <div>ค่าแรง (__EMPTY_15): {priceData.rawData?.__EMPTY_15 || 'N/A'}</div>
-                                  <div>รวมค่าใช้จ่าย (__EMPTY_16): {priceData.rawData?.__EMPTY_16 || 'N/A'}</div>
-                                </div>
-                              )}
-                              {props.trWiringType === 'ร้อยท่อเดินในอากาศ กลุ่ม 2' && trWiringGroup2 === 'RSC' && (
-                                <div className="text-xs space-y-1">
-                                  <div>รหัส (f): {priceData.rawData?.f || 'N/A'}</div>
-                                  <div>ค่าของ (__EMPTY_13): {priceData.rawData?.__EMPTY_13 || 'N/A'}</div>
-                                  <div>ค่าแรง (__EMPTY_14): {priceData.rawData?.__EMPTY_14 || 'N/A'}</div>
-                                  <div>รวมค่าใช้จ่าย (__EMPTY_15): {priceData.rawData?.__EMPTY_15 || 'N/A'}</div>
-                                </div>
-                              )}
-                              {props.trWiringType === 'ร้อยท่อฝังใต้ดิน' && (
-                                <div className="text-xs space-y-1">
-                                  <div>รหัส (__EMPTY): {priceData.rawData?.__EMPTY || 'N/A'}</div>
-                                  <div>ค่าของ (__EMPTY_14): {priceData.rawData?.__EMPTY_14 || 'N/A'}</div>
-                                  <div>ค่าแรง (__EMPTY_15): {priceData.rawData?.__EMPTY_15 || 'N/A'}</div>
-                                  <div>รวมค่าใช้จ่าย (__EMPTY_16): {priceData.rawData?.__EMPTY_16 || 'N/A'}</div>
-                                </div>
-                              )}
-                              {props.trWiringType === 'ราง TRAY ไม่มีฝา' && (
-                                <div className="text-xs space-y-1">
-                                  <div>รหัส (__EMPTY): {priceData.rawData?.__EMPTY || 'N/A'}</div>
-                                  <div>ค่าของ (__EMPTY_14): {priceData.rawData?.__EMPTY_14 || 'N/A'}</div>
-                                  <div>ค่าแรง (__EMPTY_15): {priceData.rawData?.__EMPTY_15 || 'N/A'}</div>
-                                  <div>รวมค่าใช้จ่าย (__EMPTY_16): {priceData.rawData?.__EMPTY_16 || 'N/A'}</div>
-                                </div>
-                              )}
-                              {props.trWiringType === 'ราง LADDER ไม่มีฝา' && (
-                                <div className="text-xs space-y-1">
-                                  <div>รหัส (__EMPTY): {priceData.rawData?.__EMPTY || 'N/A'}</div>
-                                  <div>ค่าของ (__EMPTY_14): {priceData.rawData?.__EMPTY_14 || 'N/A'}</div>
-                                  <div>ค่าแรง (__EMPTY_15): {priceData.rawData?.__EMPTY_15 || 'N/A'}</div>
-                                  <div>รวมค่าใช้จ่าย (__EMPTY_16): {priceData.rawData?.__EMPTY_16 || 'N/A'}</div>
-                                </div>
-                              )}
-                            </div>
                           </div>
-
                         </div>
                       );
                     } else {
@@ -1938,7 +1864,7 @@ function MoreDetailCard(props: any) {
 
                               type="number"
 
-                              className="w-32"
+                              className="w-32 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
 
                               value={distance}
 
@@ -2057,7 +1983,7 @@ function MoreDetailCard(props: any) {
 
                             type="number"
 
-                            className="w-32"
+                            className="w-32 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
 
                             value={groupDistance}
 
@@ -2109,17 +2035,6 @@ function MoreDetailCard(props: any) {
               <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
                 <h4 className="font-semibold text-blue-800 mb-3">ผลลัพธ์การคำนวณ MDB to Charger Configuration</h4>
 
-                {/* Debug Information */}
-                <div className="mb-4 p-3 bg-gray-100 rounded text-xs">
-                  <div><strong>Debug Info:</strong></div>
-                  <div>chargerResults: {JSON.stringify(chargerResults)}</div>
-                  <div>chargerSelection: {chargerSelection}</div>
-                  <div>chargerLineDistances: {JSON.stringify(chargerLineDistances)}</div>
-                  <div>chargerConduitChoices: {JSON.stringify(chargerConduitChoices)}</div>
-                  <div>chargerWiringType: {props.chargerWiringType}</div>
-                  <div>chargerSummary: {JSON.stringify(props.chargerSummary)}</div>
-                </div>
-
                 {Object.keys(chargerResults).length > 0 ? (
                   <div className="space-y-3">
                     {Object.entries(chargerResults).map(([index, result]) => (
@@ -2127,6 +2042,18 @@ function MoreDetailCard(props: any) {
                         <div className="text-sm font-medium text-gray-700 mb-2">
                           Charger {parseInt(index) + 1}: {props.chargerSummary?.[parseInt(index)]?.name || ''}
                         </div>
+
+                        {/* แสดงข้อมูลที่ผู้ใช้กรอก */}
+                        <div className="mb-3 p-2 bg-blue-50 rounded border">
+                          <div className="text-xs font-medium text-blue-700 mb-1">ข้อมูลที่กรอก:</div>
+                          <div className="text-sm space-y-1">
+                            <div><span className="font-medium">ระยะ (เมตร):</span> {chargerLineDistances[parseInt(index)] || '-'} เมตร</div>
+                            {props.chargerWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ' && (
+                              <div><span className="font-medium">เลือกท่อ:</span> {chargerConduitChoices[parseInt(index)] || '-'}</div>
+                            )}
+                          </div>
+                        </div>
+
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                           <div className="p-2 bg-gray-50 rounded">
                             <div className="text-xs font-medium text-gray-600">รหัส:</div>
@@ -2145,14 +2072,26 @@ function MoreDetailCard(props: any) {
                             </div>
                           </div>
                           <div className="p-2 bg-yellow-50 rounded border border-yellow-200">
-                            <div className="text-xs font-medium text-yellow-700">รวมค่าใช้จ่าย:</div>
+                            <div className="text-xs font-medium text-yellow-700">ค่าแรง+ค่าของ:</div>
                             <div className="text-sm font-semibold text-yellow-800">
-                              {result.totalCost.toLocaleString('th-TH')} บาท
+                              {(result.laborCost + result.materialCost).toLocaleString('th-TH')} บาท
                             </div>
                           </div>
                         </div>
                       </div>
                     ))}
+
+                    {/* รวมค่าใช้จ่ายทั้งหมด */}
+                    <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
+                      <div className="flex items-center gap-[750px]">
+                        <div className="text-lg font-semibold text-green-800">รวมค่าใช้จ่าย:</div>
+                        <div className="text-2xl font-bold text-green-700">
+                          {Object.values(chargerResults).reduce((total, result) =>
+                            total + (result.laborCost + result.materialCost), 0
+                          ).toLocaleString('th-TH')} บาท
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <div className="text-sm text-gray-500">
@@ -2171,124 +2110,6 @@ function MoreDetailCard(props: any) {
 
 
 
-      {/* MDB to Charger Configuration Card - New Section */}
-      <Card className="shadow-xl border-0 overflow-hidden mb-6">
-        <CardHeader className="bg-gradient-to-r from-purple-50 to-indigo-50 border-b">
-          <CardTitle className="flex items-center justify-between text-purple-800">
-            <div className="flex items-center gap-2">
-              <Wrench className="h-5 w-5" />
-              MDB to Charger Configuration <span className="text-xs">(การตั้งค่า MDB ไป Charger)</span>
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-6">
-          <div className="space-y-4">
-            {/* Display data from Home.tsx */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <div className="text-sm font-medium text-gray-600 mb-1">Charger Wiring Type:</div>
-                <div className="text-sm font-semibold text-gray-800">{props.chargerWiringType}</div>
-              </div>
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <div className="text-sm font-medium text-gray-600 mb-1">Charger Wiring Cable (CV/THW):</div>
-                <div className="text-sm font-semibold text-gray-800">
-                  {Array.isArray(props.chargerWiringCableAll)
-                    ? props.chargerWiringCableAll[0] || '-'
-                    : props.chargerWiringCable || '-'
-                  }
-                </div>
-              </div>
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <div className="text-sm font-medium text-gray-600 mb-1">Charger Wire conduit:</div>
-                <div className="text-sm font-semibold text-gray-800">
-                  {Array.isArray(props.chargerWireConduitAll)
-                    ? props.chargerWireConduitAll[0] || '-'
-                    : props.chargerWireConduit || '-'
-                  }
-                </div>
-              </div>
-            </div>
-
-            {/* Charger Details from Electrical Configuration Summary */}
-            <div className="mt-4">
-              <h4 className="font-semibold text-gray-700 mb-3">Charger Details:</h4>
-              <div className="space-y-2">
-                {props.chargerSummary?.map((charger: any, index: number) => (
-                  <div key={index} className="p-3 bg-white rounded border">
-                    <div className="text-sm font-medium text-gray-700">
-                      Charger {index + 1}: {charger.name} ({charger.kw} kW)
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Distance Input */}
-            <div className="mt-4">
-              <Label htmlFor="mdbChargerDistance" className="text-sm font-medium text-gray-700 mb-2 block">
-                ระยะทาง (เมตร):
-              </Label>
-              <Input
-                id="mdbChargerDistance"
-                type="number"
-                className="w-32"
-                placeholder="กรอกระยะทาง"
-                onChange={(e) => {
-                  const distance = parseFloat(e.target.value) || 0;
-                  // Trigger calculation when distance changes
-                  if (distance > 0 && props.chargerSummary && props.chargerSummary.length > 0) {
-                    calculateMdbToChargerResults(distance);
-                  }
-                }}
-              />
-            </div>
-
-            {/* Conduit Type Selection (only for group 2 air) */}
-            {props.chargerWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ' && (
-              <div className="mt-4">
-                <Label className="text-sm font-medium text-gray-700 mb-2 block">เลือกท่อ:</Label>
-                <div className="flex gap-4">
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="radio"
-                      id="imc"
-                      name="conduitType"
-                      value="IMC"
-                      className="text-purple-500"
-                    />
-                    <Label htmlFor="imc" className="font-medium cursor-pointer">IMC</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="radio"
-                      id="rsc"
-                      name="conduitType"
-                      value="RSC"
-                      className="text-purple-500"
-                    />
-                    <Label htmlFor="rsc" className="font-medium cursor-pointer">RSC</Label>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Results Display */}
-            <div className="mt-6 p-4 bg-purple-50 rounded-lg border border-purple-200">
-              <h4 className="font-semibold text-purple-800 mb-3">ผลลัพธ์การคำนวณ:</h4>
-              {isCalculating ? (
-                <div className="flex items-center justify-center p-4">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-                  <span className="ml-2 text-purple-600">กำลังคำนวณ...</span>
-                </div>
-              ) : (
-                <div id="mdbChargerResults" className="space-y-3">
-                  <div className="text-sm text-gray-500">กรุณากรอกระยะทางเพื่อดูผลลัพธ์</div>
-                </div>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Additional Features Card */}
 
@@ -2453,9 +2274,9 @@ function MoreDetailCard(props: any) {
                       {stationEquipmentPriceMapping['bumper-poles'] && (
                         <div className="text-xs mt-1 space-y-1">
                           <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['bumper-poles'].productCode}</div>
-                          <div><span className="font-medium">ราคาค่าของ:</span> {stationEquipmentPriceMapping['bumper-poles'].materialPrice.toLocaleString('th-TH')} บาท</div>
-                          <div><span className="font-medium">ราคาค่าแรง:</span> {stationEquipmentPriceMapping['bumper-poles'].laborPrice.toLocaleString('th-TH')} บาท</div>
-                          <div><span className="font-medium">ราคารวม:</span> {stationEquipmentPriceMapping['bumper-poles'].totalPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคาค่าของ:</span> {(stationEquipmentPriceMapping['bumper-poles'].materialPrice * (parseInt(parkingSlots) * 2)).toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคาค่าแรง:</span> {(stationEquipmentPriceMapping['bumper-poles'].laborPrice * (parseInt(parkingSlots) * 2)).toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคารวม:</span> {(stationEquipmentPriceMapping['bumper-poles'].totalPrice * (parseInt(parkingSlots) * 2)).toLocaleString('th-TH')} บาท</div>
                         </div>
                       )}
 
@@ -2482,9 +2303,9 @@ function MoreDetailCard(props: any) {
                       {stationEquipmentPriceMapping['wheel-stops'] && (
                         <div className="text-xs mt-1 space-y-1">
                           <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['wheel-stops'].productCode}</div>
-                          <div><span className="font-medium">ราคาค่าของ:</span> {stationEquipmentPriceMapping['wheel-stops'].materialPrice.toLocaleString('th-TH')} บาท</div>
-                          <div><span className="font-medium">ราคาค่าแรง:</span> {stationEquipmentPriceMapping['wheel-stops'].laborPrice.toLocaleString('th-TH')} บาท</div>
-                          <div><span className="font-medium">ราคารวม:</span> {stationEquipmentPriceMapping['wheel-stops'].totalPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคาค่าของ:</span> {(stationEquipmentPriceMapping['wheel-stops'].materialPrice * parseInt(parkingSlots)).toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคาค่าแรง:</span> {(stationEquipmentPriceMapping['wheel-stops'].laborPrice * parseInt(parkingSlots)).toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคารวม:</span> {(stationEquipmentPriceMapping['wheel-stops'].totalPrice * parseInt(parkingSlots)).toLocaleString('th-TH')} บาท</div>
                         </div>
                       )}
 
@@ -2511,9 +2332,9 @@ function MoreDetailCard(props: any) {
                       {stationEquipmentPriceMapping['fire-extinguisher'] && (
                         <div className="text-xs mt-1 space-y-1">
                           <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['fire-extinguisher'].productCode}</div>
-                          <div><span className="font-medium">ราคาค่าของ:</span> {stationEquipmentPriceMapping['fire-extinguisher'].materialPrice.toLocaleString('th-TH')} บาท</div>
-                          <div><span className="font-medium">ราคาค่าแรง:</span> {stationEquipmentPriceMapping['fire-extinguisher'].laborPrice.toLocaleString('th-TH')} บาท</div>
-                          <div><span className="font-medium">ราคารวม:</span> {stationEquipmentPriceMapping['fire-extinguisher'].totalPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคาค่าของ:</span> {(stationEquipmentPriceMapping['fire-extinguisher'].materialPrice * props.numberOfChargers).toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคาค่าแรง:</span> {(stationEquipmentPriceMapping['fire-extinguisher'].laborPrice * props.numberOfChargers).toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคารวม:</span> {(stationEquipmentPriceMapping['fire-extinguisher'].totalPrice * props.numberOfChargers).toLocaleString('th-TH')} บาท</div>
                         </div>
                       )}
 
@@ -2540,9 +2361,9 @@ function MoreDetailCard(props: any) {
                       {stationEquipmentPriceMapping['signage'] && (
                         <div className="text-xs mt-1 space-y-1">
                           <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['signage'].productCode}</div>
-                          <div><span className="font-medium">ราคาค่าของ:</span> {stationEquipmentPriceMapping['signage'].materialPrice.toLocaleString('th-TH')} บาท</div>
-                          <div><span className="font-medium">ราคาค่าแรง:</span> {stationEquipmentPriceMapping['signage'].laborPrice.toLocaleString('th-TH')} บาท</div>
-                          <div><span className="font-medium">ราคารวม:</span> {stationEquipmentPriceMapping['signage'].totalPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคาค่าของ:</span> {(stationEquipmentPriceMapping['signage'].materialPrice * props.numberOfChargers).toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคาค่าแรง:</span> {(stationEquipmentPriceMapping['signage'].laborPrice * props.numberOfChargers).toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคารวม:</span> {(stationEquipmentPriceMapping['signage'].totalPrice * props.numberOfChargers).toLocaleString('th-TH')} บาท</div>
                         </div>
                       )}
 
@@ -2552,6 +2373,40 @@ function MoreDetailCard(props: any) {
 
                   </div>
 
+                </div>
+
+                {/* รวมค่าใช้จ่ายอุปกรณ์ประกอบสถานี */}
+                <div className="mt-6 p-4 bg-green-50 rounded-lg border border-green-200">
+                  <div className="flex items-center gap-10">
+                    <div className="text-lg font-semibold text-green-800">รวมค่าใช้จ่ายอุปกรณ์ประกอบสถานี:</div>
+                    <div className="text-2xl font-bold text-green-700">
+                      {(() => {
+                        let total = 0;
+
+                        // เสากันชน
+                        if (stationEquipmentPriceMapping['bumper-poles']) {
+                          total += stationEquipmentPriceMapping['bumper-poles'].totalPrice * (parseInt(parkingSlots) * 2);
+                        }
+
+                        // ยางกั้นล้อ (ปูน)
+                        if (stationEquipmentPriceMapping['wheel-stops']) {
+                          total += stationEquipmentPriceMapping['wheel-stops'].totalPrice * parseInt(parkingSlots);
+                        }
+
+                        // ถังดับเพลิง+ตู้
+                        if (stationEquipmentPriceMapping['fire-extinguisher']) {
+                          total += stationEquipmentPriceMapping['fire-extinguisher'].totalPrice * props.numberOfChargers;
+                        }
+
+                        // ป้ายสูง + วิธีใช้งาน
+                        if (stationEquipmentPriceMapping['signage']) {
+                          total += stationEquipmentPriceMapping['signage'].totalPrice * props.numberOfChargers;
+                        }
+
+                        return total.toLocaleString('th-TH');
+                      })()} บาท
+                    </div>
+                  </div>
                 </div>
 
               </div>
@@ -2585,9 +2440,9 @@ function MoreDetailCard(props: any) {
                       {stationEquipmentPriceMapping['wifi-4g-hub'] && (
                         <div className="text-xs mt-1 space-y-1">
                           <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['wifi-4g-hub'].productCode}</div>
-                          <div><span className="font-medium">ราคาค่าของ:</span> {stationEquipmentPriceMapping['wifi-4g-hub'].materialPrice.toLocaleString('th-TH')} บาท</div>
-                          <div><span className="font-medium">ราคาค่าแรง:</span> {stationEquipmentPriceMapping['wifi-4g-hub'].laborPrice.toLocaleString('th-TH')} บาท</div>
-                          <div><span className="font-medium">ราคารวม:</span> {stationEquipmentPriceMapping['wifi-4g-hub'].totalPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคาค่าของ:</span> {(stationEquipmentPriceMapping['wifi-4g-hub'].materialPrice * 1).toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคาค่าแรง:</span> {(stationEquipmentPriceMapping['wifi-4g-hub'].laborPrice * 1).toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคารวม:</span> {(stationEquipmentPriceMapping['wifi-4g-hub'].totalPrice * 1).toLocaleString('th-TH')} บาท</div>
                         </div>
                       )}
 
@@ -2610,9 +2465,9 @@ function MoreDetailCard(props: any) {
                       {stationEquipmentPriceMapping['cctv'] && (
                         <div className="text-xs mt-1 space-y-1">
                           <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['cctv'].productCode}</div>
-                          <div><span className="font-medium">ราคาค่าของ:</span> {stationEquipmentPriceMapping['cctv'].materialPrice.toLocaleString('th-TH')} บาท</div>
-                          <div><span className="font-medium">ราคาค่าแรง:</span> {stationEquipmentPriceMapping['cctv'].laborPrice.toLocaleString('th-TH')} บาท</div>
-                          <div><span className="font-medium">ราคารวม:</span> {stationEquipmentPriceMapping['cctv'].totalPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคาค่าของ:</span> {(stationEquipmentPriceMapping['cctv'].materialPrice * 4).toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคาค่าแรง:</span> {(stationEquipmentPriceMapping['cctv'].laborPrice * 4).toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคารวม:</span> {(stationEquipmentPriceMapping['cctv'].totalPrice * 4).toLocaleString('th-TH')} บาท</div>
                         </div>
                       )}
 
@@ -2635,9 +2490,9 @@ function MoreDetailCard(props: any) {
                       {stationEquipmentPriceMapping['lighting'] && (
                         <div className="text-xs mt-1 space-y-1">
                           <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['lighting'].productCode}</div>
-                          <div><span className="font-medium">ราคาค่าของ:</span> {stationEquipmentPriceMapping['lighting'].materialPrice.toLocaleString('th-TH')} บาท</div>
-                          <div><span className="font-medium">ราคาค่าแรง:</span> {stationEquipmentPriceMapping['lighting'].laborPrice.toLocaleString('th-TH')} บาท</div>
-                          <div><span className="font-medium">ราคารวม:</span> {stationEquipmentPriceMapping['lighting'].totalPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคาค่าของ:</span> {(stationEquipmentPriceMapping['lighting'].materialPrice * 3).toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคาค่าแรง:</span> {(stationEquipmentPriceMapping['lighting'].laborPrice * 3).toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคารวม:</span> {(stationEquipmentPriceMapping['lighting'].totalPrice * 3).toLocaleString('th-TH')} บาท</div>
                         </div>
                       )}
 
@@ -2660,9 +2515,9 @@ function MoreDetailCard(props: any) {
                       {stationEquipmentPriceMapping['acc-system'] && (
                         <div className="text-xs mt-1 space-y-1">
                           <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['acc-system'].productCode}</div>
-                          <div><span className="font-medium">ราคาค่าของ:</span> {stationEquipmentPriceMapping['acc-system'].materialPrice.toLocaleString('th-TH')} บาท</div>
-                          <div><span className="font-medium">ราคาค่าแรง:</span> {stationEquipmentPriceMapping['acc-system'].laborPrice.toLocaleString('th-TH')} บาท</div>
-                          <div><span className="font-medium">ราคารวม:</span> {stationEquipmentPriceMapping['acc-system'].totalPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคาค่าของ:</span> {(stationEquipmentPriceMapping['acc-system'].materialPrice * 1).toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคาค่าแรง:</span> {(stationEquipmentPriceMapping['acc-system'].laborPrice * 1).toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคารวม:</span> {(stationEquipmentPriceMapping['acc-system'].totalPrice * 1).toLocaleString('th-TH')} บาท</div>
                         </div>
                       )}
 
@@ -2672,6 +2527,40 @@ function MoreDetailCard(props: any) {
 
                   </div>
 
+                </div>
+
+                {/* รวมค่าใช้จ่ายระบบสื่อสาร */}
+                <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="flex items-center gap-10">
+                    <div className="text-lg font-semibold text-blue-800">รวมค่าใช้จ่ายระบบสื่อสาร:</div>
+                    <div className="text-2xl font-bold text-blue-700">
+                      {(() => {
+                        let total = 0;
+
+                        // WIFI + 4G + HUB
+                        if (stationEquipmentPriceMapping['wifi-4g-hub']) {
+                          total += stationEquipmentPriceMapping['wifi-4g-hub'].totalPrice * 1;
+                        }
+
+                        // กล้อง CCTV
+                        if (stationEquipmentPriceMapping['cctv']) {
+                          total += stationEquipmentPriceMapping['cctv'].totalPrice * 4;
+                        }
+
+                        // หลอดไฟ
+                        if (stationEquipmentPriceMapping['lighting']) {
+                          total += stationEquipmentPriceMapping['lighting'].totalPrice * 3;
+                        }
+
+                        // ACC (สาย + รางสาย + ตู้outdoor + อื่นๆ)
+                        if (stationEquipmentPriceMapping['acc-system']) {
+                          total += stationEquipmentPriceMapping['acc-system'].totalPrice * 1;
+                        }
+
+                        return total.toLocaleString('th-TH');
+                      })()} บาท
+                    </div>
+                  </div>
                 </div>
 
               </div>
@@ -2705,9 +2594,9 @@ function MoreDetailCard(props: any) {
                       {stationEquipmentPriceMapping['mdb-concrete-base'] && (
                         <div className="text-xs mt-1 space-y-1">
                           <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['mdb-concrete-base'].productCode}</div>
-                          <div><span className="font-medium">ราคาค่าของ:</span> {stationEquipmentPriceMapping['mdb-concrete-base'].materialPrice.toLocaleString('th-TH')} บาท</div>
-                          <div><span className="font-medium">ราคาค่าแรง:</span> {stationEquipmentPriceMapping['mdb-concrete-base'].laborPrice.toLocaleString('th-TH')} บาท</div>
-                          <div><span className="font-medium">ราคารวม:</span> {stationEquipmentPriceMapping['mdb-concrete-base'].totalPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคาค่าของ:</span> {(stationEquipmentPriceMapping['mdb-concrete-base'].materialPrice * 1).toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคาค่าแรง:</span> {(stationEquipmentPriceMapping['mdb-concrete-base'].laborPrice * 1).toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคารวม:</span> {(stationEquipmentPriceMapping['mdb-concrete-base'].totalPrice * 1).toLocaleString('th-TH')} บาท</div>
                         </div>
                       )}
 
@@ -2734,9 +2623,9 @@ function MoreDetailCard(props: any) {
                       {stationEquipmentPriceMapping['charger-concrete-base'] && (
                         <div className="text-xs mt-1 space-y-1">
                           <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['charger-concrete-base'].productCode}</div>
-                          <div><span className="font-medium">ราคาค่าของ:</span> {stationEquipmentPriceMapping['charger-concrete-base'].materialPrice.toLocaleString('th-TH')} บาท</div>
-                          <div><span className="font-medium">ราคาค่าแรง:</span> {stationEquipmentPriceMapping['charger-concrete-base'].laborPrice.toLocaleString('th-TH')} บาท</div>
-                          <div><span className="font-medium">ราคารวม:</span> {stationEquipmentPriceMapping['charger-concrete-base'].totalPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคาค่าของ:</span> {(stationEquipmentPriceMapping['charger-concrete-base'].materialPrice * props.numberOfChargers).toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคาค่าแรง:</span> {(stationEquipmentPriceMapping['charger-concrete-base'].laborPrice * props.numberOfChargers).toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคารวม:</span> {(stationEquipmentPriceMapping['charger-concrete-base'].totalPrice * props.numberOfChargers).toLocaleString('th-TH')} บาท</div>
                         </div>
                       )}
 
@@ -2763,9 +2652,9 @@ function MoreDetailCard(props: any) {
                       {stationEquipmentPriceMapping['parking-concrete-floor'] && (
                         <div className="text-xs mt-1 space-y-1">
                           <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['parking-concrete-floor'].productCode}</div>
-                          <div><span className="font-medium">ราคาค่าของ:</span> {stationEquipmentPriceMapping['parking-concrete-floor'].materialPrice.toLocaleString('th-TH')} บาท</div>
-                          <div><span className="font-medium">ราคาค่าแรง:</span> {stationEquipmentPriceMapping['parking-concrete-floor'].laborPrice.toLocaleString('th-TH')} บาท</div>
-                          <div><span className="font-medium">ราคารวม:</span> {stationEquipmentPriceMapping['parking-concrete-floor'].totalPrice.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคาค่าของ:</span> {(stationEquipmentPriceMapping['parking-concrete-floor'].materialPrice * parseInt(parkingSlots)).toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคาค่าแรง:</span> {(stationEquipmentPriceMapping['parking-concrete-floor'].laborPrice * parseInt(parkingSlots)).toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ราคารวม:</span> {(stationEquipmentPriceMapping['parking-concrete-floor'].totalPrice * parseInt(parkingSlots)).toLocaleString('th-TH')} บาท</div>
                         </div>
                       )}
 
@@ -2800,6 +2689,40 @@ function MoreDetailCard(props: any) {
 
                   </div>
 
+                </div>
+
+                {/* รวมค่าใช้จ่ายงานปูน */}
+                <div className="mt-6 p-4 bg-orange-50 rounded-lg border border-orange-200">
+                  <div className="flex items-center gap-10">
+                    <div className="text-lg font-semibold text-orange-800">รวมค่าใช้จ่ายงานปูน:</div>
+                    <div className="text-2xl font-bold text-orange-700">
+                      {(() => {
+                        let total = 0;
+
+                        // ฐานปูน MDB
+                        if (stationEquipmentPriceMapping['mdb-concrete-base']) {
+                          total += stationEquipmentPriceMapping['mdb-concrete-base'].totalPrice * 1;
+                        }
+
+                        // ฐานปูน CHARGER
+                        if (stationEquipmentPriceMapping['charger-concrete-base']) {
+                          total += stationEquipmentPriceMapping['charger-concrete-base'].totalPrice * props.numberOfChargers;
+                        }
+
+                        // พื้นปูน ลานจอดรถ
+                        if (stationEquipmentPriceMapping['parking-concrete-floor']) {
+                          total += stationEquipmentPriceMapping['parking-concrete-floor'].totalPrice * parseInt(parkingSlots);
+                        }
+
+                        // เทพื้นปูนทั่วไป (ไม่คูณจำนวนเพราะแล้วแต่กำหนด)
+                        if (stationEquipmentPriceMapping['general-concrete-floor']) {
+                          total += stationEquipmentPriceMapping['general-concrete-floor'].totalPrice;
+                        }
+
+                        return total.toLocaleString('th-TH');
+                      })()} บาท
+                    </div>
+                  </div>
                 </div>
 
               </div>
@@ -2927,9 +2850,9 @@ function MoreDetailCard(props: any) {
                             <div className="font-medium">ข้อมูลราคาทาสี:</div>
                             <div className="text-xs space-y-1">
                               <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping[`paint-${parkingPaintType}`].productCode}</div>
-                              <div><span className="font-medium">ราคาค่าของ:</span> {stationEquipmentPriceMapping[`paint-${parkingPaintType}`].materialPrice.toLocaleString('th-TH')} บาท</div>
-                              <div><span className="font-medium">ราคาค่าแรง:</span> {stationEquipmentPriceMapping[`paint-${parkingPaintType}`].laborPrice.toLocaleString('th-TH')} บาท</div>
-                              <div><span className="font-medium">ราคารวม:</span> {stationEquipmentPriceMapping[`paint-${parkingPaintType}`].totalPrice.toLocaleString('th-TH')} บาท</div>
+                              <div><span className="font-medium">ราคาค่าของ:</span> {(stationEquipmentPriceMapping[`paint-${parkingPaintType}`].materialPrice * parseInt(parkingSlots)).toLocaleString('th-TH')} บาท</div>
+                              <div><span className="font-medium">ราคาค่าแรง:</span> {(stationEquipmentPriceMapping[`paint-${parkingPaintType}`].laborPrice * parseInt(parkingSlots)).toLocaleString('th-TH')} บาท</div>
+                              <div><span className="font-medium">ราคารวม:</span> {(stationEquipmentPriceMapping[`paint-${parkingPaintType}`].totalPrice * parseInt(parkingSlots)).toLocaleString('th-TH')} บาท</div>
                             </div>
                           </div>
                         )}
@@ -2949,9 +2872,9 @@ function MoreDetailCard(props: any) {
                             <div className="font-medium">ข้อมูลราคาตีเส้น:</div>
                             <div className="text-xs space-y-1">
                               <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['side-line-marking'].productCode}</div>
-                              <div><span className="font-medium">ราคาค่าของ:</span> {stationEquipmentPriceMapping['side-line-marking'].materialPrice.toLocaleString('th-TH')} บาท</div>
-                              <div><span className="font-medium">ราคาค่าแรง:</span> {stationEquipmentPriceMapping['side-line-marking'].laborPrice.toLocaleString('th-TH')} บาท</div>
-                              <div><span className="font-medium">ราคารวม:</span> {stationEquipmentPriceMapping['side-line-marking'].totalPrice.toLocaleString('th-TH')} บาท</div>
+                              <div><span className="font-medium">ราคาค่าของ:</span> {(stationEquipmentPriceMapping['side-line-marking'].materialPrice * parseInt(parkingSlots)).toLocaleString('th-TH')} บาท</div>
+                              <div><span className="font-medium">ราคาค่าแรง:</span> {(stationEquipmentPriceMapping['side-line-marking'].laborPrice * parseInt(parkingSlots)).toLocaleString('th-TH')} บาท</div>
+                              <div><span className="font-medium">ราคารวม:</span> {(stationEquipmentPriceMapping['side-line-marking'].totalPrice * parseInt(parkingSlots)).toLocaleString('th-TH')} บาท</div>
                             </div>
                           </div>
                         )}
@@ -2966,9 +2889,9 @@ function MoreDetailCard(props: any) {
                             <div className="font-medium">ข้อมูลราคาทำลายลายเดิม:</div>
                             <div className="text-xs space-y-1">
                               <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['center-pattern-original'].productCode}</div>
-                              <div><span className="font-medium">ราคาค่าของ:</span> {stationEquipmentPriceMapping['center-pattern-original'].materialPrice.toLocaleString('th-TH')} บาท</div>
-                              <div><span className="font-medium">ราคาค่าแรง:</span> {stationEquipmentPriceMapping['center-pattern-original'].laborPrice.toLocaleString('th-TH')} บาท</div>
-                              <div><span className="font-medium">ราคารวม:</span> {stationEquipmentPriceMapping['center-pattern-original'].totalPrice.toLocaleString('th-TH')} บาท</div>
+                              <div><span className="font-medium">ราคาค่าของ:</span> {(stationEquipmentPriceMapping['center-pattern-original'].materialPrice * parseInt(parkingSlots)).toLocaleString('th-TH')} บาท</div>
+                              <div><span className="font-medium">ราคาค่าแรง:</span> {(stationEquipmentPriceMapping['center-pattern-original'].laborPrice * parseInt(parkingSlots)).toLocaleString('th-TH')} บาท</div>
+                              <div><span className="font-medium">ราคารวม:</span> {(stationEquipmentPriceMapping['center-pattern-original'].totalPrice * parseInt(parkingSlots)).toLocaleString('th-TH')} บาท</div>
                             </div>
                           </div>
                         )}
@@ -2978,9 +2901,9 @@ function MoreDetailCard(props: any) {
                             <div className="font-medium">ข้อมูลราคาทำลายลายใหม่:</div>
                             <div className="text-xs space-y-1">
                               <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['center-pattern-new'].productCode}</div>
-                              <div><span className="font-medium">ราคาค่าของ:</span> {stationEquipmentPriceMapping['center-pattern-new'].materialPrice.toLocaleString('th-TH')} บาท</div>
-                              <div><span className="font-medium">ราคาค่าแรง:</span> {stationEquipmentPriceMapping['center-pattern-new'].laborPrice.toLocaleString('th-TH')} บาท</div>
-                              <div><span className="font-medium">ราคารวม:</span> {stationEquipmentPriceMapping['center-pattern-new'].totalPrice.toLocaleString('th-TH')} บาท</div>
+                              <div><span className="font-medium">ราคาค่าของ:</span> {(stationEquipmentPriceMapping['center-pattern-new'].materialPrice * parseInt(parkingSlots)).toLocaleString('th-TH')} บาท</div>
+                              <div><span className="font-medium">ราคาค่าแรง:</span> {(stationEquipmentPriceMapping['center-pattern-new'].laborPrice * parseInt(parkingSlots)).toLocaleString('th-TH')} บาท</div>
+                              <div><span className="font-medium">ราคารวม:</span> {(stationEquipmentPriceMapping['center-pattern-new'].totalPrice * parseInt(parkingSlots)).toLocaleString('th-TH')} บาท</div>
                             </div>
                           </div>
                         )}
@@ -2996,6 +2919,42 @@ function MoreDetailCard(props: any) {
                   )}
 
                 </div>
+
+                {/* รวมค่าใช้จ่ายงานทาสีช่องจอด */}
+                {parkingPaintType && (
+                  <div className="mt-6 p-4 bg-pink-50 rounded-lg border border-pink-200">
+                    <div className="flex items-center gap-10">
+                      <div className="text-lg font-semibold text-pink-800">รวมค่าใช้จ่ายงานทาสีช่องจอด:</div>
+                      <div className="text-2xl font-bold text-pink-700">
+                        {(() => {
+                          let total = 0;
+
+                          // ทาสีพื้นช่องจอดรถ
+                          if (stationEquipmentPriceMapping[`paint-${parkingPaintType}`]) {
+                            total += stationEquipmentPriceMapping[`paint-${parkingPaintType}`].totalPrice * parseInt(parkingSlots);
+                          }
+
+                          // ตีเส้นด้านข้าง
+                          if (stationEquipmentPriceMapping['side-line-marking']) {
+                            total += stationEquipmentPriceMapping['side-line-marking'].totalPrice * parseInt(parkingSlots);
+                          }
+
+                          // ทำลายกลางช่องจอด (ใช้ลายเดิม)
+                          if (stationEquipmentPriceMapping['center-pattern-original']) {
+                            total += stationEquipmentPriceMapping['center-pattern-original'].totalPrice * parseInt(parkingSlots);
+                          }
+
+                          // ทำลายกลางช่องจอด (ออกแบบลายใหม่)
+                          if (stationEquipmentPriceMapping['center-pattern-new']) {
+                            total += stationEquipmentPriceMapping['center-pattern-new'].totalPrice * parseInt(parkingSlots);
+                          }
+
+                          return total.toLocaleString('th-TH');
+                        })()} บาท
+                      </div>
+                    </div>
+                  </div>
+                )}
 
               </div>
 
@@ -3336,13 +3295,13 @@ function MoreDetailCard(props: any) {
 
                 type="number"
 
+                className="w-32 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+
                 placeholder="กรอกระยะทาง"
 
                 value={travelDistance}
 
                 onChange={(e) => setTravelDistance(e.target.value)}
-
-                className="w-32"
 
               />
 
@@ -3454,6 +3413,21 @@ function MoreDetailCard(props: any) {
 
                 </div>
 
+                {/* แสดงรายละเอียดการคำนวณ */}
+                <div className="mt-3 p-3 bg-white rounded border text-xs space-y-1">
+                  <div className="font-medium text-gray-700">รายละเอียดการคำนวณ:</div>
+                  <div>• ระยะทาง: {travelDistance} กม.</div>
+                  <div>• จำนวน Charger: {props.numberOfChargers} Unit</div>
+                  {trainingWork === 'yes' && (
+                    <div className="text-green-600">
+                      • รวมงานฝึกอบรม: {(parseFloat(travelDistance) * 15 + 2600 + 1000).toLocaleString('th-TH')} บาท
+                    </div>
+                  )}
+                  <div className="font-medium text-blue-600">
+                    • ยอดรวมทั้งหมด: {travelCostResult.toLocaleString('th-TH')} บาท
+                  </div>
+                </div>
+
               </div>
 
             )}
@@ -3563,12 +3537,19 @@ function StationAccessory() {
 
         const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
-        allSheetsData[sheetName] = jsonData;
+        // เพิ่ม __sheetName__ และ __rowNum__ ให้กับแต่ละ row
+        const processedData = jsonData.map((row: any, index: number) => ({
+          ...row,
+          __sheetName__: sheetName,
+          __rowNum__: index + 1 // Excel row numbers start from 1
+        }));
+
+        allSheetsData[sheetName] = processedData;
 
         // แสดงข้อมูลทุก sheet ใน Console
         console.log(`=== Sheet: ${sheetName} ===`);
-        console.log(`จำนวนแถว: ${jsonData.length}`);
-        console.log('ข้อมูลครบทุกแถว:', jsonData);
+        console.log(`จำนวนแถว: ${processedData.length}`);
+        console.log('ข้อมูลครบทุกแถว:', processedData);
         console.log('---');
 
       });
@@ -4417,686 +4398,16 @@ function StationAccessory() {
 
 
 
-        {/* Excel Data Status */}
 
-        {loading && (
 
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
 
-            <div className="flex items-center gap-2">
 
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
 
-              <span className="text-blue-700">กำลังโหลดข้อมูลจาก Google Sheets...</span>
 
-            </div>
 
-          </div>
 
-        )}
 
 
-
-        {error && (
-
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-
-            <div className="flex items-center gap-2">
-
-              <span className="text-red-700">❌ เกิดข้อผิดพลาด: {error}</span>
-
-            </div>
-
-            <button
-
-              onClick={fetchExcelData}
-
-              className="mt-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
-
-            >
-
-              ลองใหม่
-
-            </button>
-
-          </div>
-
-        )}
-
-
-
-        {Object.keys(excelData).length > 0 && (
-
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-
-            <div className="flex items-center gap-2 mb-2">
-
-              <span className="text-green-700">✅ โหลดข้อมูลสำเร็จ</span>
-
-            </div>
-
-            <div className="text-sm text-green-600 mb-2">
-              พบ {Object.keys(excelData).length} sheets: {Object.keys(excelData).join(', ')}
-
-            </div>
-
-            <div className="text-sm text-green-600 mb-2">
-              📊 Mapping สร้างเสร็จ: Transformer Price ({Object.keys(transformerPriceMapping).length} รายการ),
-              MDB Configuration ({Object.keys(mdbConfigurationMapping).length} รายการ)
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => {
-                  console.log('=== Transformer Price Mapping ===');
-                  console.log(transformerPriceMapping);
-                  console.log('Keys:', Object.keys(transformerPriceMapping));
-                  console.log('Values:', Object.values(transformerPriceMapping));
-                }}
-                className="px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
-              >
-                ดู Transformer Mapping ใน Console
-              </button>
-              <button
-                onClick={() => {
-                  console.log('=== MDB Configuration Mapping ===');
-                  console.log(mdbConfigurationMapping);
-                  console.log('Keys:', Object.keys(mdbConfigurationMapping));
-                  console.log('Values:', Object.values(mdbConfigurationMapping));
-                }}
-                className="px-3 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600"
-              >
-                ดู MDB Mapping ใน Console
-              </button>
-              <button
-                onClick={() => {
-                  const dataStr = JSON.stringify(transformerPriceMapping, null, 2);
-                  const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
-                  const exportFileDefaultName = 'transformer-price-mapping.json';
-                  const linkElement = document.createElement('a');
-                  linkElement.setAttribute('href', dataUri);
-                  linkElement.setAttribute('download', exportFileDefaultName);
-                  linkElement.click();
-                }}
-                className="px-3 py-1 bg-purple-500 text-white text-xs rounded hover:bg-purple-600"
-              >
-                Export Transformer JSON
-              </button>
-              <button
-                onClick={() => {
-                  const dataStr = JSON.stringify(mdbConfigurationMapping, null, 2);
-                  const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
-                  const exportFileDefaultName = 'mdb-configuration-mapping.json';
-                  const linkElement = document.createElement('a');
-                  linkElement.setAttribute('href', dataUri);
-                  linkElement.setAttribute('download', exportFileDefaultName);
-                  linkElement.click();
-                }}
-                className="px-3 py-1 bg-orange-500 text-white text-xs rounded hover:bg-orange-600"
-              >
-                Export MDB JSON
-              </button>
-            </div>
-          </div>
-
-        )}
-
-
-        {/* Mapping Data Preview */}
-        {(Object.keys(transformerPriceMapping).length > 0 || Object.keys(mdbConfigurationMapping).length > 0) && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Zap className="h-5 w-5" />
-                ข้อมูล Mapping ที่สร้างขึ้น
-              </CardTitle>
-              <CardDescription>
-                ข้อมูลที่ประมวลผลจาก Excel และจัดเก็บในรูปแบบ mapping สำหรับการใช้งาน
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {/* Transformer Price Mapping */}
-                {Object.keys(transformerPriceMapping).length > 0 && (
-                  <div className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-semibold text-lg text-blue-600">
-                        Transformer Price Mapping ({Object.keys(transformerPriceMapping).length} รายการ)
-                      </h3>
-                      <button
-                        onClick={() => setShowTransformerMapping(!showTransformerMapping)}
-                        className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
-                      >
-                        {showTransformerMapping ? 'ซ่อนรายละเอียด' : 'แสดงรายละเอียด'}
-                      </button>
-                    </div>
-
-                    {showTransformerMapping && (
-                      <div className="mt-4">
-                        <div className="mb-4 p-3 bg-blue-50 rounded border">
-                          <h4 className="font-medium text-blue-800 mb-2">โครงสร้างข้อมูล:</h4>
-                          <div className="text-sm text-blue-700 space-y-1">
-                            <p>• Key format: "22kv-416v-[size]" หรือ "33kv-316v-[size]"</p>
-                            <p>• Data: size, type, price, column, rowNum, rowData</p>
-                            <p>• ขนาด: 100, 160, 250, 315, 400, 500, 630, 800, 1000, 1250, 1500, 2000 kVA</p>
-                          </div>
-                        </div>
-
-                        {/* Search Box */}
-                        <div className="mb-4">
-                          <Input
-                            type="text"
-                            placeholder="ค้นหา Transformer (ขนาด, ประเภท, ราคา)..."
-                            value={transformerSearchTerm}
-                            onChange={(e) => setTransformerSearchTerm(e.target.value)}
-                            className="w-full"
-                          />
-                          {transformerSearchTerm && (
-                            <div className="text-sm text-blue-600 mt-1">
-                              พบ {Object.keys(getFilteredTransformerMapping()).length} รายการ
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-sm max-h-96 overflow-y-auto">
-                          {Object.entries(getFilteredTransformerMapping()).map(([key, data]) => (
-                            <div key={key} className="p-3 bg-blue-50 rounded border">
-                              <div className="font-medium text-blue-800 mb-1">{key}</div>
-                              <div className="text-blue-600 space-y-1">
-                                <div>Size: {data.size} kVA</div>
-                                <div>Type: {data.type}</div>
-                                {data.productName && <div>Product: {data.productName}</div>}
-                                {data.laborCost && <div>Labor Cost: {data.laborCost}</div>}
-                                {data.installationCost && <div>Installation Cost: {data.installationCost}</div>}
-                                {data.totalInstallationCost && <div>Total Installation: {data.totalInstallationCost}</div>}
-                                <div>Column: {data.column}</div>
-                                <div>Row: {data.rowNum}</div>
-                              </div>
-                            </div>
-                          ))}
-                          {Object.keys(getFilteredTransformerMapping()).length === 0 && (
-                            <div className="col-span-full text-center  py-4">
-                              ไม่พบข้อมูลที่ตรงกับคำค้นหา
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {!showTransformerMapping && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                        {Object.entries(transformerPriceMapping).slice(0, 6).map(([key, data]) => (
-                          <div key={key} className="p-2 bg-blue-50 rounded border">
-                            <div className="font-medium text-blue-800">{key}</div>
-                            <div className="text-blue-600">
-                              {data.size} kVA - {data.type}
-                              {data.productName && <div className="text-xs text-gray-500">Product: {data.productName}</div>}
-                              {data.laborCost && <div className="text-xs text-green-600">Labor: {data.laborCost}</div>}
-                              {data.installationCost && <div className="text-xs text-orange-600">Install: {data.installationCost}</div>}
-                              {data.totalInstallationCost && <div className="text-xs text-purple-600 font-medium">Total: {data.totalInstallationCost}</div>}
-                            </div>
-                          </div>
-                        ))}
-                        {Object.keys(transformerPriceMapping).length > 6 && (
-                          <div className=" text-sm p-2">
-                            และอีก {Object.keys(transformerPriceMapping).length - 6} รายการ...
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* MDB Configuration Mapping */}
-                {Object.keys(mdbConfigurationMapping).length > 0 && (
-                  <div className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-semibold text-lg text-green-600">
-                        MDB Configuration Mapping ({Object.keys(mdbConfigurationMapping).length} รายการ)
-                      </h3>
-                      <button
-                        onClick={() => setShowMdbMapping(!showMdbMapping)}
-                        className="px-3 py-1 bg-green-500 text-white text-sm rounded hover:bg-green-600"
-                      >
-                        {showMdbMapping ? 'ซ่อนรายละเอียด' : 'แสดงรายละเอียด'}
-                      </button>
-                    </div>
-
-                    {showMdbMapping && (
-                      <div className="mt-4">
-                        <div className="mb-4 p-3 bg-green-50 rounded border">
-                          <h4 className="font-medium text-green-800 mb-2">โครงสร้างข้อมูล:</h4>
-                          <div className="text-sm text-green-700 space-y-1">
-                            <p>• Key format: "[brand]-[size]" (เช่น "ABB-100", "EATON-250")</p>
-                            <p>• Data: transformerSize, mccbBrand, startRow, header, products</p>
-                            <p>• ยี่ห้อ: ABB, EATON, LS</p>
-                            <p>• ขนาด: 100, 160, 250, 315, 400, 500, 630, 800, 1000, 1200 kVA</p>
-                          </div>
-                        </div>
-
-                        {/* Search Box */}
-                        <div className="mb-4">
-                          <Input
-                            type="text"
-                            placeholder="ค้นหา MDB (ยี่ห้อ, ขนาด, start row)..."
-                            value={mdbSearchTerm}
-                            onChange={(e) => setMdbSearchTerm(e.target.value)}
-                            className="w-full"
-                          />
-                          {mdbSearchTerm && (
-                            <div className="text-sm text-green-600 mt-1">
-                              พบ {Object.keys(getFilteredMdbMapping()).length} รายการ
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-sm max-h-96 overflow-y-auto">
-                          {Object.entries(getFilteredMdbMapping()).map(([key, data]) => (
-                            <div key={key} className="p-3 bg-green-50 rounded border">
-                              <div className="font-medium text-green-800 mb-1">{key}</div>
-                              <div className="text-green-600 space-y-1">
-                                <div>Brand: {data.mccbBrand}</div>
-                                <div>Size: {data.transformerSize} kVA</div>
-                                <div>Start Row: {data.startRow}</div>
-                                <div>Products: {data.products.length} รายการ</div>
-                                <div className="text-xs text-green-500">
-                                  Header: {data.header.name}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                          {Object.keys(getFilteredMdbMapping()).length === 0 && (
-                            <div className="col-span-full text-center  py-4">
-                              ไม่พบข้อมูลที่ตรงกับคำค้นหา
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {!showMdbMapping && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                        {Object.entries(mdbConfigurationMapping).slice(0, 6).map(([key, data]) => (
-                          <div key={key} className="p-2 bg-green-50 rounded border">
-                            <div className="font-medium text-green-800">{key}</div>
-                            <div className="text-green-600">
-                              {data.mccbBrand} - {data.transformerSize} kVA - {data.products.length} products
-                            </div>
-                          </div>
-                        ))}
-                        {Object.keys(mdbConfigurationMapping).length > 6 && (
-                          <div className=" text-sm p-2">
-                            และอีก {Object.keys(mdbConfigurationMapping).length - 6} รายการ...
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-
-        {/* Excel Data Preview */}
-
-        {Object.keys(excelData).length > 0 && (
-
-          <Card className="mb-6">
-
-            <CardHeader>
-
-              <CardTitle className="flex items-center gap-2">
-
-                <Zap className="h-5 w-5" />
-
-                ข้อมูลจาก Google Sheets
-
-              </CardTitle>
-
-              <CardDescription>
-
-              </CardDescription>
-
-            </CardHeader>
-
-          </Card>
-
-        )}
-
-
-
-        {/* ข้อมูลเฉพาะ Sheet "ราคาหม้อแปลง" */}
-
-        {excelData['ราคาหม้อแปลง'] && (
-
-          <Card className="mb-6">
-
-            <CardHeader>
-
-              <CardTitle className="flex items-center gap-2">
-
-                <Zap className="h-5 w-5" />
-
-                ข้อมูลราคาหม้อแปลง (ครบถ้วน)
-
-              </CardTitle>
-
-              <CardDescription>
-
-                ข้อมูลทั้งหมดจาก Sheet "ราคาหม้อแปลง" สำหรับการคำนวณราคา
-
-              </CardDescription>
-
-            </CardHeader>
-
-            <CardContent>
-
-              <div className="space-y-4">
-
-                <div className="p-4 bg-blue-50 rounded-lg">
-
-                  <h4 className="font-semibold text-blue-800 mb-2">โครงสร้างข้อมูล:</h4>
-
-                  <div className="text-sm text-blue-700">
-
-                    <p>• หม้อแปลง 22 (24) kV / 416 V → ใช้ column "ตาราง_____ราคาหม้อแปลง"</p>
-
-                    <p>• หม้อแปลง 33 kV / 316 V → ใช้ column "__EMPTY_5"</p>
-
-                    <p>• ข้อมูลแถว 4-15 (__rowNum__ 4-15) ตามขนาดหม้อแปลง</p>
-
-                    <p>• MDB Configuration → ใช้ Sheet "ตารางแสดงราคา MAIN MCCB ของ MDB"</p>
-
-                  </div>
-
-                </div>
-
-
-
-                <div className="overflow-x-auto">
-
-                  <table className="min-w-full text-sm border-collapse border border-gray-300">
-
-                    <thead>
-
-                      <tr className="bg-gray-100">
-
-                        <th className="border border-gray-300 p-2 text-left font-medium">__rowNum__</th>
-
-                        {Object.keys(excelData['ราคาหม้อแปลง'][0] || {}).map((key, index) => (
-
-                          <th key={index} className="border border-gray-300 p-2 text-left font-medium">
-
-                            {key}
-
-                          </th>
-
-                        ))}
-
-                      </tr>
-
-                    </thead>
-
-                    <tbody>
-
-                      {excelData['ราคาหม้อแปลง'].map((row, rowIndex) => (
-
-                        <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-
-                          <td className="border border-gray-300 p-2 font-medium bg-yellow-50">
-
-                            {row.__rowNum__ || rowIndex + 1}
-
-                          </td>
-
-                          {Object.entries(row).map(([key, value], colIndex) => (
-
-                            <td key={colIndex} className={`border border-gray-300 p-2 ${key === 'ตาราง_____ราคาหม้อแปลง' ? 'bg-green-50 font-medium' :
-
-                              key === '__EMPTY_10' ? 'bg-orange-50 font-medium' : ''
-
-                              }`}>
-
-                              {String(value || '')}
-
-                            </td>
-
-                          ))}
-
-                        </tr>
-
-                      ))}
-
-                    </tbody>
-
-                  </table>
-
-                </div>
-
-
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-
-                  <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-
-                    <h5 className="font-semibold text-green-800 mb-2">หม้อแปลง 22 (24) kV / 416 V</h5>
-
-                    <div className="text-sm text-green-700 space-y-1">
-
-                      <p>Column: "ตาราง_____ราคาหม้อแปลง"</p>
-
-                      <p>แถว: __rowNum__ 4-15</p>
-
-                      <p>ขนาด: 100-2000 kVA</p>
-
-                    </div>
-
-                  </div>
-
-
-
-                  <div className="p-3 bg-orange-50 rounded-lg border border-orange-200">
-
-                    <h5 className="font-semibold text-orange-800 mb-2">หม้อแปลง 33 kV / 316 V</h5>
-
-                    <div className="text-sm text-orange-700 space-y-1">
-
-                      <p>Column: "__EMPTY_10"</p>
-
-                      <p>แถว: __rowNum__ 4-15</p>
-
-                      <p>ขนาด: 100-2000 kVA</p>
-
-                    </div>
-
-                  </div>
-
-                </div>
-
-              </div>
-
-            </CardContent>
-
-          </Card>
-
-        )}
-
-
-
-        {/* ข้อมูลเฉพาะ Sheet "ตารางแสดงราคา MAIN MCCB ของ MDB" */}
-
-        {excelData['ตารางแสดงราคา MAIN MCCB ของ MDB'] && (
-
-          <Card className="mb-6">
-
-            <CardHeader>
-
-              <CardTitle className="flex items-center gap-2">
-
-                <Zap className="h-5 w-5" />
-
-                ข้อมูล MDB Configuration (ครบถ้วน)
-
-              </CardTitle>
-
-              <CardDescription>
-
-                ข้อมูลทั้งหมดจาก Sheet "ตารางแสดงราคา MAIN MCCB ของ MDB" สำหรับการเลือก MCCB
-
-              </CardDescription>
-
-            </CardHeader>
-
-            <CardContent>
-
-              <div className="space-y-4">
-
-                <div className="p-4 bg-green-50 rounded-lg">
-
-                  <h4 className="font-semibold text-green-800 mb-2">โครงสร้างข้อมูล MDB:</h4>
-
-                  <div className="text-sm text-green-700">
-
-                    <p>• <span className="font-medium">ABB:</span> Header Row __rowNum__ 3, Product Rows 4-8</p>
-
-                    <p>• <span className="font-medium">EATON:</span> Header Row __rowNum__ 10, Product Rows 11-15</p>
-
-                    <p>• <span className="font-medium">LS:</span> Header Row __rowNum__ 17, Product Rows 18-22</p>
-
-                    <p>• Column mapping ตามขนาดหม้อแปลง (100-1200 kVA)</p>
-
-                  </div>
-
-                </div>
-
-
-
-                <div className="overflow-x-auto">
-
-                  <table className="min-w-full text-sm border-collapse border border-gray-300">
-
-                    <thead>
-
-                      <tr className="bg-gray-100">
-
-                        <th className="border border-gray-300 p-2 text-left font-medium">__rowNum__</th>
-
-                        {Object.keys(excelData['ตารางแสดงราคา MAIN MCCB ของ MDB'][0] || {}).map((key, index) => (
-
-                          <th key={index} className="border border-gray-300 p-2 text-left font-medium">
-
-                            {key}
-
-                          </th>
-
-                        ))}
-
-                      </tr>
-
-                    </thead>
-
-                    <tbody>
-
-                      {excelData['ตารางแสดงราคา MAIN MCCB ของ MDB'].map((row, rowIndex) => (
-
-                        <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-
-                          <td className="border border-gray-300 p-2 font-medium bg-yellow-50">
-
-                            {row.__rowNum__ || rowIndex + 1}
-
-                          </td>
-
-                          {Object.entries(row).map(([key, value], colIndex) => (
-
-                            <td key={colIndex} className={`border border-gray-300 p-2 ${key === '__EMPTY_1' ? 'bg-green-50 font-medium' :
-
-                              key.includes('__EMPTY_') ? 'bg-blue-50' : ''
-
-                              }`}>
-
-                              {String(value || '')}
-
-                            </td>
-
-                          ))}
-
-                        </tr>
-
-                      ))}
-
-                    </tbody>
-
-                  </table>
-
-                </div>
-
-
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-
-                  <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-
-                    <h5 className="font-semibold text-green-800 mb-2">ABB</h5>
-
-                    <div className="text-sm text-green-700 space-y-1">
-
-                      <p>Header: __rowNum__ 3</p>
-
-                      <p>Products: __rowNum__ 4-8</p>
-
-                      <p>Columns: __EMPTY_1, __EMPTY_6, __EMPTY_X</p>
-
-                    </div>
-
-                  </div>
-
-
-
-                  <div className="p-3 bg-orange-50 rounded-lg border border-orange-200">
-
-                    <h5 className="font-semibold text-orange-800 mb-2">EATON</h5>
-
-                    <div className="text-sm text-orange-700 space-y-1">
-
-                      <p>Header: __rowNum__ 10</p>
-
-                      <p>Products: __rowNum__ 11-15</p>
-
-                      <p>Columns: __EMPTY_1, __EMPTY_6, __EMPTY_X</p>
-
-                    </div>
-
-                  </div>
-
-
-
-                  <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-
-                    <h5 className="font-semibold text-blue-800 mb-2">LS</h5>
-
-                    <div className="text-sm text-blue-700 space-y-1">
-
-                      <p>Header: __rowNum__ 17</p>
-
-                      <p>Products: __rowNum__ 18-22</p>
-
-                      <p>Columns: __EMPTY_1, __EMPTY_6, __EMPTY_X</p>
-
-                    </div>
-
-                  </div>
-
-                </div>
-
-              </div>
-
-            </CardContent>
-
-          </Card>
-
-        )}
 
 
 

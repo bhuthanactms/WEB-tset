@@ -1381,7 +1381,7 @@ export default function Home(): React.JSX.Element {
                             Charger{idx + 1}: {form.charger}
                           </span>
                           <span className="text-gray-700">
-                            In: {results?.inOfCharger !== undefined ? results.inOfCharger.toFixed(2) : '-'} A
+                            ln(100%): {results?.inOfCharger !== undefined ? results.inOfCharger.toFixed(2) : '-'} A
                           </span>
                           <span className="text-gray-700">
                             Cable (CV/THW): {Array.isArray(cableArr) ? (cableArr[idx] ? cableArr[idx].replace(/^Charger\d+:\s*/, '') : '-') : (typeof cableArr === 'string' ? cableArr : '-')}
@@ -1658,9 +1658,9 @@ export default function Home(): React.JSX.Element {
                           {form.numberOfChargers || '-'}
                         </span>
                       </div>
-                      {/* kW of Charger */}
+                      {/* In100% of charger */}
                       <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <span className="font-medium text-gray-700">kW of Charger:</span>
+                        <span className="font-medium text-gray-700">In100% of charger:</span>
                         <span className="font-semibold text-gray-900 text-base">
                           {chargerTypeMode === 'any'
                             ? (
