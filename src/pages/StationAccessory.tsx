@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 
-import { Zap, Car, Paintbrush, Shield, Home, Wrench, MapPin } from 'lucide-react'
+import { Zap, Car, Paintbrush, Shield, Home, Wrench, MapPin, ChevronDown, ChevronUp } from 'lucide-react'
 
 import { useLocation } from 'react-router-dom'
 
@@ -17,6 +17,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import axios from 'axios'
 import * as XLSX from 'xlsx'
 
@@ -26,6 +27,135 @@ import * as XLSX from 'xlsx'
 
 function MoreDetailCard(props: any) {
   const { stationEquipmentPriceMapping, roofCostMapping, getParkingRoofData, getTrToMdbPrice, trToMdbMapping } = props;
+
+  // ฟังก์ชันช่วยเหลือสำหรับการเข้าถึงข้อมูล Excel
+  const getExcelData = (sheetName: string) => {
+    return props.excelData?.[sheetName] || [];
+  };
+
+  // ฟังก์ชันดึงข้อมูล MCCB Sub จาก Excel sheet "ราคา MCCB ของ CHARGER"
+  const getMccbSubData = (mccbSubValue: string, brand: string) => {
+    // Mapping สำหรับกรณีพิเศษ (ต้องเช็คก่อน)
+    const specialCases: { [key: string]: number } = {
+      '640 kW Prime+': 16,
+      '4 x 300 A': 17,
+      '4 x 350 A': 18,
+      '4 x 400 A': 19,
+    };
+
+    // เช็คกรณีพิเศษก่อน
+    const specialKey = Object.keys(specialCases).find(key =>
+      mccbSubValue.includes(key)
+    );
+
+    // Mapping ระหว่างค่า A กับ row number
+    const mccbValueToRow: { [key: number]: number } = {
+      60: 3,
+      80: 4,
+      125: 5,
+      150: 6,
+      225: 7,
+      300: 8,
+      350: 9,
+      450: 10,
+      630: 11,
+      900: 13,
+      1200: 14,
+    };
+
+    // ดึงข้อมูลจาก Excel sheet "ราคา MCCB ของ CHARGER"
+    const chargerMccbSheet = getExcelData('ราคา MCCB ของ CHARGER');
+    if (!chargerMccbSheet || chargerMccbSheet.length === 0) {
+      console.warn('ไม่พบข้อมูลใน Sheet "ราคา MCCB ของ CHARGER"');
+      return null;
+    }
+
+    // ถ้าเป็นกรณีพิเศษ ให้ดึงข้อมูลจาก row นั้นโดยตรง
+    if (specialKey) {
+      const rowNum = specialCases[specialKey];
+      const row = chargerMccbSheet.find((r: any) => r.__rowNum__ === rowNum);
+      if (!row) {
+        console.warn(`ไม่พบ row ${rowNum} ใน Sheet "ราคา MCCB ของ CHARGER"`);
+        return null;
+      }
+
+      // ดึงข้อมูลตามแบรนด์
+      let model, quantity, price;
+      if (brand === 'ABB') {
+        model = row.__EMPTY_3;
+        quantity = row.__EMPTY_2;
+        price = row.__EMPTY_4;
+      } else if (brand === 'EATON') {
+        model = row.__EMPTY_5;
+        quantity = row.__EMPTY_2;
+        price = row.__EMPTY_6;
+      } else if (brand === 'LS') {
+        model = row.__EMPTY_7;
+        quantity = row.__EMPTY_2;
+        price = row.__EMPTY_8;
+      } else {
+        return null;
+      }
+
+      return [{
+        value: mccbSubValue,
+        rowNum,
+        model: model || '-',
+        quantity: quantity || '-',
+        price: price || '-',
+      }];
+    }
+
+    // กรณีปกติ: แปลงค่า MCCB Sub (เช่น "100 125 160 A") เป็น array ของตัวเลข
+    const values = mccbSubValue.replace(/ A$/, '').trim().split(/\s+/).map(v => parseInt(v)).filter(v => !isNaN(v));
+
+    if (values.length === 0) return null;
+
+    // ดึงข้อมูลสำหรับแต่ละค่า MCCB Sub
+    const results = values.map((value) => {
+      // หา row number
+      const rowNum = mccbValueToRow[value];
+
+      if (!rowNum) {
+        console.warn(`ไม่พบ row mapping สำหรับ MCCB Sub ${value} A`);
+        return null;
+      }
+
+      const row = chargerMccbSheet.find((r: any) => r.__rowNum__ === rowNum);
+      if (!row) {
+        console.warn(`ไม่พบ row ${rowNum} ใน Sheet "ราคา MCCB ของ CHARGER"`);
+        return null;
+      }
+
+      // ดึงข้อมูลตามแบรนด์
+      let model, quantity, price;
+      if (brand === 'ABB') {
+        model = row.__EMPTY_3;
+        quantity = row.__EMPTY_2;
+        price = row.__EMPTY_4;
+      } else if (brand === 'EATON') {
+        model = row.__EMPTY_5;
+        quantity = row.__EMPTY_2;
+        price = row.__EMPTY_6;
+      } else if (brand === 'LS') {
+        model = row.__EMPTY_7;
+        quantity = row.__EMPTY_2;
+        price = row.__EMPTY_8;
+      } else {
+        return null;
+      }
+
+      return {
+        value: `${value} A`,
+        rowNum,
+        model: model || '-',
+        quantity: quantity || '-',
+        price: price || '-',
+      };
+    }).filter(item => item !== null);
+
+    return results.length > 0 ? results : null;
+  };
 
   const [trDistance, setTrDistance] = useState(props.trDistance || '');
 
@@ -41,6 +171,7 @@ function MoreDetailCard(props: any) {
 
   const [chargerLineDistances, setChargerLineDistances] = useState<string[]>(initialDistances);
   const [chargerResults, setChargerResults] = useState<{ [key: number]: any }>({});
+  const [openChargers, setOpenChargers] = useState<{ [key: number]: boolean }>({});
   const [isCalculating, setIsCalculating] = useState(false);
 
   // ฟังก์ชันคำนวณราคา MDB to Charger Configuration - New Section
@@ -325,7 +456,7 @@ function MoreDetailCard(props: any) {
 
   const [mdbRoofM2, setMdbRoofM2] = useState(props.mdbRoofM2 || '');
 
-  const [chargerRoofType, setChargerRoofType] = useState(props.chargerRoofType || '');
+  const [chargerRoofType, setChargerRoofType] = useState(props.chargerRoofType || 'no');
 
   const [travelDistance, setTravelDistance] = useState(props.travelDistance || '');
 
@@ -336,10 +467,15 @@ function MoreDetailCard(props: any) {
   const [transformerSelection, setTransformerSelection] = useState(props.transformerSelection || 'no');
 
   const [transformerType, setTransformerType] = useState(props.transformerType || '');
+  const [lowVoltageRequest, setLowVoltageRequest] = useState<'low-voltage' | 'use-transformer' | ''>('');
+  const [lowVoltageDistance2, setLowVoltageDistance2] = useState<string>('');
+  const [lowVoltageDistance3, setLowVoltageDistance3] = useState<string>('');
 
   const [transformerPrice, setTransformerPrice] = useState<any>(null);
 
   const [mccbMainBrand, setMccbMainBrand] = useState(props.mccbMainBrand || '');
+
+  const [mccbSubBrand, setMccbSubBrand] = useState('ABB');
 
   const [mdbConfiguration, setMdbConfiguration] = useState<any>(null);
 
@@ -581,6 +717,23 @@ function MoreDetailCard(props: any) {
 
 
 
+  // รีเซ็ต lowVoltageRequest เมื่อเงื่อนไขเปลี่ยน
+  React.useEffect(() => {
+    if (!(props.powerAuthority === 'MEA' && parseInt(props.transformer) <= 400)) {
+      setLowVoltageRequest('');
+      setLowVoltageDistance2('');
+      setLowVoltageDistance3('');
+    }
+  }, [props.powerAuthority, props.transformer]);
+
+  // รีเซ็ต distance เมื่อเปลี่ยนการเลือก
+  React.useEffect(() => {
+    if (lowVoltageRequest !== 'low-voltage') {
+      setLowVoltageDistance2('');
+      setLowVoltageDistance3('');
+    }
+  }, [lowVoltageRequest]);
+
   // คำนวณ Transformer Price เมื่อมีการเปลี่ยนแปลง transformer type หรือ transformer size
 
   React.useEffect(() => {
@@ -807,204 +960,352 @@ function MoreDetailCard(props: any) {
 
                 </div>
 
-
-
-                {/* แสดงตัวเลือก Transformer Type */}
-
-                <div className="space-y-3">
-
-                  <Label className="text-sm font-medium ">
-
-                    ประเภทหม้อแปลง <span className="text-xs ">(Transformer Type)</span>
-
-                  </Label>
-
-                  <div className="grid grid-cols-2 gap-3">
-
-                    <div
-
-                      className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-blue-50 cursor-pointer ${transformerType === '22kv-416v' ? 'bg-blue-100 border-blue-300' : ''}`}
-
-                      onClick={() => setTransformerType('22kv-416v')}
-
-                    >
-
-                      <Checkbox
-
-                        id="transformer-22kv"
-
-                        checked={transformerType === '22kv-416v'}
-
-                        onCheckedChange={(checked) => {
-
-                          if (checked) setTransformerType('22kv-416v');
-
-                        }}
-
-                        className="text-blue-500 border-blue-400 data-[state=checked]:bg-blue-500"
-
-                      />
-
-                      <Label htmlFor="transformer-22kv" className="font-medium cursor-pointer text-blue-700">
-
-                        หม้อแปลง 22 (24) kV / 416 V
-
-                      </Label>
-
+                {/* ตรวจสอบเงื่อนไข MEA และ Transformer Size <= 400 */}
+                {props.powerAuthority === 'MEA' && parseInt(props.transformer) <= 400 && (
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">
+                      เลือกประเภทการติดตั้ง
+                    </Label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div
+                        className={`flex items-center space-x-2 p-3 rounded-lg border cursor-pointer ${lowVoltageRequest === 'low-voltage' ? 'bg-blue-100 border-blue-300' : 'hover:bg-gray-50'}`}
+                        onClick={() => setLowVoltageRequest('low-voltage')}
+                      >
+                        <Checkbox
+                          id="low-voltage-request"
+                          checked={lowVoltageRequest === 'low-voltage'}
+                          onCheckedChange={(checked) => { if (checked) setLowVoltageRequest('low-voltage'); }}
+                          className="border-blue-400 data-[state=checked]:bg-blue-500"
+                        />
+                        <Label htmlFor="low-voltage-request" className="font-medium cursor-pointer text-sm">ขอแรงต่ำ</Label>
+                      </div>
+                      <div
+                        className={`flex items-center space-x-2 p-3 rounded-lg border cursor-pointer ${lowVoltageRequest === 'use-transformer' ? 'bg-green-100 border-green-300' : 'hover:bg-gray-50'}`}
+                        onClick={() => setLowVoltageRequest('use-transformer')}
+                      >
+                        <Checkbox
+                          id="use-transformer"
+                          checked={lowVoltageRequest === 'use-transformer'}
+                          onCheckedChange={(checked) => { if (checked) setLowVoltageRequest('use-transformer'); }}
+                          className="border-green-400 data-[state=checked]:bg-green-500"
+                        />
+                        <Label htmlFor="use-transformer" className="font-medium cursor-pointer text-sm">ใช้หม้อแปลง</Label>
+                      </div>
                     </div>
-
-                    <div
-
-                      className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-purple-50 cursor-pointer ${transformerType === '33kv-316v' ? 'bg-purple-100 border-purple-300' : ''}`}
-
-                      onClick={() => setTransformerType('33kv-316v')}
-
-                    >
-
-                      <Checkbox
-
-                        id="transformer-33kv"
-
-                        checked={transformerType === '33kv-316v'}
-
-                        onCheckedChange={(checked) => {
-
-                          if (checked) setTransformerType('33kv-316v');
-
-                        }}
-
-                        className="text-purple-500 border-purple-400 data-[state=checked]:bg-purple-500"
-
-                      />
-
-                      <Label htmlFor="transformer-33kv" className="font-medium cursor-pointer text-purple-700">
-
-                        หม้อแปลง 33 kV / 316 V
-
-                      </Label>
-
-                    </div>
-
                   </div>
+                )}
 
+                {/* แสดงข้อมูลขอแรงต่ำ */}
+                {props.powerAuthority === 'MEA' && parseInt(props.transformer) <= 400 && lowVoltageRequest === 'low-voltage' && (() => {
+                  const lowVoltageSheet = getExcelData('ตารางระบบงานแรงสูง');
+                  const row2 = lowVoltageSheet.find((row: any) => row.__rowNum__ === 2);
+                  const row3 = lowVoltageSheet.find((row: any) => row.__rowNum__ === 3);
 
+                  if (!row2 || !row3) return null;
 
-                  {/* แสดงประเภทที่เลือก */}
+                  // ตรวจสอบว่าจำนวนเป็น "1 ม." หรือไม่
+                  const quantity2 = row2.__EMPTY_3 || '';
+                  const quantity3 = row3.__EMPTY_3 || '';
+                  const isDistance2 = quantity2.toString().includes('ม.') || quantity2.toString().includes('เมตร');
+                  const isDistance3 = quantity3.toString().includes('ม.') || quantity3.toString().includes('เมตร');
 
-                  {transformerType && (
+                  // คำนวณราคาตามระยะ
+                  const distance2 = parseFloat(lowVoltageDistance2) || 0;
+                  const distance3 = parseFloat(lowVoltageDistance3) || 0;
 
-                    <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                  // ราคาต่อหน่วย (จาก row)
+                  const materialPricePerUnit2 = parseFloat(row2.__EMPTY_4 || 0) || 0;
+                  const laborPricePerUnit2 = parseFloat(row2.__EMPTY_5 || 0) || 0;
+                  const materialPricePerUnit3 = parseFloat(row3.__EMPTY_4 || 0) || 0;
+                  const laborPricePerUnit3 = parseFloat(row3.__EMPTY_5 || 0) || 0;
 
-                      <div className="text-sm ">
+                  // คำนวณราคารวม
+                  const materialPrice2 = isDistance2 ? materialPricePerUnit2 * distance2 : materialPricePerUnit2;
+                  const laborPrice2 = isDistance2 ? laborPricePerUnit2 * distance2 : laborPricePerUnit2;
+                  const totalPrice2 = materialPrice2 + laborPrice2;
 
-                        <span className="font-medium">ประเภทที่เลือก:</span> {transformerType === '22kv-416v' ? 'หม้อแปลง 22 (24) kV / 416 V' : 'หม้อแปลง 33 kV / 316 V'}
+                  const materialPrice3 = isDistance3 ? materialPricePerUnit3 * distance3 : materialPricePerUnit3;
+                  const laborPrice3 = isDistance3 ? laborPricePerUnit3 * distance3 : laborPricePerUnit3;
+                  const totalPrice3 = materialPrice3 + laborPrice3;
 
+                  const totalMaterial = materialPrice2 + materialPrice3;
+                  const totalLabor = laborPrice2 + laborPrice3;
+                  const totalPrice = totalPrice2 + totalPrice3;
+
+                  return (
+                    <div className="space-y-4">
+                      {/* Row 2 */}
+                      <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <div className="font-medium text-blue-800 mb-2">{row2.__EMPTY || 'รายการที่ 1'}:</div>
+                        <div className="space-y-2 text-sm">
+                          {isDistance2 ? (
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">ระยะ:</span>
+                              <Input
+                                type="number"
+                                value={lowVoltageDistance2}
+                                onChange={(e) => setLowVoltageDistance2(e.target.value)}
+                                placeholder="กรอกระยะ (เมตร)"
+                                className="w-32"
+                                min="0"
+                              />
+                              <span className="text-gray-500">เมตร</span>
+                            </div>
+                          ) : (
+                            <div><span className="font-medium">จำนวน:</span> {quantity2 || '-'}</div>
+                          )}
+                          <div><span className="font-medium">ค่าของ:</span> {materialPrice2.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ค่าแรง:</span> {laborPrice2.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">รวม:</span> {totalPrice2.toLocaleString('th-TH')} บาท</div>
+                        </div>
                       </div>
 
-                    </div>
+                      {/* Row 3 */}
+                      <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <div className="font-medium text-blue-800 mb-2">{row3.__EMPTY || 'รายการที่ 2'}:</div>
+                        <div className="space-y-2 text-sm">
+                          {isDistance3 ? (
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">ระยะ:</span>
+                              <Input
+                                type="number"
+                                value={lowVoltageDistance3}
+                                onChange={(e) => setLowVoltageDistance3(e.target.value)}
+                                placeholder="กรอกระยะ (เมตร)"
+                                className="w-32"
+                                min="0"
+                              />
+                              <span className="text-gray-500">เมตร</span>
+                            </div>
+                          ) : (
+                            <div><span className="font-medium">จำนวน:</span> {quantity3 || '-'}</div>
+                          )}
+                          <div><span className="font-medium">ค่าของ:</span> {materialPrice3.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">ค่าแรง:</span> {laborPrice3.toLocaleString('th-TH')} บาท</div>
+                          <div><span className="font-medium">รวม:</span> {totalPrice3.toLocaleString('th-TH')} บาท</div>
+                        </div>
+                      </div>
 
-                  )}
-
-
-
-                  {/* แสดงราคา Transformer */}
-
-                  {transformerPrice && (
-
-                    <div className="mt-3 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                      <div className="space-y-3">
-                        {/* Header */}
-                        <div className="flex items-center justify-between">
+                      {/* รวมค่าใช้จ่าย */}
+                      <div className="p-4 bg-blue-50 rounded-lg border border-blue-200 space-y-4">
+                        <div className="text-lg font-semibold text-blue-800">รวมค่าใช้จ่าย</div>
+                        <div className="grid grid-cols-3 gap-4">
                           <div>
-                            <div className="text-sm text-blue-600 font-medium">
-                              ข้อมูลหม้อแปลง {transformerPrice.size} kVA
+                            <div className="text-sm text-gray-600 mb-1">ค่าของรวม:</div>
+                            <div className="text-xl font-bold text-gray-800">
+                              {totalMaterial.toLocaleString('th-TH')} บาท
                             </div>
-                            <div className="text-xs text-blue-500">
-                              ประเภท: {transformerPrice.type === '22kv-416v' ? '22 (24) kV / 416 V' : '33 kV / 316 V'}
+                          </div>
+                          <div>
+                            <div className="text-sm text-gray-600 mb-1">ค่าแรงรวม:</div>
+                            <div className="text-xl font-bold text-gray-800">
+                              {totalLabor.toLocaleString('th-TH')} บาท
                             </div>
-                            <div className="text-xs ">
-                              ข้อมูลจาก: column "{transformerPrice.column}" __rowNum__{transformerPrice.rowNum}
+                          </div>
+                          <div>
+                            <div className="text-sm text-blue-700 font-semibold mb-1">ราคารวม:</div>
+                            <div className="text-2xl font-bold text-blue-700">
+                              {totalPrice.toLocaleString('th-TH')} บาท
                             </div>
                           </div>
                         </div>
+                      </div>
+                    </div>
+                  );
+                })()}
 
-                        {/* รายการสินค้า */}
-                        {transformerPrice.productName && (
-                          <div className="p-3 bg-gray-50 rounded border border-gray-200">
-                            <div className="flex justify-between items-center">
-                              <div className="text-sm font-medium text-gray-700">รายการสินค้า:</div>
-                              <div className="text-sm font-bold text-gray-800">
+                {/* แสดงตัวเลือก Transformer Type - แสดงเฉพาะเมื่อเลือกใช้หม้อแปลง หรือไม่ใช่เงื่อนไขพิเศษ */}
+                {(!(props.powerAuthority === 'MEA' && parseInt(props.transformer) <= 400) || lowVoltageRequest === 'use-transformer') && (
+                  <div className="space-y-3">
+
+                    <Label className="text-sm font-medium ">
+
+                      ประเภทหม้อแปลง <span className="text-xs ">(Transformer Type)</span>
+
+                    </Label>
+
+                    <div className="grid grid-cols-2 gap-3">
+
+                      <div
+
+                        className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-blue-50 cursor-pointer ${transformerType === '22kv-416v' ? 'bg-blue-100 border-blue-300' : ''}`}
+
+                        onClick={() => setTransformerType('22kv-416v')}
+
+                      >
+
+                        <Checkbox
+
+                          id="transformer-22kv"
+
+                          checked={transformerType === '22kv-416v'}
+
+                          onCheckedChange={(checked) => {
+
+                            if (checked) setTransformerType('22kv-416v');
+
+                          }}
+
+                          className="text-blue-500 border-blue-400 data-[state=checked]:bg-blue-500"
+
+                        />
+
+                        <Label htmlFor="transformer-22kv" className="font-medium cursor-pointer text-blue-700">
+
+                          หม้อแปลง 22 (24) kV / 416 V
+
+                        </Label>
+
+                      </div>
+
+                      <div
+
+                        className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-purple-50 cursor-pointer ${transformerType === '33kv-316v' ? 'bg-purple-100 border-purple-300' : ''}`}
+
+                        onClick={() => setTransformerType('33kv-316v')}
+
+                      >
+
+                        <Checkbox
+
+                          id="transformer-33kv"
+
+                          checked={transformerType === '33kv-316v'}
+
+                          onCheckedChange={(checked) => {
+
+                            if (checked) setTransformerType('33kv-316v');
+
+                          }}
+
+                          className="text-purple-500 border-purple-400 data-[state=checked]:bg-purple-500"
+
+                        />
+
+                        <Label htmlFor="transformer-33kv" className="font-medium cursor-pointer text-purple-700">
+
+                          หม้อแปลง 33 kV / 316 V
+
+                        </Label>
+
+                      </div>
+
+                    </div>
+
+
+
+                    {/* แสดงประเภทที่เลือก */}
+
+                    {transformerType && (
+
+                      <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+
+                        <div className="text-sm ">
+
+                          <span className="font-medium">ประเภทที่เลือก:</span> {transformerType === '22kv-416v' ? 'หม้อแปลง 22 (24) kV / 416 V' : 'หม้อแปลง 33 kV / 316 V'}
+
+                        </div>
+
+                      </div>
+
+                    )}
+
+
+
+                    {/* แสดงราคา Transformer */}
+
+                    {transformerPrice && (
+
+                      <div className="mt-3 p-4 bg-blue-50 rounded-lg border border-blue-200 space-y-4">
+                        {/* Header */}
+                        <div>
+                          <div className="text-lg font-semibold text-blue-800">
+                            ข้อมูลหม้อแปลง {transformerPrice.size} kVA
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            ประเภท: {transformerPrice.type === '22kv-416v' ? '22 (24) kV / 416 V' : '33 kV / 316 V'}
+                          </div>
+                          {transformerPrice.productName && (
+                            <div className="mt-2 text-sm">
+                              <span className="font-medium text-gray-700">รายการสินค้า:</span>
+                              <span className="text-gray-600 ml-1">
                                 {transformerPrice.productName}
-                              </div>
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* รวมค่าใช้จ่าย */}
+                        <div className="grid grid-cols-3 gap-4">
+                          <div>
+                            <div className="text-sm text-gray-600 mb-1">ค่าของรวม:</div>
+                            <div className="text-xl font-bold text-gray-800">
+                              {(() => {
+                                const materialCost = typeof transformerPrice.installationCost === 'number'
+                                  ? transformerPrice.installationCost
+                                  : parseFloat(transformerPrice.installationCost || 0) || 0;
+                                return materialCost.toLocaleString('th-TH');
+                              })()} บาท
                             </div>
                           </div>
-                        )}
-
-                        {/* ราคาค่าแรง */}
-                        {transformerPrice.laborCost && (
-                          <div className="p-3 bg-green-50 rounded border border-green-200">
-                            <div className="flex justify-between items-center">
-                              <div className="text-sm font-medium text-green-700">ราคาค่าแรง:</div>
-                              <div className="text-sm font-bold text-green-800">
-                                {typeof transformerPrice.laborCost === 'number' ?
-                                  transformerPrice.laborCost.toLocaleString('th-TH') :
-                                  transformerPrice.laborCost
-                                } บาท
-                              </div>
+                          <div>
+                            <div className="text-sm text-gray-600 mb-1">ค่าแรงรวม:</div>
+                            <div className="text-xl font-bold text-gray-800">
+                              {(() => {
+                                const laborCost = typeof transformerPrice.laborCost === 'number'
+                                  ? transformerPrice.laborCost
+                                  : parseFloat(transformerPrice.laborCost || 0) || 0;
+                                return laborCost.toLocaleString('th-TH');
+                              })()} บาท
                             </div>
                           </div>
-                        )}
-
-                        {/* ราคาค่าติดตั้ง */}
-                        {transformerPrice.installationCost && (
-                          <div className="p-3 bg-orange-50 rounded border border-orange-200">
-                            <div className="flex justify-between items-center">
-                              <div className="text-sm font-medium text-orange-700">ราคาค่าติดตั้ง:</div>
-                              <div className="text-sm font-bold text-orange-800">
-                                {typeof transformerPrice.installationCost === 'number' ?
-                                  transformerPrice.installationCost.toLocaleString('th-TH') :
-                                  transformerPrice.installationCost
-                                } บาท
-                              </div>
+                          <div>
+                            <div className="text-sm text-blue-700 font-semibold mb-1">ราคารวม:</div>
+                            <div className="text-2xl font-bold text-blue-700">
+                              {(() => {
+                                let total = 0;
+                                if (transformerPrice.totalInstallationCost && transformerPrice.totalInstallationCost > 0) {
+                                  total = typeof transformerPrice.totalInstallationCost === 'number'
+                                    ? transformerPrice.totalInstallationCost
+                                    : parseFloat(transformerPrice.totalInstallationCost || 0) || 0;
+                                } else {
+                                  const materialCost = typeof transformerPrice.installationCost === 'number'
+                                    ? transformerPrice.installationCost
+                                    : parseFloat(transformerPrice.installationCost || 0) || 0;
+                                  const laborCost = typeof transformerPrice.laborCost === 'number'
+                                    ? transformerPrice.laborCost
+                                    : parseFloat(transformerPrice.laborCost || 0) || 0;
+                                  total = materialCost + laborCost;
+                                }
+                                return total.toLocaleString('th-TH');
+                              })()} บาท
                             </div>
                           </div>
-                        )}
-
-                        {/* ราคารวมติดตั้ง */}
-                        {transformerPrice.totalInstallationCost && transformerPrice.totalInstallationCost > 0 && (
-                          <div className="p-3 bg-purple-50 rounded border border-purple-200">
-                            <div className="flex justify-between items-center">
-                              <div className="text-sm font-medium text-purple-700">ราคารวมติดตั้ง:</div>
-                              <div className="text-lg font-bold text-purple-800">
-                                {transformerPrice.totalInstallationCost.toLocaleString('th-TH')} บาท
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                  )}
-
-
-
-                  {/* แสดงข้อความเมื่อไม่พบข้อมูล */}
-
-                  {transformerType && props.transformer && !transformerPrice && (
-
-                    <div className="mt-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-
-                      <div className="text-sm text-yellow-700">
-
-                        ⚠️ ไม่พบข้อมูลราคาสำหรับหม้อแปลง {props.transformer} kVA ประเภท {transformerType === '22kv-416v' ? '22 (24) kV / 416 V' : '33 kV / 316 V'} ใน Sheet "ราคาหม้อแปลง"
-
+                        </div>
                       </div>
 
-                    </div>
+                    )}
 
-                  )}
 
-                </div>
+
+                    {/* แสดงข้อความเมื่อไม่พบข้อมูล */}
+
+                    {transformerType && props.transformer && !transformerPrice && (
+
+                      <div className="mt-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+
+                        <div className="text-sm text-yellow-700">
+
+                          ⚠️ ไม่พบข้อมูลราคาสำหรับหม้อแปลง {props.transformer} kVA ประเภท {transformerType === '22kv-416v' ? '22 (24) kV / 416 V' : '33 kV / 316 V'} ใน Sheet "ราคาหม้อแปลง"
+
+                        </div>
+
+                      </div>
+
+                    )}
+
+                  </div>
+                )}
 
               </div>
 
@@ -1219,16 +1520,44 @@ function MoreDetailCard(props: any) {
                       }
 
                       return (
-                        <div className="text-sm space-y-3">
-                          {/* ราคาสายไฟ จากหม้อแปลงเข้าMDB */}
-                          <div className="bg-green-50 p-3 rounded-lg border">
-                            <div className="font-semibold text-green-800 mb-2">ราคาสายไฟ จากหม้อแปลงเข้าMDB</div>
-                            <div className="space-y-1">
-                              <div><span className="font-medium">รหัส:</span> {priceData.productCode}</div>
-                              <div><span className="font-medium">ระยะทาง:</span> {priceData.distance} เมตร</div>
-                              <div><span className="font-medium">ค่าของ:</span> {priceData.materialPrice.toLocaleString('th-TH')} บาท</div>
-                              <div><span className="font-medium">ค่าแรง:</span> {priceData.laborPrice.toLocaleString('th-TH')} บาท</div>
-                              <div><span className="font-medium">รวมค่าใช้จ่าย:</span> {priceData.totalPrice.toLocaleString('th-TH')} บาท</div>
+                        <div className="p-4 bg-green-50 rounded-lg border border-green-200 space-y-4">
+                          {/* Header */}
+                          <div>
+                            <div className="text-lg font-semibold text-green-800">
+                              ราคาสายไฟ จากหม้อแปลงเข้าMDB
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              ประเภท: {wiringTypeDisplay}
+                            </div>
+                            <div className="mt-2 text-sm">
+                              <span className="font-medium text-gray-700">รหัส:</span>
+                              <span className="text-gray-600 ml-1">{priceData.productCode}</span>
+                            </div>
+                            <div className="mt-1 text-sm">
+                              <span className="font-medium text-gray-700">ระยะทาง:</span>
+                              <span className="text-gray-600 ml-1">{priceData.distance} เมตร</span>
+                            </div>
+                          </div>
+
+                          {/* รวมค่าใช้จ่าย */}
+                          <div className="grid grid-cols-3 gap-4">
+                            <div>
+                              <div className="text-sm text-gray-600 mb-1">ค่าของรวม:</div>
+                              <div className="text-xl font-bold text-gray-800">
+                                {priceData.materialPrice.toLocaleString('th-TH')} บาท
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-sm text-gray-600 mb-1">ค่าแรงรวม:</div>
+                              <div className="text-xl font-bold text-gray-800">
+                                {priceData.laborPrice.toLocaleString('th-TH')} บาท
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-sm text-green-700 font-semibold mb-1">ราคารวม:</div>
+                              <div className="text-2xl font-bold text-green-700">
+                                {priceData.totalPrice.toLocaleString('th-TH')} บาท
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -1400,8 +1729,6 @@ function MoreDetailCard(props: any) {
 
               </div>
 
-
-
               {/* แสดงตัวเลือกยี่ห้อ MCCB Main */}
 
               <div className="space-y-3">
@@ -1412,7 +1739,7 @@ function MoreDetailCard(props: any) {
 
                 </Label>
 
-                <div className="grid grid-cols-1 gap-3">
+                <div className="grid grid-cols-3 gap-3">
 
                   <div
 
@@ -1512,96 +1839,229 @@ function MoreDetailCard(props: any) {
 
                 </div>
 
-
-
-                {/* แสดงยี่ห้อที่เลือก */}
-
-                {mccbMainBrand && (
-
-                  <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-
-                    <div className="text-sm ">
-
-                      <span className="font-medium">ยี่ห้อที่เลือก:</span> {mccbMainBrand}
-
-                    </div>
-
-                  </div>
-
-                )}
-
-
-
                 {/* แสดงข้อมูล MDB Configuration */}
-
                 {mdbConfiguration && (
-
-                  <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-
-                    <div className="mb-3">
-
-                      <h4 className="font-semibold text-blue-800 mb-2">
-
-                        ข้อมูล MCCB สำหรับ {mdbConfiguration.transformerSize} kVA ({mdbConfiguration.mccbBrand})
-
-                      </h4>
-
+                  <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200 space-y-4">
+                    {/* Header */}
+                    <div>
+                      <div className="text-lg font-semibold text-blue-800">
+                        ข้อมูล MCCB สำหรับ {mdbConfiguration.transformerSize} kVA
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        ประเภท: {mdbConfiguration.mccbBrand}
+                      </div>
+                      {mdbConfiguration.product.productCode && (
+                        <div className="mt-2 text-sm">
+                          <span className="font-medium text-gray-700">รหัสสินค้า:</span>
+                          <span className="text-gray-600 ml-1">{mdbConfiguration.product.productCode}</span>
+                        </div>
+                      )}
                     </div>
 
-
-
-                    <div className="space-y-3">
-
-                      {/* Header Row */}
-                      <div className="p-3 bg-white rounded border border-blue-300">
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs text-gray-500">Row {mdbConfiguration.headerRowNum}:</span>
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{mdbConfiguration.header.name}</span>
-                            <span className="text-gray-400">|</span>
-                            <span className="font-medium">{mdbConfiguration.header.spec1}</span>
-                            <span className="text-gray-400">|</span>
-                            <span className="font-semibold text-blue-700">{mdbConfiguration.header.productCodeHeader}</span>
-                          </div>
+                    {/* รวมค่าใช้จ่าย */}
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <div className="text-sm text-gray-600 mb-1">ค่าของรวม:</div>
+                        <div className="text-xl font-bold text-gray-800">
+                          {(() => {
+                            const mainPrice = parseFloat(mdbConfiguration.product.productCode) || 0;
+                            return mainPrice.toLocaleString('th-TH');
+                          })()} บาท
                         </div>
                       </div>
-
-                      {/* Product Row */}
-                      <div className="p-3 bg-white rounded border border-blue-200">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <span className="text-xs text-gray-500">Row {mdbConfiguration.productRowNum}:</span>
-                            <span className="font-medium">{mdbConfiguration.product.name}</span>
-                          </div>
-                          <div className="text-sm text-blue-600 font-mono font-semibold">
-                            {mdbConfiguration.product.productCode} <span className="text-xs">บาท</span>
-                          </div>
+                      <div>
+                        <div className="text-sm text-gray-600 mb-1">ค่าแรงรวม:</div>
+                        <div className="text-xl font-bold text-gray-800">
+                          0 บาท
                         </div>
                       </div>
-
+                      <div>
+                        <div className="text-sm text-blue-700 font-semibold mb-1">ราคารวม:</div>
+                        <div className="text-2xl font-bold text-blue-700">
+                          {(() => {
+                            const mainPrice = parseFloat(mdbConfiguration.product.productCode) || 0;
+                            return mainPrice.toLocaleString('th-TH');
+                          })()} บาท
+                        </div>
+                      </div>
                     </div>
-
                   </div>
-
                 )}
-
-
 
                 {/* แสดงข้อความเมื่อไม่พบข้อมูล MDB */}
-
                 {mccbMainBrand && props.transformer && !mdbConfiguration && (
-
                   <div className="mt-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-
                     <div className="text-sm text-yellow-700">
-
                       ⚠️ ไม่พบข้อมูล MCCB สำหรับ {props.transformer} kVA ยี่ห้อ {mccbMainBrand} ใน Sheet "ตารางแสดงราคา MAIN MCCB ของ MDB"
+                    </div>
+                  </div>
+                )}
 
+                {/* แสดงตัวเลือกยี่ห้อ MCCB Sub */}
+                {Array.isArray(props.mdbSubs) && props.mdbSubs.length > 0 && (
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">
+                      ยี่ห้อ MCCB Sub <span className="text-xs">(MCCB Sub Brand)</span>
+                    </Label>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div
+                        className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-red-50 cursor-pointer ${mccbSubBrand === 'ABB' ? 'bg-red-100 border-red-300' : ''}`}
+                        onClick={() => setMccbSubBrand('ABB')}
+                      >
+                        <Checkbox
+                          id="mccb-sub-abb"
+                          checked={mccbSubBrand === 'ABB'}
+                          onCheckedChange={(checked) => {
+                            if (checked) setMccbSubBrand('ABB');
+                          }}
+                          className="text-red-500 border-red-400 data-[state=checked]:bg-red-500"
+                        />
+                        <Label htmlFor="mccb-sub-abb" className="font-medium cursor-pointer text-red-700">
+                          ABB
+                        </Label>
+                      </div>
+                      <div
+                        className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-green-50 cursor-pointer ${mccbSubBrand === 'EATON' ? 'bg-green-100 border-green-300' : ''}`}
+                        onClick={() => setMccbSubBrand('EATON')}
+                      >
+                        <Checkbox
+                          id="mccb-sub-eaton"
+                          checked={mccbSubBrand === 'EATON'}
+                          onCheckedChange={(checked) => {
+                            if (checked) setMccbSubBrand('EATON');
+                          }}
+                          className="text-green-500 border-green-400 data-[state=checked]:bg-green-500"
+                        />
+                        <Label htmlFor="mccb-sub-eaton" className="font-medium cursor-pointer text-green-700">
+                          EATON
+                        </Label>
+                      </div>
+                      <div
+                        className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-blue-50 cursor-pointer ${mccbSubBrand === 'LS' ? 'bg-blue-100 border-blue-300' : ''}`}
+                        onClick={() => setMccbSubBrand('LS')}
+                      >
+                        <Checkbox
+                          id="mccb-sub-ls"
+                          checked={mccbSubBrand === 'LS'}
+                          onCheckedChange={(checked) => {
+                            if (checked) setMccbSubBrand('LS');
+                          }}
+                          className="text-blue-500 border-blue-400 data-[state=checked]:bg-blue-500"
+                        />
+                        <Label htmlFor="mccb-sub-ls" className="font-medium cursor-pointer text-blue-700">
+                          LS
+                        </Label>
+                      </div>
                     </div>
 
+                    {/* แสดงข้อมูลราคา MCCB Sub */}
+                    {mccbSubBrand && (
+                      <div className="mt-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                        <div className="mb-3">
+                          <h4 className="font-semibold text-yellow-800 mb-2">
+                            ข้อมูลราคา MCCB Sub ({mccbSubBrand})
+                          </h4>
+                        </div>
+                        <div className="space-y-3">
+                          {Array.isArray(props.mdbSubs) && props.mdbSubs.map((val: string, idx: number) => {
+                            const mccbSubData = getMccbSubData(val, mccbSubBrand);
+                            return (
+                              <div key={idx} className="p-3 bg-white rounded border border-yellow-300">
+                                <div className="font-medium text-yellow-800 mb-2">
+                                  MCCB Sub C{idx + 1}: {val}
+                                </div>
+                                {mccbSubData && Array.isArray(mccbSubData) && mccbSubData.length > 0 ? (
+                                  <div className="space-y-2">
+                                    {mccbSubData.map((item: any, itemIdx: number) => (
+                                      <div key={itemIdx} className="flex items-center gap-2 text-sm">
+                                        <span className="font-medium">รุ่น: {item.model}</span>
+                                        <span className="text-gray-400">|</span>
+                                        <span className="font-medium">จำนวนชุด: {item.quantity}</span>
+                                        <span className="text-gray-400">|</span>
+                                        <span className="font-semibold text-yellow-700">ราคา: {item.price}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="text-sm text-gray-500">
+                                    ⚠️ ไม่พบข้อมูลราคาสำหรับ MCCB Sub {val} ยี่ห้อ {mccbSubBrand} ใน Sheet "ราคา MCCB ของ CHARGER"
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {/* ราคารวม MCCB Sub */}
+                        {(() => {
+                          let totalSubPrice = 0;
+                          Array.isArray(props.mdbSubs) && props.mdbSubs.forEach((val: string) => {
+                            const mccbSubData = getMccbSubData(val, mccbSubBrand);
+                            if (mccbSubData && Array.isArray(mccbSubData)) {
+                              mccbSubData.forEach((item: any) => {
+                                if (item.price && item.price !== '-') {
+                                  // แปลงราคาเป็นตัวเลข (ลบ comma, space, หรืออักขระอื่นๆ)
+                                  const priceStr = String(item.price).replace(/[,\s]/g, '');
+                                  const priceNum = parseFloat(priceStr);
+                                  if (!isNaN(priceNum)) {
+                                    totalSubPrice += priceNum;
+                                  }
+                                }
+                              });
+                            }
+                          });
+                          return totalSubPrice > 0 ? (
+                            <div className="mt-4 p-3 bg-yellow-100 rounded-lg border border-yellow-300">
+                              <div className="flex items-center justify-between">
+                                <span className="font-semibold text-yellow-800">ราคารวม MCCB Sub:</span>
+                                <span className="text-lg font-bold text-yellow-700">{totalSubPrice.toLocaleString()} บาท</span>
+                              </div>
+                            </div>
+                          ) : null;
+                        })()}
+                      </div>
+                    )}
                   </div>
-
                 )}
+
+                {/* ราคารวม MDB */}
+                {mdbConfiguration && mccbSubBrand && Array.isArray(props.mdbSubs) && props.mdbSubs.length > 0 && (() => {
+                  // คำนวณราคา MDB Main
+                  let mainPrice = 0;
+                  if (mdbConfiguration.product.productCode && mdbConfiguration.product.productCode !== '-') {
+                    const mainPriceStr = String(mdbConfiguration.product.productCode).replace(/[,\s]/g, '');
+                    const mainPriceNum = parseFloat(mainPriceStr);
+                    if (!isNaN(mainPriceNum)) {
+                      mainPrice = mainPriceNum;
+                    }
+                  }
+
+                  // คำนวณราคารวม MCCB Sub
+                  let totalSubPrice = 0;
+                  props.mdbSubs.forEach((val: string) => {
+                    const mccbSubData = getMccbSubData(val, mccbSubBrand);
+                    if (mccbSubData && Array.isArray(mccbSubData)) {
+                      mccbSubData.forEach((item: any) => {
+                        if (item.price && item.price !== '-') {
+                          const priceStr = String(item.price).replace(/[,\s]/g, '');
+                          const priceNum = parseFloat(priceStr);
+                          if (!isNaN(priceNum)) {
+                            totalSubPrice += priceNum;
+                          }
+                        }
+                      });
+                    }
+                  });
+
+                  const totalMdbPrice = mainPrice + totalSubPrice;
+                  return totalMdbPrice > 0 ? (
+                    <div className="mt-4 p-3 bg-blue-100 rounded-lg border border-blue-300">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-blue-800">ราคารวม MDB:</span>
+                        <span className="text-lg font-bold text-blue-700">{totalMdbPrice.toLocaleString()} บาท</span>
+                      </div>
+                    </div>
+                  ) : null;
+                })()}
 
               </div>
 
@@ -2029,69 +2489,123 @@ function MoreDetailCard(props: any) {
               })()}
 
               {/* Results Summary */}
-              <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <h4 className="font-semibold text-blue-800 mb-3">ผลลัพธ์การคำนวณ MDB to Charger Configuration</h4>
+              <div className="mt-6 space-y-4">
+                <h4 className="font-semibold text-blue-800 text-lg">ผลลัพธ์การคำนวณ MDB to Charger Configuration</h4>
 
                 {Object.keys(chargerResults).length > 0 ? (
-                  <div className="space-y-3">
-                    {Object.entries(chargerResults).map(([index, result]) => (
-                      <div key={index} className="p-3 bg-white rounded border">
-                        <div className="text-sm font-medium text-gray-700 mb-2">
-                          Charger {parseInt(index) + 1}: {props.chargerSummary?.[parseInt(index)]?.name || ''}
-                        </div>
+                  <div className="space-y-4">
+                    {Object.entries(chargerResults).map(([index, result]) => {
+                      const chargerIndex = parseInt(index);
+                      const isOpen = openChargers[chargerIndex] ?? false;
 
-                        {/* แสดงข้อมูลที่ผู้ใช้กรอก */}
-                        <div className="mb-3 p-2 bg-blue-50 rounded border">
-                          <div className="text-xs font-medium text-blue-700 mb-1">ข้อมูลที่กรอก:</div>
-                          <div className="text-sm space-y-1">
-                            <div><span className="font-medium">ระยะ (เมตร):</span> {chargerLineDistances[parseInt(index)] || '-'} เมตร</div>
-                            {props.chargerWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ' && (
-                              <div><span className="font-medium">เลือกท่อ:</span> {chargerConduitChoices[parseInt(index)] || '-'}</div>
-                            )}
-                          </div>
-                        </div>
+                      return (
+                        <Collapsible
+                          key={index}
+                          open={isOpen}
+                          onOpenChange={(open) => setOpenChargers(prev => ({ ...prev, [chargerIndex]: open }))}
+                        >
+                          <div className="bg-blue-50 rounded-lg border border-blue-200">
+                            {/* Header ที่สามารถคลิกได้ */}
+                            <CollapsibleTrigger className="w-full p-4 text-left hover:bg-blue-100 transition-colors rounded-lg">
+                              <div className="flex items-center justify-between">
+                                <div className="text-lg font-semibold text-blue-800">
+                                  Charger {chargerIndex + 1}: {props.chargerSummary?.[chargerIndex]?.name || ''}
+                                </div>
+                                <div className="ml-4">
+                                  {isOpen ? (
+                                    <ChevronUp className="h-5 w-5 text-blue-600" />
+                                  ) : (
+                                    <ChevronDown className="h-5 w-5 text-blue-600" />
+                                  )}
+                                </div>
+                              </div>
+                            </CollapsibleTrigger>
 
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                          <div className="p-2 bg-gray-50 rounded">
-                            <div className="text-xs font-medium text-gray-600">รหัส:</div>
-                            <div className="text-sm font-semibold text-gray-800">{result.code}</div>
+                            {/* Content ที่สามารถพับได้ */}
+                            <CollapsibleContent>
+                              <div className="px-4 pb-4 space-y-4">
+                                {/* ข้อมูลเพิ่มเติม */}
+                                <div>
+                                  <div className="text-xs text-gray-500">
+                                    ประเภท: {props.chargerWiringType}
+                                  </div>
+                                  <div className="mt-2 text-sm">
+                                    <span className="font-medium text-gray-700">รหัส:</span>
+                                    <span className="text-gray-600 ml-1">{result.code}</span>
+                                    <span className="text-gray-400 mx-2">|</span>
+                                    <span className="font-medium text-gray-700">ระยะ:</span>
+                                    <span className="text-gray-600 ml-1">{chargerLineDistances[chargerIndex] || '-'} เมตร</span>
+                                    {props.chargerWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ' && chargerConduitChoices[chargerIndex] && (
+                                      <>
+                                        <span className="text-gray-400 mx-2">|</span>
+                                        <span className="font-medium text-gray-700">เลือกท่อ:</span>
+                                        <span className="text-gray-600 ml-1">{chargerConduitChoices[chargerIndex]}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* รวมค่าใช้จ่าย */}
+                                <div className="grid grid-cols-3 gap-4">
+                                  <div>
+                                    <div className="text-sm text-gray-600 mb-1">ค่าของรวม:</div>
+                                    <div className="text-xl font-bold text-gray-800">
+                                      {result.materialCost.toLocaleString('th-TH')} บาท
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <div className="text-sm text-gray-600 mb-1">ค่าแรงรวม:</div>
+                                    <div className="text-xl font-bold text-gray-800">
+                                      {result.laborCost.toLocaleString('th-TH')} บาท
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <div className="text-sm text-blue-700 font-semibold mb-1">ราคารวม:</div>
+                                    <div className="text-2xl font-bold text-blue-700">
+                                      {(result.laborCost + result.materialCost).toLocaleString('th-TH')} บาท
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </CollapsibleContent>
                           </div>
-                          <div className="p-2 bg-gray-50 rounded">
-                            <div className="text-xs font-medium text-gray-600">ค่าของ:</div>
-                            <div className="text-sm font-semibold text-gray-800">
-                              {result.materialCost.toLocaleString('th-TH')} บาท
-                            </div>
-                          </div>
-                          <div className="p-2 bg-gray-50 rounded">
-                            <div className="text-xs font-medium text-gray-600">ค่าแรง:</div>
-                            <div className="text-sm font-semibold text-gray-800">
-                              {result.laborCost.toLocaleString('th-TH')} บาท
-                            </div>
-                          </div>
-                          <div className="p-2 bg-yellow-50 rounded border border-yellow-200">
-                            <div className="text-xs font-medium text-yellow-700">ค่าแรง+ค่าของ:</div>
-                            <div className="text-sm font-semibold text-yellow-800">
-                              {(result.laborCost + result.materialCost).toLocaleString('th-TH')} บาท
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                        </Collapsible>
+                      );
+                    })}
 
                     {/* รวมค่าใช้จ่ายทั้งหมด */}
-                    <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
-                      <div className="flex items-center gap-[750px]">
-                        <div className="text-lg font-semibold text-green-800">รวมค่าใช้จ่าย:</div>
-                        <div className="text-2xl font-bold text-green-700">
-                          {Object.values(chargerResults).reduce((total, result) =>
-                            total + (result.laborCost + result.materialCost), 0
-                          ).toLocaleString('th-TH')} บาท
+                    <div className="p-4 bg-green-50 rounded-lg border border-green-200 space-y-4">
+                      <div className="text-lg font-semibold text-green-800">รวมค่าใช้จ่ายทั้งหมด</div>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <div className="text-sm text-gray-600 mb-1">ค่าของรวม:</div>
+                          <div className="text-xl font-bold text-gray-800">
+                            {Object.values(chargerResults).reduce((total, result) =>
+                              total + result.materialCost, 0
+                            ).toLocaleString('th-TH')} บาท
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-sm text-gray-600 mb-1">ค่าแรงรวม:</div>
+                          <div className="text-xl font-bold text-gray-800">
+                            {Object.values(chargerResults).reduce((total, result) =>
+                              total + result.laborCost, 0
+                            ).toLocaleString('th-TH')} บาท
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-sm text-green-700 font-semibold mb-1">ราคารวม:</div>
+                          <div className="text-2xl font-bold text-green-700">
+                            {Object.values(chargerResults).reduce((total, result) =>
+                              total + (result.laborCost + result.materialCost), 0
+                            ).toLocaleString('th-TH')} บาท
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <div className="text-sm text-gray-500">
+                  <div className="text-sm text-gray-500 p-4 bg-gray-50 rounded-lg border">
                     ยังไม่มีผลลัพธ์ - กรุณากรอกข้อมูลและเลือกประเภทท่อ
                   </div>
                 )}
@@ -2488,63 +3002,70 @@ function MoreDetailCard(props: any) {
                 <div className="mt-6 p-4 bg-green-50 rounded-lg border border-green-200 space-y-4">
                   <div className="text-lg font-semibold text-green-800">รวมค่าใช้จ่ายอุปกรณ์ประกอบสถานี</div>
 
-                  {/* รายละเอียดราคาของแต่ละรายการ */}
-                  <div className="space-y-2">
-                    {(() => {
-                      const items: Array<{ name: string; materialPrice: number; laborPrice: number; totalPrice: number }> = [];
-
-                      // เสากันชน
-                      if (bumperPoles === 'yes' && stationEquipmentPriceMapping['bumper-poles']) {
-                        const qty = parseInt(parkingSlots) * 2;
-                        const material = stationEquipmentPriceMapping['bumper-poles'].materialPrice * qty;
-                        const labor = stationEquipmentPriceMapping['bumper-poles'].laborPrice * qty;
-                        const total = stationEquipmentPriceMapping['bumper-poles'].totalPrice * qty;
-                        items.push({ name: 'เสากันชน', materialPrice: material, laborPrice: labor, totalPrice: total });
-                      }
-
-                      // ยางกั้นล้อ (ปูน)
-                      if (wheelStops === 'yes' && stationEquipmentPriceMapping['wheel-stops']) {
-                        const qty = parseInt(parkingSlots);
-                        const material = stationEquipmentPriceMapping['wheel-stops'].materialPrice * qty;
-                        const labor = stationEquipmentPriceMapping['wheel-stops'].laborPrice * qty;
-                        const total = stationEquipmentPriceMapping['wheel-stops'].totalPrice * qty;
-                        items.push({ name: 'ยางกั้นล้อ (ปูน)', materialPrice: material, laborPrice: labor, totalPrice: total });
-                      }
-
-                      // ถังดับเพลิง+ตู้
-                      if (fireExtinguisherCabinet === 'yes' && stationEquipmentPriceMapping['fire-extinguisher']) {
-                        const qty = props.numberOfChargers;
-                        const material = stationEquipmentPriceMapping['fire-extinguisher'].materialPrice * qty;
-                        const labor = stationEquipmentPriceMapping['fire-extinguisher'].laborPrice * qty;
-                        const total = stationEquipmentPriceMapping['fire-extinguisher'].totalPrice * qty;
-                        items.push({ name: 'ถังดับเพลิง+ตู้', materialPrice: material, laborPrice: labor, totalPrice: total });
-                      }
-
-                      // ป้ายสูง + วิธีใช้งาน
-                      if (signage === 'yes' && stationEquipmentPriceMapping['signage']) {
-                        const qty = props.numberOfChargers;
-                        const material = stationEquipmentPriceMapping['signage'].materialPrice * qty;
-                        const labor = stationEquipmentPriceMapping['signage'].laborPrice * qty;
-                        const total = stationEquipmentPriceMapping['signage'].totalPrice * qty;
-                        items.push({ name: 'ป้ายสูง + วิธีใช้งาน', materialPrice: material, laborPrice: labor, totalPrice: total });
-                      }
-
-                      return items.map((item, index) => (
-                        <div key={index} className="flex items-center justify-between p-2 bg-white rounded border border-green-200">
-                          <span className="font-medium text-sm">{item.name}:</span>
-                          <div className="flex items-center gap-4 text-sm">
-                            <span>ค่าแรง+ค่าของ: <span className="font-semibold">{(item.materialPrice + item.laborPrice).toLocaleString('th-TH')} บาท</span></span>
-                            <span className="text-green-700 font-semibold">ราคารวม: {item.totalPrice.toLocaleString('th-TH')} บาท</span>
-                          </div>
-                        </div>
-                      ));
-                    })()}
-                  </div>
-
                   {/* ราคารวม */}
-                  <div className="pt-3 border-t border-green-300">
-                    <div className="flex items-center justify-between">
-                      <div className="text-lg font-semibold text-green-800">ราคารวม:</div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <div className="text-sm text-gray-600 mb-1">ค่าของรวม:</div>
+                      <div className="text-xl font-bold text-gray-800">
+                        {(() => {
+                          let total = 0;
+
+                          // เสากันชน
+                          if (bumperPoles === 'yes' && stationEquipmentPriceMapping['bumper-poles']) {
+                            total += stationEquipmentPriceMapping['bumper-poles'].materialPrice * (parseInt(parkingSlots) * 2);
+                          }
+
+                          // ยางกั้นล้อ (ปูน)
+                          if (wheelStops === 'yes' && stationEquipmentPriceMapping['wheel-stops']) {
+                            total += stationEquipmentPriceMapping['wheel-stops'].materialPrice * parseInt(parkingSlots);
+                          }
+
+                          // ถังดับเพลิง+ตู้
+                          if (fireExtinguisherCabinet === 'yes' && stationEquipmentPriceMapping['fire-extinguisher']) {
+                            total += stationEquipmentPriceMapping['fire-extinguisher'].materialPrice * props.numberOfChargers;
+                          }
+
+                          // ป้ายสูง + วิธีใช้งาน
+                          if (signage === 'yes' && stationEquipmentPriceMapping['signage']) {
+                            total += stationEquipmentPriceMapping['signage'].materialPrice * props.numberOfChargers;
+                          }
+
+                          return total.toLocaleString('th-TH');
+                        })()} บาท
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-600 mb-1">ค่าแรงรวม:</div>
+                      <div className="text-xl font-bold text-gray-800">
+                        {(() => {
+                          let total = 0;
+
+                          // เสากันชน
+                          if (bumperPoles === 'yes' && stationEquipmentPriceMapping['bumper-poles']) {
+                            total += stationEquipmentPriceMapping['bumper-poles'].laborPrice * (parseInt(parkingSlots) * 2);
+                          }
+
+                          // ยางกั้นล้อ (ปูน)
+                          if (wheelStops === 'yes' && stationEquipmentPriceMapping['wheel-stops']) {
+                            total += stationEquipmentPriceMapping['wheel-stops'].laborPrice * parseInt(parkingSlots);
+                          }
+
+                          // ถังดับเพลิง+ตู้
+                          if (fireExtinguisherCabinet === 'yes' && stationEquipmentPriceMapping['fire-extinguisher']) {
+                            total += stationEquipmentPriceMapping['fire-extinguisher'].laborPrice * props.numberOfChargers;
+                          }
+
+                          // ป้ายสูง + วิธีใช้งาน
+                          if (signage === 'yes' && stationEquipmentPriceMapping['signage']) {
+                            total += stationEquipmentPriceMapping['signage'].laborPrice * props.numberOfChargers;
+                          }
+
+                          return total.toLocaleString('th-TH');
+                        })()} บาท
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-green-700 font-semibold mb-1">ราคารวม:</div>
                       <div className="text-2xl font-bold text-green-700">
                         {(() => {
                           let total = 0;
@@ -2820,63 +3341,70 @@ function MoreDetailCard(props: any) {
                 <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200 space-y-4">
                   <div className="text-lg font-semibold text-blue-800">รวมค่าใช้จ่ายระบบสื่อสาร</div>
 
-                  {/* รายละเอียดราคาของแต่ละรายการ */}
-                  <div className="space-y-2">
-                    {(() => {
-                      const items: Array<{ name: string; materialPrice: number; laborPrice: number; totalPrice: number }> = [];
-
-                      // WIFI + 4G + HUB
-                      if (wifi4gHub === 'yes' && stationEquipmentPriceMapping['wifi-4g-hub']) {
-                        const qty = 1;
-                        const material = stationEquipmentPriceMapping['wifi-4g-hub'].materialPrice * qty;
-                        const labor = stationEquipmentPriceMapping['wifi-4g-hub'].laborPrice * qty;
-                        const total = stationEquipmentPriceMapping['wifi-4g-hub'].totalPrice * qty;
-                        items.push({ name: 'WIFI + 4G + HUB', materialPrice: material, laborPrice: labor, totalPrice: total });
-                      }
-
-                      // กล้อง CCTV
-                      if (cctv === 'yes' && stationEquipmentPriceMapping['cctv']) {
-                        const qty = 4;
-                        const material = stationEquipmentPriceMapping['cctv'].materialPrice * qty;
-                        const labor = stationEquipmentPriceMapping['cctv'].laborPrice * qty;
-                        const total = stationEquipmentPriceMapping['cctv'].totalPrice * qty;
-                        items.push({ name: 'กล้อง CCTV', materialPrice: material, laborPrice: labor, totalPrice: total });
-                      }
-
-                      // หลอดไฟ
-                      if (lighting === 'yes' && stationEquipmentPriceMapping['lighting']) {
-                        const qty = 3;
-                        const material = stationEquipmentPriceMapping['lighting'].materialPrice * qty;
-                        const labor = stationEquipmentPriceMapping['lighting'].laborPrice * qty;
-                        const total = stationEquipmentPriceMapping['lighting'].totalPrice * qty;
-                        items.push({ name: 'หลอดไฟ', materialPrice: material, laborPrice: labor, totalPrice: total });
-                      }
-
-                      // ACC (สาย + รางสาย + ตู้outdoor + อื่นๆ)
-                      if (accSystem === 'yes' && stationEquipmentPriceMapping['acc-system']) {
-                        const qty = 1;
-                        const material = stationEquipmentPriceMapping['acc-system'].materialPrice * qty;
-                        const labor = stationEquipmentPriceMapping['acc-system'].laborPrice * qty;
-                        const total = stationEquipmentPriceMapping['acc-system'].totalPrice * qty;
-                        items.push({ name: 'ACC (สาย + รางสาย + ตู้outdoor + อื่นๆ)', materialPrice: material, laborPrice: labor, totalPrice: total });
-                      }
-
-                      return items.map((item, index) => (
-                        <div key={index} className="flex items-center justify-between p-2 bg-white rounded border border-blue-200">
-                          <span className="font-medium text-sm">{item.name}:</span>
-                          <div className="flex items-center gap-4 text-sm">
-                            <span>ค่าแรง+ค่าของ: <span className="font-semibold">{(item.materialPrice + item.laborPrice).toLocaleString('th-TH')} บาท</span></span>
-                            <span className="text-blue-700 font-semibold">ราคารวม: {item.totalPrice.toLocaleString('th-TH')} บาท</span>
-                          </div>
-                        </div>
-                      ));
-                    })()}
-                  </div>
-
                   {/* ราคารวม */}
-                  <div className="pt-3 border-t border-blue-300">
-                    <div className="flex items-center justify-between">
-                      <div className="text-lg font-semibold text-blue-800">ราคารวม:</div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <div className="text-sm text-gray-600 mb-1">ค่าของรวม:</div>
+                      <div className="text-xl font-bold text-gray-800">
+                        {(() => {
+                          let total = 0;
+
+                          // WIFI + 4G + HUB
+                          if (wifi4gHub === 'yes' && stationEquipmentPriceMapping['wifi-4g-hub']) {
+                            total += stationEquipmentPriceMapping['wifi-4g-hub'].materialPrice * 1;
+                          }
+
+                          // กล้อง CCTV
+                          if (cctv === 'yes' && stationEquipmentPriceMapping['cctv']) {
+                            total += stationEquipmentPriceMapping['cctv'].materialPrice * 4;
+                          }
+
+                          // หลอดไฟ
+                          if (lighting === 'yes' && stationEquipmentPriceMapping['lighting']) {
+                            total += stationEquipmentPriceMapping['lighting'].materialPrice * 3;
+                          }
+
+                          // ACC (สาย + รางสาย + ตู้outdoor + อื่นๆ)
+                          if (accSystem === 'yes' && stationEquipmentPriceMapping['acc-system']) {
+                            total += stationEquipmentPriceMapping['acc-system'].materialPrice * 1;
+                          }
+
+                          return total.toLocaleString('th-TH');
+                        })()} บาท
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-600 mb-1">ค่าแรงรวม:</div>
+                      <div className="text-xl font-bold text-gray-800">
+                        {(() => {
+                          let total = 0;
+
+                          // WIFI + 4G + HUB
+                          if (wifi4gHub === 'yes' && stationEquipmentPriceMapping['wifi-4g-hub']) {
+                            total += stationEquipmentPriceMapping['wifi-4g-hub'].laborPrice * 1;
+                          }
+
+                          // กล้อง CCTV
+                          if (cctv === 'yes' && stationEquipmentPriceMapping['cctv']) {
+                            total += stationEquipmentPriceMapping['cctv'].laborPrice * 4;
+                          }
+
+                          // หลอดไฟ
+                          if (lighting === 'yes' && stationEquipmentPriceMapping['lighting']) {
+                            total += stationEquipmentPriceMapping['lighting'].laborPrice * 3;
+                          }
+
+                          // ACC (สาย + รางสาย + ตู้outdoor + อื่นๆ)
+                          if (accSystem === 'yes' && stationEquipmentPriceMapping['acc-system']) {
+                            total += stationEquipmentPriceMapping['acc-system'].laborPrice * 1;
+                          }
+
+                          return total.toLocaleString('th-TH');
+                        })()} บาท
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-blue-700 font-semibold mb-1">ราคารวม:</div>
                       <div className="text-2xl font-bold text-blue-700">
                         {(() => {
                           let total = 0;
@@ -3157,62 +3685,70 @@ function MoreDetailCard(props: any) {
                 <div className="mt-6 p-4 bg-orange-50 rounded-lg border border-orange-200 space-y-4">
                   <div className="text-lg font-semibold text-orange-800">รวมค่าใช้จ่ายงานปูน</div>
 
-                  {/* รายละเอียดราคาของแต่ละรายการ */}
-                  <div className="space-y-2">
-                    {(() => {
-                      const items: Array<{ name: string; materialPrice: number; laborPrice: number; totalPrice: number }> = [];
-
-                      // ฐานปูน MDB
-                      if (mdbConcreteBase === 'yes' && stationEquipmentPriceMapping['mdb-concrete-base']) {
-                        const qty = 1;
-                        const material = stationEquipmentPriceMapping['mdb-concrete-base'].materialPrice * qty;
-                        const labor = stationEquipmentPriceMapping['mdb-concrete-base'].laborPrice * qty;
-                        const total = stationEquipmentPriceMapping['mdb-concrete-base'].totalPrice * qty;
-                        items.push({ name: 'ฐานปูน MDB 200 x 200 x 20 ซม.', materialPrice: material, laborPrice: labor, totalPrice: total });
-                      }
-
-                      // ฐานปูน CHARGER
-                      if (chargerConcreteBase === 'yes' && stationEquipmentPriceMapping['charger-concrete-base']) {
-                        const qty = props.numberOfChargers;
-                        const material = stationEquipmentPriceMapping['charger-concrete-base'].materialPrice * qty;
-                        const labor = stationEquipmentPriceMapping['charger-concrete-base'].laborPrice * qty;
-                        const total = stationEquipmentPriceMapping['charger-concrete-base'].totalPrice * qty;
-                        items.push({ name: 'ฐานปูน CHARGER 150 x 150 x 20 ซม.', materialPrice: material, laborPrice: labor, totalPrice: total });
-                      }
-
-                      // พื้นปูน ลานจอดรถ
-                      if (parkingConcreteFloor === 'yes' && stationEquipmentPriceMapping['parking-concrete-floor']) {
-                        const qty = parseInt(parkingSlots);
-                        const material = stationEquipmentPriceMapping['parking-concrete-floor'].materialPrice * qty;
-                        const labor = stationEquipmentPriceMapping['parking-concrete-floor'].laborPrice * qty;
-                        const total = stationEquipmentPriceMapping['parking-concrete-floor'].totalPrice * qty;
-                        items.push({ name: 'พื้นปูน ลานจอดรถ 300 x 600 x 10 ซม.', materialPrice: material, laborPrice: labor, totalPrice: total });
-                      }
-
-                      // เทพื้นปูนทั่วไป
-                      if (generalConcreteFloor === 'yes' && stationEquipmentPriceMapping['general-concrete-floor']) {
-                        const material = stationEquipmentPriceMapping['general-concrete-floor'].materialPrice;
-                        const labor = stationEquipmentPriceMapping['general-concrete-floor'].laborPrice;
-                        const total = stationEquipmentPriceMapping['general-concrete-floor'].totalPrice;
-                        items.push({ name: 'เทพื้นปูนทั่วไป 100 x 100 x 10 ซม.', materialPrice: material, laborPrice: labor, totalPrice: total });
-                      }
-
-                      return items.map((item, index) => (
-                        <div key={index} className="flex items-center justify-between p-2 bg-white rounded border border-orange-200">
-                          <span className="font-medium text-sm">{item.name}:</span>
-                          <div className="flex items-center gap-4 text-sm">
-                            <span>ค่าแรง+ค่าของ: <span className="font-semibold">{(item.materialPrice + item.laborPrice).toLocaleString('th-TH')} บาท</span></span>
-                            <span className="text-orange-700 font-semibold">ราคารวม: {item.totalPrice.toLocaleString('th-TH')} บาท</span>
-                          </div>
-                        </div>
-                      ));
-                    })()}
-                  </div>
-
                   {/* ราคารวม */}
-                  <div className="pt-3 border-t border-orange-300">
-                    <div className="flex items-center justify-between">
-                      <div className="text-lg font-semibold text-orange-800">ราคารวม:</div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <div className="text-sm text-gray-600 mb-1">ค่าของรวม:</div>
+                      <div className="text-xl font-bold text-gray-800">
+                        {(() => {
+                          let total = 0;
+
+                          // ฐานปูน MDB
+                          if (mdbConcreteBase === 'yes' && stationEquipmentPriceMapping['mdb-concrete-base']) {
+                            total += stationEquipmentPriceMapping['mdb-concrete-base'].materialPrice * 1;
+                          }
+
+                          // ฐานปูน CHARGER
+                          if (chargerConcreteBase === 'yes' && stationEquipmentPriceMapping['charger-concrete-base']) {
+                            total += stationEquipmentPriceMapping['charger-concrete-base'].materialPrice * props.numberOfChargers;
+                          }
+
+                          // พื้นปูน ลานจอดรถ
+                          if (parkingConcreteFloor === 'yes' && stationEquipmentPriceMapping['parking-concrete-floor']) {
+                            total += stationEquipmentPriceMapping['parking-concrete-floor'].materialPrice * parseInt(parkingSlots);
+                          }
+
+                          // เทพื้นปูนทั่วไป
+                          if (generalConcreteFloor === 'yes' && stationEquipmentPriceMapping['general-concrete-floor']) {
+                            total += stationEquipmentPriceMapping['general-concrete-floor'].materialPrice;
+                          }
+
+                          return total.toLocaleString('th-TH');
+                        })()} บาท
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-600 mb-1">ค่าแรงรวม:</div>
+                      <div className="text-xl font-bold text-gray-800">
+                        {(() => {
+                          let total = 0;
+
+                          // ฐานปูน MDB
+                          if (mdbConcreteBase === 'yes' && stationEquipmentPriceMapping['mdb-concrete-base']) {
+                            total += stationEquipmentPriceMapping['mdb-concrete-base'].laborPrice * 1;
+                          }
+
+                          // ฐานปูน CHARGER
+                          if (chargerConcreteBase === 'yes' && stationEquipmentPriceMapping['charger-concrete-base']) {
+                            total += stationEquipmentPriceMapping['charger-concrete-base'].laborPrice * props.numberOfChargers;
+                          }
+
+                          // พื้นปูน ลานจอดรถ
+                          if (parkingConcreteFloor === 'yes' && stationEquipmentPriceMapping['parking-concrete-floor']) {
+                            total += stationEquipmentPriceMapping['parking-concrete-floor'].laborPrice * parseInt(parkingSlots);
+                          }
+
+                          // เทพื้นปูนทั่วไป
+                          if (generalConcreteFloor === 'yes' && stationEquipmentPriceMapping['general-concrete-floor']) {
+                            total += stationEquipmentPriceMapping['general-concrete-floor'].laborPrice;
+                          }
+
+                          return total.toLocaleString('th-TH');
+                        })()} บาท
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-orange-700 font-semibold mb-1">ราคารวม:</div>
                       <div className="text-2xl font-bold text-orange-700">
                         {(() => {
                           let total = 0;
@@ -3525,66 +4061,70 @@ function MoreDetailCard(props: any) {
                   <div className="mt-6 p-4 bg-pink-50 rounded-lg border border-pink-200 space-y-4">
                     <div className="text-lg font-semibold text-pink-800">รวมค่าใช้จ่ายงานทาสีช่องจอด</div>
 
-                    {/* รายละเอียดราคาของแต่ละรายการ */}
-                    <div className="space-y-2">
-                      {(() => {
-                        const items: Array<{ name: string; materialPrice: number; laborPrice: number; totalPrice: number }> = [];
-
-                        // ทาสีพื้นช่องจอดรถ
-                        if (stationEquipmentPriceMapping[`paint-${parkingPaintType}`]) {
-                          const qty = parseInt(parkingSlots);
-                          const material = stationEquipmentPriceMapping[`paint-${parkingPaintType}`].materialPrice * qty;
-                          const labor = stationEquipmentPriceMapping[`paint-${parkingPaintType}`].laborPrice * qty;
-                          const total = stationEquipmentPriceMapping[`paint-${parkingPaintType}`].totalPrice * qty;
-                          const paintName = parkingPaintType === 'no-grind-no-polish' ? 'ทาสีพื้นช่องจอดรถ แบบไม่ขัด ไม่โป้ว' :
-                            parkingPaintType === 'grind-no-polish' ? 'ทาสีพื้นช่องจอดรถ แบบขัด แต่ไม่โป้ว' :
-                              'ทาสีพื้นช่องจอดรถ แบบขัด และโป้วให้เรียบ';
-                          items.push({ name: paintName, materialPrice: material, laborPrice: labor, totalPrice: total });
-                        }
-
-                        // ตีเส้นด้านข้าง
-                        if (sideLineMarking === 'yes' && stationEquipmentPriceMapping['side-line-marking']) {
-                          const qty = parseInt(parkingSlots);
-                          const material = stationEquipmentPriceMapping['side-line-marking'].materialPrice * qty;
-                          const labor = stationEquipmentPriceMapping['side-line-marking'].laborPrice * qty;
-                          const total = stationEquipmentPriceMapping['side-line-marking'].totalPrice * qty;
-                          items.push({ name: 'ตีเส้นด้านข้าง', materialPrice: material, laborPrice: labor, totalPrice: total });
-                        }
-
-                        // ทำลายกลางช่องจอด (ใช้ลายเดิม)
-                        if (centerPatternOriginal === 'yes' && stationEquipmentPriceMapping['center-pattern-original']) {
-                          const qty = parseInt(parkingSlots);
-                          const material = stationEquipmentPriceMapping['center-pattern-original'].materialPrice * qty;
-                          const labor = stationEquipmentPriceMapping['center-pattern-original'].laborPrice * qty;
-                          const total = stationEquipmentPriceMapping['center-pattern-original'].totalPrice * qty;
-                          items.push({ name: 'ทำลายกลางช่องจอด ใช้ลายเดิม', materialPrice: material, laborPrice: labor, totalPrice: total });
-                        }
-
-                        // ทำลายกลางช่องจอด (ออกแบบลายใหม่)
-                        if (centerPatternNew === 'yes' && stationEquipmentPriceMapping['center-pattern-new']) {
-                          const qty = parseInt(parkingSlots);
-                          const material = stationEquipmentPriceMapping['center-pattern-new'].materialPrice * qty;
-                          const labor = stationEquipmentPriceMapping['center-pattern-new'].laborPrice * qty;
-                          const total = stationEquipmentPriceMapping['center-pattern-new'].totalPrice * qty;
-                          items.push({ name: 'ทำลายกลางช่องจอด ออกแบบลายใหม่', materialPrice: material, laborPrice: labor, totalPrice: total });
-                        }
-
-                        return items.map((item, index) => (
-                          <div key={index} className="flex items-center justify-between p-2 bg-white rounded border border-pink-200">
-                            <span className="font-medium text-sm">{item.name}:</span>
-                            <div className="flex items-center gap-4 text-sm">
-                              <span>ค่าแรง+ค่าของ: <span className="font-semibold">{(item.materialPrice + item.laborPrice).toLocaleString('th-TH')} บาท</span></span>
-                              <span className="text-pink-700 font-semibold">ราคารวม: {item.totalPrice.toLocaleString('th-TH')} บาท</span>
-                            </div>
-                          </div>
-                        ));
-                      })()}
-                    </div>
-
                     {/* ราคารวม */}
-                    <div className="pt-3 border-t border-pink-300">
-                      <div className="flex items-center justify-between">
-                        <div className="text-lg font-semibold text-pink-800">ราคารวม:</div>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <div className="text-sm text-gray-600 mb-1">ค่าของรวม:</div>
+                        <div className="text-xl font-bold text-gray-800">
+                          {(() => {
+                            let total = 0;
+
+                            // ทาสีพื้นช่องจอดรถ
+                            if (stationEquipmentPriceMapping[`paint-${parkingPaintType}`]) {
+                              total += stationEquipmentPriceMapping[`paint-${parkingPaintType}`].materialPrice * parseInt(parkingSlots);
+                            }
+
+                            // ตีเส้นด้านข้าง
+                            if (sideLineMarking === 'yes' && stationEquipmentPriceMapping['side-line-marking']) {
+                              total += stationEquipmentPriceMapping['side-line-marking'].materialPrice * parseInt(parkingSlots);
+                            }
+
+                            // ทำลายกลางช่องจอด (ใช้ลายเดิม)
+                            if (centerPatternOriginal === 'yes' && stationEquipmentPriceMapping['center-pattern-original']) {
+                              total += stationEquipmentPriceMapping['center-pattern-original'].materialPrice * parseInt(parkingSlots);
+                            }
+
+                            // ทำลายกลางช่องจอด (ออกแบบลายใหม่)
+                            if (centerPatternNew === 'yes' && stationEquipmentPriceMapping['center-pattern-new']) {
+                              total += stationEquipmentPriceMapping['center-pattern-new'].materialPrice * parseInt(parkingSlots);
+                            }
+
+                            return total.toLocaleString('th-TH');
+                          })()} บาท
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-sm text-gray-600 mb-1">ค่าแรงรวม:</div>
+                        <div className="text-xl font-bold text-gray-800">
+                          {(() => {
+                            let total = 0;
+
+                            // ทาสีพื้นช่องจอดรถ
+                            if (stationEquipmentPriceMapping[`paint-${parkingPaintType}`]) {
+                              total += stationEquipmentPriceMapping[`paint-${parkingPaintType}`].laborPrice * parseInt(parkingSlots);
+                            }
+
+                            // ตีเส้นด้านข้าง
+                            if (sideLineMarking === 'yes' && stationEquipmentPriceMapping['side-line-marking']) {
+                              total += stationEquipmentPriceMapping['side-line-marking'].laborPrice * parseInt(parkingSlots);
+                            }
+
+                            // ทำลายกลางช่องจอด (ใช้ลายเดิม)
+                            if (centerPatternOriginal === 'yes' && stationEquipmentPriceMapping['center-pattern-original']) {
+                              total += stationEquipmentPriceMapping['center-pattern-original'].laborPrice * parseInt(parkingSlots);
+                            }
+
+                            // ทำลายกลางช่องจอด (ออกแบบลายใหม่)
+                            if (centerPatternNew === 'yes' && stationEquipmentPriceMapping['center-pattern-new']) {
+                              total += stationEquipmentPriceMapping['center-pattern-new'].laborPrice * parseInt(parkingSlots);
+                            }
+
+                            return total.toLocaleString('th-TH');
+                          })()} บาท
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-sm text-pink-700 font-semibold mb-1">ราคารวม:</div>
                         <div className="text-2xl font-bold text-pink-700">
                           {(() => {
                             let total = 0;
@@ -3693,14 +4233,31 @@ function MoreDetailCard(props: any) {
 
                 </div>
 
-                {/* แสดงข้อมูลราคาหลังคาคุมช่องจอดเมื่อเลือก "มี" */}
+                {/* รวมค่าใช้จ่ายหลังคาคุมช่องจอด */}
                 {roofCoverType === 'yes' && getParkingRoofData && getParkingRoofData(parseInt(parkingSlots)) && (
-                  <div className="p-3 rounded-lg border space-y-2">
-                    <div className="font-medium">ข้อมูลราคาหลังคาคุมช่องจอด ({getParkingRoofData(parseInt(parkingSlots)).slots} ช่องจอด):</div>
-                    <div className="text-xs space-y-1">
-                      <div><span className="font-medium">ราคาค่าของ:</span> {getParkingRoofData(parseInt(parkingSlots)).materialPrice.toLocaleString('th-TH')} บาท</div>
-                      <div><span className="font-medium">ราคาค่าแรง:</span> {getParkingRoofData(parseInt(parkingSlots)).laborPrice.toLocaleString('th-TH')} บาท</div>
-                      <div><span className="font-medium">ราคารวม:</span> {getParkingRoofData(parseInt(parkingSlots)).totalPrice.toLocaleString('th-TH')} บาท</div>
+                  <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200 space-y-4">
+                    <div className="text-lg font-semibold text-blue-800">รวมค่าใช้จ่ายหลังคาคุมช่องจอด</div>
+
+                    {/* ราคารวม */}
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <div className="text-sm text-gray-600 mb-1">ค่าของรวม:</div>
+                        <div className="text-xl font-bold text-gray-800">
+                          {getParkingRoofData(parseInt(parkingSlots)).materialPrice.toLocaleString('th-TH')} บาท
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-sm text-gray-600 mb-1">ค่าแรงรวม:</div>
+                        <div className="text-xl font-bold text-gray-800">
+                          {getParkingRoofData(parseInt(parkingSlots)).laborPrice.toLocaleString('th-TH')} บาท
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-sm text-blue-700 font-semibold mb-1">ราคารวม:</div>
+                        <div className="text-2xl font-bold text-blue-700">
+                          {getParkingRoofData(parseInt(parkingSlots)).totalPrice.toLocaleString('th-TH')} บาท
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -3782,17 +4339,44 @@ function MoreDetailCard(props: any) {
 
                 </div>
 
-                {/* แสดงข้อมูลราคาหลังคาเฉพาะ MDB เมื่อเลือก "มี" */}
-                {mdbRoof === 'yes' && roofCostMapping && roofCostMapping['mdb-roof'] && (
-                  <div className="p-4 bg-blue-50 rounded-lg border space-y-2">
-                    <div className="font-medium">{roofCostMapping['mdb-roof'].name}:</div>
-                    <div className="text-xs space-y-1">
-                      <div><span className="font-medium">ราคาค่าของ:</span> {roofCostMapping['mdb-roof'].materialPrice.toLocaleString('th-TH')} บาท</div>
-                      <div><span className="font-medium">ราคาค่าแรง:</span> {roofCostMapping['mdb-roof'].laborPrice.toLocaleString('th-TH')} บาท</div>
-                      <div><span className="font-medium">ราคารวม:</span> {roofCostMapping['mdb-roof'].totalPrice.toLocaleString('th-TH')} บาท</div>
+                {/* รวมค่าใช้จ่ายหลังคาเฉพาะ MDB */}
+                {mdbRoof === 'yes' && (() => {
+                  const roofSheet = getExcelData('ตารางต้นทุนหลังคาสถานี');
+                  const mdbRoofRow = roofSheet.find((row: any) => row.__rowNum__ === 14);
+                  if (!mdbRoofRow) return null;
+
+                  const materialPrice = parseFloat(mdbRoofRow.__EMPTY_4 || 0) || 0;
+                  const laborPrice = parseFloat(mdbRoofRow.__EMPTY_5 || 0) || 0;
+                  const totalPrice = parseFloat(mdbRoofRow.__EMPTY_6 || 0) || 0;
+
+                  return (
+                    <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200 space-y-4">
+                      <div className="text-lg font-semibold text-blue-800">รวมค่าใช้จ่ายหลังคาเฉพาะ MDB</div>
+
+                      {/* ราคารวม */}
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <div className="text-sm text-gray-600 mb-1">ค่าของรวม:</div>
+                          <div className="text-xl font-bold text-gray-800">
+                            {materialPrice.toLocaleString('th-TH')} บาท
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-sm text-gray-600 mb-1">ค่าแรงรวม:</div>
+                          <div className="text-xl font-bold text-gray-800">
+                            {laborPrice.toLocaleString('th-TH')} บาท
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-sm text-blue-700 font-semibold mb-1">ราคารวม:</div>
+                          <div className="text-2xl font-bold text-blue-700">
+                            {totalPrice.toLocaleString('th-TH')} บาท
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
               </div>
 
@@ -3812,7 +4396,35 @@ function MoreDetailCard(props: any) {
 
                 </Label>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
+
+                  <div
+
+                    className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer ${chargerRoofType === 'normal' ? 'bg-gray-100 border-gray-300' : ''}`}
+
+                    onClick={() => setChargerRoofType('normal')}
+
+                  >
+
+                    <Checkbox
+
+                      id="charger-roof-normal"
+
+                      checked={chargerRoofType === 'normal'}
+
+                      onCheckedChange={(checked) => {
+
+                        if (checked) setChargerRoofType('normal');
+
+                      }}
+
+                      className="border-gray-400 data-[state=checked]:bg-gray-500"
+
+                    />
+
+                    <Label htmlFor="charger-roof-normal" className="font-medium cursor-pointer">ธรรมดา</Label>
+
+                  </div>
 
                   <div
 
@@ -3824,7 +4436,7 @@ function MoreDetailCard(props: any) {
 
                     <Checkbox
 
-                      id="composite"
+                      id="charger-roof-composite"
 
                       checked={chargerRoofType === 'composite'}
 
@@ -3838,65 +4450,89 @@ function MoreDetailCard(props: any) {
 
                     />
 
-                    <Label htmlFor="composite" className="font-medium cursor-pointer text-green-700">Composite</Label>
+                    <Label htmlFor="charger-roof-composite" className="font-medium cursor-pointer text-green-700">Composite</Label>
 
                   </div>
 
                   <div
 
-                    className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer ${chargerRoofType === 'normal' ? 'bg-gray-100 border-gray-300' : ''}`}
+                    className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-red-50 cursor-pointer ${chargerRoofType === 'no' ? 'bg-red-100 border-red-300' : ''}`}
 
-                    onClick={() => setChargerRoofType('normal')}
+                    onClick={() => setChargerRoofType('no')}
 
                   >
 
                     <Checkbox
 
-                      id="normal"
+                      id="charger-roof-no"
 
-                      checked={chargerRoofType === 'normal'}
+                      checked={chargerRoofType === 'no'}
 
                       onCheckedChange={(checked) => {
 
-                        if (checked) setChargerRoofType('normal');
+                        if (checked) setChargerRoofType('no');
 
                       }}
 
-                      className=" border-gray-400 data-[state=checked]:bg-gray-500"
+                      className="text-red-500 border-red-400 data-[state=checked]:bg-red-500"
 
                     />
 
-                    <Label htmlFor="normal" className="font-medium cursor-pointer ">ธรรมดา</Label>
+                    <Label htmlFor="charger-roof-no" className="font-medium cursor-pointer text-red-700">ไม่มี</Label>
 
                   </div>
 
                 </div>
 
-                {/* แสดงข้อมูลราคาหลังคาเครื่องชาร์จ */}
-                {chargerRoofType && roofCostMapping && (
-                  <div className="p-3 rounded-lg border space-y-2">
-                    {chargerRoofType === 'normal' && roofCostMapping['charger-roof-normal'] && (
-                      <>
-                        <div className="font-medium">{roofCostMapping['charger-roof-normal'].name}:</div>
-                        <div className="text-xs space-y-1">
-                          <div><span className="font-medium">ราคาค่าของ:</span> {roofCostMapping['charger-roof-normal'].materialPrice.toLocaleString('th-TH')} บาท</div>
-                          <div><span className="font-medium">ราคาค่าแรง:</span> {roofCostMapping['charger-roof-normal'].laborPrice.toLocaleString('th-TH')} บาท</div>
-                          <div><span className="font-medium">ราคารวม:</span> {roofCostMapping['charger-roof-normal'].totalPrice.toLocaleString('th-TH')} บาท</div>
+                {/* รวมค่าใช้จ่ายหลังคาเครื่องชาร์จ */}
+                {chargerRoofType && chargerRoofType !== 'no' && (() => {
+                  const roofSheet = getExcelData('ตารางต้นทุนหลังคาสถานี');
+                  const numberOfChargers = parseInt(props.numberOfChargers) || 1;
+                  let rowNum: number | undefined;
+
+                  if (chargerRoofType === 'normal') {
+                    rowNum = 15;
+                  } else if (chargerRoofType === 'composite') {
+                    rowNum = 16;
+                  }
+
+                  if (!rowNum) return null;
+
+                  const chargerRoofRow = roofSheet.find((row: any) => row.__rowNum__ === rowNum);
+                  if (!chargerRoofRow) return null;
+
+                  const materialPrice = (parseFloat(chargerRoofRow.__EMPTY_4 || 0) || 0) * numberOfChargers;
+                  const laborPrice = (parseFloat(chargerRoofRow.__EMPTY_5 || 0) || 0) * numberOfChargers;
+                  const totalPrice = (parseFloat(chargerRoofRow.__EMPTY_6 || 0) || 0) * numberOfChargers;
+
+                  return (
+                    <div className="mt-6 p-4 bg-green-50 rounded-lg border border-green-200 space-y-4">
+                      <div className="text-lg font-semibold text-green-800">รวมค่าใช้จ่ายหลังคาเครื่องชาร์จ</div>
+
+                      {/* ราคารวม */}
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <div className="text-sm text-gray-600 mb-1">ค่าของรวม:</div>
+                          <div className="text-xl font-bold text-gray-800">
+                            {materialPrice.toLocaleString('th-TH')} บาท
+                          </div>
                         </div>
-                      </>
-                    )}
-                    {chargerRoofType === 'composite' && roofCostMapping['charger-roof-composite'] && (
-                      <>
-                        <div className="font-medium">{roofCostMapping['charger-roof-composite'].name}:</div>
-                        <div className="text-xs space-y-1">
-                          <div><span className="font-medium">ราคาค่าของ:</span> {roofCostMapping['charger-roof-composite'].materialPrice.toLocaleString('th-TH')} บาท</div>
-                          <div><span className="font-medium">ราคาค่าแรง:</span> {roofCostMapping['charger-roof-composite'].laborPrice.toLocaleString('th-TH')} บาท</div>
-                          <div><span className="font-medium">ราคารวม:</span> {roofCostMapping['charger-roof-composite'].totalPrice.toLocaleString('th-TH')} บาท</div>
+                        <div>
+                          <div className="text-sm text-gray-600 mb-1">ค่าแรงรวม:</div>
+                          <div className="text-xl font-bold text-gray-800">
+                            {laborPrice.toLocaleString('th-TH')} บาท
+                          </div>
                         </div>
-                      </>
-                    )}
-                  </div>
-                )}
+                        <div>
+                          <div className="text-sm text-green-700 font-semibold mb-1">ราคารวม:</div>
+                          <div className="text-2xl font-bold text-green-700">
+                            {totalPrice.toLocaleString('th-TH')} บาท
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
 
               </div>
 
@@ -4436,12 +5072,12 @@ function StationAccessory() {
       }
     });
 
-    // สร้าง mapping สำหรับหลังคาเฉพาะ MDB
-    const mdbRoofRow = roofSheet.find(row => row.__rowNum__ === 20);
+    // สร้าง mapping สำหรับหลังคาเฉพาะ MDB (row 14)
+    const mdbRoofRow = roofSheet.find(row => row.__rowNum__ === 14);
     if (mdbRoofRow) {
       mapping['mdb-roof'] = {
-        name: 'หลังคาคลุม MDB 3ม. X 3ม.',
-        rowNum: 20,
+        name: mdbRoofRow.__EMPTY || 'หลังคาเฉพาะ MDB',
+        rowNum: 14,
         materialPrice: mdbRoofRow.__EMPTY_4 || 0,
         laborPrice: mdbRoofRow.__EMPTY_5 || 0,
         totalPrice: mdbRoofRow.__EMPTY_6 || 0,
@@ -4449,12 +5085,12 @@ function StationAccessory() {
       };
     }
 
-    // สร้าง mapping สำหรับหลังคาเครื่องชาร์จ ธรรมดา
-    const chargerNormalRow = roofSheet.find(row => row.__rowNum__ === 22);
+    // สร้าง mapping สำหรับหลังคาเครื่องชาร์จ ธรรมดา (row 15)
+    const chargerNormalRow = roofSheet.find(row => row.__rowNum__ === 15);
     if (chargerNormalRow) {
       mapping['charger-roof-normal'] = {
-        name: 'หลังคาคลุม Charger 3ม. X 3ม.',
-        rowNum: 22,
+        name: chargerNormalRow.__EMPTY || 'หลังคาเครื่องชาร์จ ธรรมดา',
+        rowNum: 15,
         materialPrice: chargerNormalRow.__EMPTY_4 || 0,
         laborPrice: chargerNormalRow.__EMPTY_5 || 0,
         totalPrice: chargerNormalRow.__EMPTY_6 || 0,
@@ -4462,12 +5098,12 @@ function StationAccessory() {
       };
     }
 
-    // สร้าง mapping สำหรับหลังคาเครื่องชาร์จ Composite
-    const chargerCompositeRow = roofSheet.find(row => row.__rowNum__ === 24);
+    // สร้าง mapping สำหรับหลังคาเครื่องชาร์จ Composite (row 16)
+    const chargerCompositeRow = roofSheet.find(row => row.__rowNum__ === 16);
     if (chargerCompositeRow) {
       mapping['charger-roof-composite'] = {
-        name: 'หลังคาcompositeคลุม Charger 3ม. X 3ม.',
-        rowNum: 24,
+        name: chargerCompositeRow.__EMPTY || 'หลังคาเครื่องชาร์จ Composite',
+        rowNum: 16,
         materialPrice: chargerCompositeRow.__EMPTY_4 || 0,
         laborPrice: chargerCompositeRow.__EMPTY_5 || 0,
         totalPrice: chargerCompositeRow.__EMPTY_6 || 0,
@@ -4913,6 +5549,130 @@ function StationAccessory() {
     console.log(`MDB Configuration ${transformerSize} kVA (${mccbBrand}) จาก mapping key "${key}":`, mappingData);
 
     return mappingData;
+  };
+
+  // ฟังก์ชันดึงข้อมูล MCCB Sub จาก Excel sheet "ราคา MCCB ของ CHARGER"
+  const getMccbSubData = (mccbSubValue: string, brand: string) => {
+    // Mapping สำหรับกรณีพิเศษ (ต้องเช็คก่อน)
+    const specialCases: { [key: string]: number } = {
+      '640 kW Prime+': 16,
+      '4 x 300 A': 17,
+      '4 x 350 A': 18,
+      '4 x 400 A': 19,
+    };
+
+    // เช็คกรณีพิเศษก่อน
+    const specialKey = Object.keys(specialCases).find(key =>
+      mccbSubValue.includes(key)
+    );
+
+    // Mapping ระหว่างค่า A กับ row number
+    const mccbValueToRow: { [key: number]: number } = {
+      60: 3,
+      80: 4,
+      125: 5,
+      150: 6,
+      225: 7,
+      300: 8,
+      350: 9,
+      450: 10,
+      630: 11,
+      900: 13,
+      1200: 14,
+    };
+
+    // ดึงข้อมูลจาก Excel sheet "ราคา MCCB ของ CHARGER"
+    const chargerMccbSheet = getExcelData('ราคา MCCB ของ CHARGER');
+    if (!chargerMccbSheet || chargerMccbSheet.length === 0) {
+      console.warn('ไม่พบข้อมูลใน Sheet "ราคา MCCB ของ CHARGER"');
+      return null;
+    }
+
+    // ถ้าเป็นกรณีพิเศษ ให้ดึงข้อมูลจาก row นั้นโดยตรง
+    if (specialKey) {
+      const rowNum = specialCases[specialKey];
+      const row = chargerMccbSheet.find((r: any) => r.__rowNum__ === rowNum);
+      if (!row) {
+        console.warn(`ไม่พบ row ${rowNum} ใน Sheet "ราคา MCCB ของ CHARGER"`);
+        return null;
+      }
+
+      // ดึงข้อมูลตามแบรนด์
+      let model, quantity, price;
+      if (brand === 'ABB') {
+        model = row.__EMPTY_3;
+        quantity = row.__EMPTY_2;
+        price = row.__EMPTY_4;
+      } else if (brand === 'EATON') {
+        model = row.__EMPTY_5;
+        quantity = row.__EMPTY_2;
+        price = row.__EMPTY_6;
+      } else if (brand === 'LS') {
+        model = row.__EMPTY_7;
+        quantity = row.__EMPTY_2;
+        price = row.__EMPTY_8;
+      } else {
+        return null;
+      }
+
+      return [{
+        value: mccbSubValue,
+        rowNum,
+        model: model || '-',
+        quantity: quantity || '-',
+        price: price || '-',
+      }];
+    }
+
+    // กรณีปกติ: แปลงค่า MCCB Sub (เช่น "100 125 160 A") เป็น array ของตัวเลข
+    const values = mccbSubValue.replace(/ A$/, '').trim().split(/\s+/).map(v => parseInt(v)).filter(v => !isNaN(v));
+
+    if (values.length === 0) return null;
+
+    // ดึงข้อมูลสำหรับแต่ละค่า MCCB Sub
+    const results = values.map((value) => {
+      // หา row number
+      const rowNum = mccbValueToRow[value];
+
+      if (!rowNum) {
+        console.warn(`ไม่พบ row mapping สำหรับ MCCB Sub ${value} A`);
+        return null;
+      }
+
+      const row = chargerMccbSheet.find((r: any) => r.__rowNum__ === rowNum);
+      if (!row) {
+        console.warn(`ไม่พบ row ${rowNum} ใน Sheet "ราคา MCCB ของ CHARGER"`);
+        return null;
+      }
+
+      // ดึงข้อมูลตามแบรนด์
+      let model, quantity, price;
+      if (brand === 'ABB') {
+        model = row.__EMPTY_3;
+        quantity = row.__EMPTY_2;
+        price = row.__EMPTY_4;
+      } else if (brand === 'EATON') {
+        model = row.__EMPTY_5;
+        quantity = row.__EMPTY_2;
+        price = row.__EMPTY_6;
+      } else if (brand === 'LS') {
+        model = row.__EMPTY_7;
+        quantity = row.__EMPTY_2;
+        price = row.__EMPTY_8;
+      } else {
+        return null;
+      }
+
+      return {
+        value: `${value} A`,
+        rowNum,
+        model: model || '-',
+        quantity: quantity || '-',
+        price: price || '-',
+      };
+    }).filter(item => item !== null);
+
+    return results.length > 0 ? results : null;
   };
 
   // ฟังก์ชันดึงข้อมูล Transformer Price จาก mapping (แทนการอ่าน Excel โดยตรง)

@@ -276,7 +276,7 @@ export default function Home(): React.JSX.Element {
   useEffect(() => {
     // log ดูโครงสร้าง excelData
     if (excelData.length > 0) {
-      console.log('excelData sample:', excelData.slice(0, 5));
+      console.log('excelData sample:', excelData.slice(0, 70));
       console.log('excelData columns for row 6 (30kW MEA):', excelData.find(r => r.__rowNum__ === 6));
       console.log('excelData columns for row 54 (30kW PEA):', excelData.find(r => r.__rowNum__ === 54));
 
@@ -847,6 +847,11 @@ export default function Home(): React.JSX.Element {
       {/* Next Button (top-right corner) */}
       <button
         onClick={() => {
+          console.log('=== Navigate to StationAccessory ===');
+          console.log('Form:', form);
+          console.log('Charger Type Mode:', chargerTypeMode);
+          console.log('Multi Chargers:', multiChargers);
+
           // ส่งข้อมูลที่ต้องการไปหน้า StationAccessory
           navigate('/station-accessory', {
             state: {
@@ -932,8 +937,20 @@ export default function Home(): React.JSX.Element {
                 return main2 ? `${main2} A` : '';
               })(),
               mdbSubs: (() => {
+                // MEA: ใช้ AD, AE, AF (__EMPTY_29, __EMPTY_30, __EMPTY_31) มาโชว์ใน MCCB Sub
+                // PEA: ใช้ AB, AC, AD (__EMPTY_27, __EMPTY_28, __EMPTY_29) มาโชว์ใน MCCB Sub
+                const meaColumns = ['__EMPTY_29', '__EMPTY_30', '__EMPTY_31']; // AD, AE, AF
+                const peaColumns = ['__EMPTY_27', '__EMPTY_28', '__EMPTY_29']; // AB, AC, AD
+                const columns = form.powerAuthority === 'MEA' ? meaColumns : peaColumns;
+
+                console.log('=== MCCB Sub Debug ===');
+                console.log('Power Authority:', form.powerAuthority);
+                console.log('Columns to read:', columns);
+                console.log('Charger Type Mode:', chargerTypeMode);
+
                 if (chargerTypeMode === 'any') {
-                  return multiChargers.map((chargerName) => {
+                  console.log('Multi Chargers:', multiChargers);
+                  return multiChargers.map((chargerName, index) => {
                     const cell = chargerToExcelCell[chargerName];
                     let rowNum: number | undefined;
                     if (form.powerAuthority === 'MEA' && cell?.mea) {
@@ -942,11 +959,26 @@ export default function Home(): React.JSX.Element {
                     if (form.powerAuthority === 'PEA' && cell?.pea) {
                       rowNum = parseInt(cell.pea.replace('C', ''));
                     }
+
+                    console.log(`[MCCB Sub ${index + 1}] Charger: ${chargerName}, Row: ${rowNum}`);
+
                     const row = excelData.find(r => r.__rowNum__ === rowNum);
-                    const val = form.powerAuthority === 'MEA'
-                      ? (row ? row.__EMPTY_29 || '-' : '-')
-                      : (row ? row.__EMPTY_27 || '-' : '-');
-                    return `${val} A`;
+                    if (!row) {
+                      console.log(`[MCCB Sub ${index + 1}] Row not found!`);
+                      return '-';
+                    }
+
+                    console.log(`[MCCB Sub ${index + 1}] Row data:`, row);
+
+                    // อ่านค่าจากทั้ง 3 คอลัมน์และแสดงพร้อมกัน
+                    const values = columns.map(col => {
+                      const val = row[col] || '-';
+                      console.log(`[MCCB Sub ${index + 1}] Column ${col}:`, val);
+                      return val;
+                    });
+                    const result = `${values.join(' ')} A`;
+                    console.log(`[MCCB Sub ${index + 1}] Final result:`, result);
+                    return result;
                   });
                 } else {
                   const cell = chargerToExcelCell[form.charger];
@@ -957,12 +989,29 @@ export default function Home(): React.JSX.Element {
                   if (form.powerAuthority === 'PEA' && cell?.pea) {
                     rowNum = parseInt(cell.pea.replace('C', ''));
                   }
+
+                  console.log('Charger:', form.charger, 'Row:', rowNum);
+
                   const row = excelData.find(r => r.__rowNum__ === rowNum);
-                  const value = form.powerAuthority === 'MEA'
-                    ? (row ? row.__EMPTY_29 || '-' : '-')
-                    : (row ? row.__EMPTY_27 || '-' : '-');
+                  if (!row) {
+                    console.log('Row not found!');
+                    return Array(parseInt(form.numberOfChargers) || 1).fill('-');
+                  }
+
+                  console.log('Row data:', row);
+
+                  // อ่านค่าจากทั้ง 3 คอลัมน์และแสดงพร้อมกัน (ทุก MCCB Sub แสดงเหมือนกัน)
+                  const values = columns.map(col => {
+                    const val = row[col] || '-';
+                    console.log(`Column ${col}:`, val);
+                    return val;
+                  });
+                  const result = `${values.join(' ')} A`;
+                  console.log('Final result:', result);
                   const numChargers = parseInt(form.numberOfChargers) || 1;
-                  return Array(numChargers).fill(`${value} A`);
+                  const finalArray = Array(numChargers).fill(result);
+                  console.log('Final array:', finalArray);
+                  return finalArray;
                 }
               })(),
               mdbLighting: '10 A',
@@ -1490,6 +1539,11 @@ export default function Home(): React.JSX.Element {
                             console.log(`MCCB Main in MDB to Charger (__EMPTY_11 or __EMPTY_14): ${mccbMain}`);
                             const main2 = trRow ? trRow.__EMPTY_14 : '-';
                             // MCCB Sub
+                            // MEA: ใช้ AD, AE, AF (__EMPTY_29, __EMPTY_30, __EMPTY_31) มาโชว์ใน MCCB Sub
+                            // PEA: ใช้ AB, AC, AD (__EMPTY_27, __EMPTY_28, __EMPTY_29) มาโชว์ใน MCCB Sub
+                            const meaColumns = ['__EMPTY_29', '__EMPTY_30', '__EMPTY_31']; // AD, AE, AF
+                            const peaColumns = ['__EMPTY_27', '__EMPTY_28', '__EMPTY_29']; // AB, AC, AD
+                            const columns = form.powerAuthority === 'MEA' ? meaColumns : peaColumns;
                             let mccbSubs: string[] = [];
                             if (chargerTypeMode === 'any') {
                               mccbSubs = multiChargers.map((chargerName) => {
@@ -1502,11 +1556,10 @@ export default function Home(): React.JSX.Element {
                                   rowNum = parseInt(cell.pea.replace('C', ''));
                                 }
                                 const row = excelData.find(r => r.__rowNum__ === rowNum);
-                                if (form.powerAuthority === 'MEA') {
-                                  return row ? row.__EMPTY_29 || '-' : '-';
-                                } else {
-                                  return row ? row.__EMPTY_27 || '-' : '-';
-                                }
+                                if (!row) return '-';
+                                // อ่านค่าจากทั้ง 3 คอลัมน์และแสดงพร้อมกัน
+                                const values = columns.map(col => row[col] || '-').filter(val => val !== '-');
+                                return values.length > 0 ? `${values.join(' ')} A` : '-';
                               });
                             } else {
                               const cell = chargerToExcelCell[form.charger];
@@ -1518,12 +1571,16 @@ export default function Home(): React.JSX.Element {
                                 rowNum = parseInt(cell.pea.replace('C', ''));
                               }
                               const row = excelData.find(r => r.__rowNum__ === rowNum);
-                              const value =
-                                form.powerAuthority === 'MEA'
-                                  ? (row ? row.__EMPTY_29 || '-' : '-')
-                                  : (row ? row.__EMPTY_27 || '-' : '-');
-                              const numChargers = parseInt(form.numberOfChargers) || 1;
-                              mccbSubs = Array(numChargers).fill(value);
+                              if (!row) {
+                                const numChargers = parseInt(form.numberOfChargers) || 1;
+                                mccbSubs = Array(numChargers).fill('-');
+                              } else {
+                                // อ่านค่าจากทั้ง 3 คอลัมน์และแสดงพร้อมกัน (ทุก MCCB Sub แสดงเหมือนกัน)
+                                const values = columns.map(col => row[col] || '-').filter(val => val !== '-');
+                                const result = values.length > 0 ? `${values.join(' ')} A` : '-';
+                                const numChargers = parseInt(form.numberOfChargers) || 1;
+                                mccbSubs = Array(numChargers).fill(result);
+                              }
                             }
                             return (
                               <div className="space-y-2">
@@ -1546,7 +1603,7 @@ export default function Home(): React.JSX.Element {
                                 {mccbSubs.map((val, idx) => (
                                   <div key={idx} className="flex items-center justify-between">
                                     <span className="font-medium text-gray-700">&nbsp;&nbsp;&nbsp;&nbsp;MCCB Sub C{idx + 1}</span>
-                                    <span className="font-semibold text-gray-900">{val} A</span>
+                                    <span className="font-semibold text-gray-900">{val}</span>
                                   </div>
                                 ))}
                                 <div className="flex items-center justify-between">
