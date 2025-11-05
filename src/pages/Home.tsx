@@ -107,8 +107,24 @@ export default function Home(): React.JSX.Element {
     // หา row ที่ __rowNum__ === rowNum
     const row = excelData.find((r) => r.__rowNum__ === rowNum);
     if (!row) return undefined;
-    const colKey = '__EMPTY_2'; // ทั้ง MEA และ PEA ใช้ __EMPTY_2
-    const value = row[colKey];
+
+    // ใช้คอลัมน์ MEA. 24kV/416/240V: สำหรับทั้ง MEA และ PEA
+    const colKey = 'MEA. 24kV/416/240V:';
+    let value = (row as any)[colKey];
+
+    // ถ้าไม่เจอ ลองหา key ที่มี "24kV" หรือ "416" หรือ "240V"
+    if (value === undefined || value === null || value === '') {
+      const keys = Object.keys(row);
+      const foundKey = keys.find(k =>
+        k.includes('24kV') &&
+        k.includes('416') &&
+        k.includes('240V')
+      );
+      if (foundKey) {
+        value = (row as any)[foundKey];
+        console.log(`[getInFromExcel] Found alternative key: ${foundKey} = ${value}`);
+      }
+    }
 
     if (typeof value !== 'number' || isNaN(value)) return undefined;
     if (type === 'inOfCharger') return value;
@@ -133,7 +149,7 @@ export default function Home(): React.JSX.Element {
       const found = steps.find(s => kWAllCharger <= s.max); // ใช้ <=
       if (found) {
         const row = excelData.find(r => r.__rowNum__ === found.row);
-        return row ? row.__EMPTY : '-';
+        return row ? (row.Charger || '-') : '-';
       }
       return '-';
     } else if (form.powerAuthority === 'PEA') {
@@ -155,7 +171,7 @@ export default function Home(): React.JSX.Element {
       const found = steps.find(s => kWAllCharger <= s.max); // ใช้ <=
       if (found) {
         const row = excelData.find(r => r.__rowNum__ === found.row);
-        return row ? row.__EMPTY : '-';
+        return row ? (row.Charger || '-') : '-';
       }
       return '-';
     }
@@ -355,8 +371,24 @@ export default function Home(): React.JSX.Element {
         if (rowNum === undefined) return { name: chargerName, in: 0 };
         const row = excelData.find((r) => r.__rowNum__ === rowNum);
         if (!row) return { name: chargerName, in: 0 };
-        const colKey = '__EMPTY_2'; // ทั้ง MEA และ PEA ใช้ __EMPTY_2
-        const value = row[colKey];
+
+        // ใช้คอลัมน์ MEA. 24kV/416/240V: สำหรับทั้ง MEA และ PEA
+        const colKey = 'MEA. 24kV/416/240V:';
+        let value = (row as any)[colKey];
+
+        // ถ้าไม่เจอ ลองหา key ที่มี "24kV" หรือ "416" หรือ "240V"
+        if (value === undefined || value === null || value === '') {
+          const keys = Object.keys(row);
+          const foundKey = keys.find(k =>
+            k.includes('24kV') &&
+            k.includes('416') &&
+            k.includes('240V')
+          );
+          if (foundKey) {
+            value = (row as any)[foundKey];
+            console.log(`[getMultiChargersIn] Found alternative key: ${foundKey} = ${value}`);
+          }
+        }
 
         if (typeof value !== 'number' || isNaN(value)) return { name: chargerName, in: 0 };
         return { name: chargerName, in: value };
@@ -418,17 +450,17 @@ export default function Home(): React.JSX.Element {
     // Mapping TR Wiring Type to columns
     const wiringTypeToCols: Record<string, string[]> = {
       'ร้อยท่อเดินในอากาศ กลุ่ม 2': [
-        '__EMPTY_15', '__EMPTY_16', '__EMPTY_17', '__EMPTY_18', '__EMPTY_19', '__EMPTY_20', '__EMPTY_21', '__EMPTY_22', '__EMPTY_23', '__EMPTY_24'
-      ], // P-Y
+        '__EMPTY_11', '__EMPTY_12', '__EMPTY_13', '__EMPTY_14', '__EMPTY_15', '__EMPTY_16', '__EMPTY_17', '__EMPTY_18', '__EMPTY_19'
+      ], // __EMPTY_11 to __EMPTY_19
       'ร้อยท่อฝังใต้ดิน กลุ่ม 5': [
-        '__EMPTY_36', '__EMPTY_37', '__EMPTY_38', '__EMPTY_39', '__EMPTY_40', '__EMPTY_41', '__EMPTY_42', '__EMPTY_43', '__EMPTY_44', '__EMPTY_45'
-      ], // AK-AT
+        '__EMPTY_30', '__EMPTY_31', '__EMPTY_32', '__EMPTY_33', '__EMPTY_34', '__EMPTY_35', '__EMPTY_36', '__EMPTY_37', '__EMPTY_38', '__EMPTY_39'
+      ], // __EMPTY_30 to __EMPTY_39
       'ราง TRAY ไม่มีฝา': [
-        '__EMPTY_57', '__EMPTY_58', '__EMPTY_59', '__EMPTY_60', '__EMPTY_61', '__EMPTY_62', '__EMPTY_63', '__EMPTY_64', '__EMPTY_65', '__EMPTY_66'
-      ], // BF-BO
+        '__EMPTY_51', '__EMPTY_52', '__EMPTY_53', '__EMPTY_54', '__EMPTY_55', '__EMPTY_56', '__EMPTY_57', '__EMPTY_58', '__EMPTY_59', '__EMPTY_60'
+      ], // __EMPTY_51 to __EMPTY_60
       'ราง LADDER ไม่มีฝา': [
-        '__EMPTY_78', '__EMPTY_79', '__EMPTY_80', '__EMPTY_81', '__EMPTY_82', '__EMPTY_83', '__EMPTY_84', '__EMPTY_85', '__EMPTY_86', '__EMPTY_87'
-      ], // CA-CJ
+        '__EMPTY_72', '__EMPTY_73', '__EMPTY_74', '__EMPTY_75', '__EMPTY_76', '__EMPTY_77', '__EMPTY_78', '__EMPTY_79', '__EMPTY_80', '__EMPTY_81'
+      ], // __EMPTY_72 to __EMPTY_81
     };
 
     const cols = wiringTypeToCols[form.trWiringType];
@@ -464,19 +496,19 @@ export default function Home(): React.JSX.Element {
     // Mapping TR Wiring Type to columns and units
     const wiringTypeToColsAndUnit: Record<string, { cols: string[]; unit: string }> = {
       'ร้อยท่อเดินในอากาศ กลุ่ม 2': {
-        cols: ['__EMPTY_32', '__EMPTY_33', '__EMPTY_34'], // ตามที่ผู้ใช้ระบุ
+        cols: ['__EMPTY_26', '__EMPTY_27', '__EMPTY_28'], // ตามที่ผู้ใช้ระบุ
         unit: 'นิ้ว'
       },
       'ร้อยท่อฝังใต้ดิน กลุ่ม 5': {
-        cols: ['__EMPTY_53', '__EMPTY_54', '__EMPTY_55'], // ตามที่ผู้ใช้ระบุ
+        cols: ['__EMPTY_47', '__EMPTY_48', '__EMPTY_49'], // ตามที่ผู้ใช้ระบุ
         unit: 'มม.'
       },
       'ราง TRAY ไม่มีฝา': {
-        cols: ['__EMPTY_74'], // ตามที่ผู้ใช้ระบุ
+        cols: ['__EMPTY_68'], // ตามที่ผู้ใช้ระบุ
         unit: 'ซม.'
       },
       'ราง LADDER ไม่มีฝา': {
-        cols: ['__EMPTY_95'], // ตามที่ผู้ใช้ระบุ
+        cols: ['__EMPTY_89'], // ตามที่ผู้ใช้ระบุ
         unit: 'ซม.'
       },
     };
@@ -503,17 +535,17 @@ export default function Home(): React.JSX.Element {
     // Mapping TR Wiring Type to columns
     const wiringTypeToCols: Record<string, string[]> = {
       'ร้อยท่อเดินในอากาศ กลุ่ม 2': [
-        '__EMPTY_15', '__EMPTY_16', '__EMPTY_17', '__EMPTY_18', '__EMPTY_19', '__EMPTY_20', '__EMPTY_21', '__EMPTY_22', '__EMPTY_23', '__EMPTY_24'
-      ], // P-Y
+        '__EMPTY_11', '__EMPTY_12', '__EMPTY_13', '__EMPTY_14', '__EMPTY_15', '__EMPTY_16', '__EMPTY_17', '__EMPTY_18', '__EMPTY_19'
+      ], // __EMPTY_11 to __EMPTY_19
       'ร้อยท่อฝังใต้ดิน กลุ่ม 5': [
-        '__EMPTY_36', '__EMPTY_37', '__EMPTY_38', '__EMPTY_39', '__EMPTY_40', '__EMPTY_41', '__EMPTY_42', '__EMPTY_43', '__EMPTY_44', '__EMPTY_45'
-      ], // AK-AT
+        '__EMPTY_30', '__EMPTY_31', '__EMPTY_32', '__EMPTY_33', '__EMPTY_34', '__EMPTY_35', '__EMPTY_36', '__EMPTY_37', '__EMPTY_38', '__EMPTY_39'
+      ], // __EMPTY_30 to __EMPTY_39
       'ราง TRAY ไม่มีฝา': [
-        '__EMPTY_57', '__EMPTY_58', '__EMPTY_59', '__EMPTY_60', '__EMPTY_61', '__EMPTY_62', '__EMPTY_63', '__EMPTY_64', '__EMPTY_65', '__EMPTY_66'
-      ], // BF-BO
+        '__EMPTY_51', '__EMPTY_52', '__EMPTY_53', '__EMPTY_54', '__EMPTY_55', '__EMPTY_56', '__EMPTY_57', '__EMPTY_58', '__EMPTY_59', '__EMPTY_60'
+      ], // __EMPTY_51 to __EMPTY_60
       'ราง LADDER ไม่มีฝา': [
-        '__EMPTY_78', '__EMPTY_79', '__EMPTY_80', '__EMPTY_81', '__EMPTY_82', '__EMPTY_83', '__EMPTY_84', '__EMPTY_85', '__EMPTY_86', '__EMPTY_87'
-      ], // CA-CJ
+        '__EMPTY_72', '__EMPTY_73', '__EMPTY_74', '__EMPTY_75', '__EMPTY_76', '__EMPTY_77', '__EMPTY_78', '__EMPTY_79', '__EMPTY_80', '__EMPTY_81'
+      ], // __EMPTY_72 to __EMPTY_81
     };
 
     const cols = wiringTypeToCols[form.trWiringType];
@@ -646,19 +678,19 @@ export default function Home(): React.JSX.Element {
     const wiringTypeToCols: Record<string, string[]> = form.powerAuthority === 'MEA'
       ? {
         'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ': [
-          '__EMPTY_33', '__EMPTY_34', '__EMPTY_35', '__EMPTY_36', '__EMPTY_37', '__EMPTY_38', '__EMPTY_39', '__EMPTY_40', '__EMPTY_41', '__EMPTY_42', '__EMPTY_43', '__EMPTY_44', '__EMPTY_45'
-        ], // AH-AT
+          '__EMPTY_31', '__EMPTY_32', '__EMPTY_33', '__EMPTY_34', '__EMPTY_35', '__EMPTY_36', '__EMPTY_37', '__EMPTY_38'
+        ], // __EMPTY_31 to __EMPTY_38
         'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน': [
-          '__EMPTY_57', '__EMPTY_58', '__EMPTY_59', '__EMPTY_60', '__EMPTY_61', '__EMPTY_62', '__EMPTY_63', '__EMPTY_64', '__EMPTY_65', '__EMPTY_66', '__EMPTY_67', '__EMPTY_68', '__EMPTY_69'
-        ], // BF-BR
+          '__EMPTY_55', '__EMPTY_56', '__EMPTY_57', '__EMPTY_58', '__EMPTY_59', '__EMPTY_60', '__EMPTY_61', '__EMPTY_62'
+        ], // __EMPTY_55 to __EMPTY_62
       }
       : {
         'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ': [
-          '__EMPTY_31', '__EMPTY_32', '__EMPTY_33', '__EMPTY_34', '__EMPTY_35', '__EMPTY_36', '__EMPTY_37', '__EMPTY_38', '__EMPTY_39', '__EMPTY_40', '__EMPTY_41', '__EMPTY_42', '__EMPTY_43'
-        ], // AF-AR
+          '__EMPTY_29', '__EMPTY_30', '__EMPTY_31', '__EMPTY_32', '__EMPTY_33', '__EMPTY_34', '__EMPTY_35', '__EMPTY_36'
+        ], // __EMPTY_29 to __EMPTY_36
         'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน': [
-          '__EMPTY_55', '__EMPTY_56', '__EMPTY_57', '__EMPTY_58', '__EMPTY_59', '__EMPTY_60', '__EMPTY_61', '__EMPTY_62', '__EMPTY_63', '__EMPTY_64', '__EMPTY_65', '__EMPTY_66', '__EMPTY_67'
-        ], // BD-BP
+          '__EMPTY_53', '__EMPTY_54', '__EMPTY_55', '__EMPTY_56', '__EMPTY_57', '__EMPTY_58', '__EMPTY_59', '__EMPTY_60'
+        ], // __EMPTY_53 to __EMPTY_60
       };
 
     const cols = wiringTypeToCols[form.chargerWiringType];
@@ -872,9 +904,9 @@ export default function Home(): React.JSX.Element {
                 // ใช้ row number จาก TR Wiring Size CVs แทน Transformer Size
                 const trWiringRowNum = getTRWiringSizeCVsRowNumber();
                 const trRow = excelData.find(r => r.__rowNum__ === trWiringRowNum);
-                const mccbMain = trRow ? (trRow.__EMPTY_11 || trRow.__EMPTY_14) : '-';
+                const mccbMain = trRow ? trRow.__EMPTY_7 : '-';
                 console.log(`MDB (MCCB Main) Debug - Using TR Wiring Row ${trWiringRowNum}:`, trRow);
-                console.log(`MCCB Main value (__EMPTY_11 or __EMPTY_14): ${mccbMain}`);
+                console.log(`MCCB Main value (__EMPTY_7): ${mccbMain}`);
                 return mccbMain ? `${mccbMain} A` : '-';
               })(),
               // New detailed MDB fields
@@ -882,9 +914,9 @@ export default function Home(): React.JSX.Element {
                 // ใช้ row number จาก TR Wiring Size CVs แทน Transformer Size
                 const trWiringRowNum = getTRWiringSizeCVsRowNumber();
                 const trRow = excelData.find(r => r.__rowNum__ === trWiringRowNum);
-                const mccbMain = trRow ? (trRow.__EMPTY_11 || trRow.__EMPTY_14) : '';
+                const mccbMain = trRow ? trRow.__EMPTY_7 : '';
                 console.log(`MDB Main AT Debug - Using TR Wiring Row ${trWiringRowNum}:`, trRow);
-                console.log(`MCCB Main AT value (__EMPTY_11 or __EMPTY_14): ${mccbMain}`);
+                console.log(`MCCB Main AT value (__EMPTY_7): ${mccbMain}`);
                 return mccbMain ? `${mccbMain} A` : '';
               })(),
               mdbMainAf: (() => {
@@ -933,14 +965,14 @@ export default function Home(): React.JSX.Element {
                   trRowNum = found?.row;
                 }
                 const trRow = excelData.find(r => r.__rowNum__ === trRowNum);
-                const main2 = trRow ? trRow.__EMPTY_14 : '';
+                const main2 = trRow ? trRow.__EMPTY_10 : '';
                 return main2 ? `${main2} A` : '';
               })(),
               mdbSubs: (() => {
-                // MEA: ใช้ AD, AE, AF (__EMPTY_29, __EMPTY_30, __EMPTY_31) มาโชว์ใน MCCB Sub
-                // PEA: ใช้ AB, AC, AD (__EMPTY_27, __EMPTY_28, __EMPTY_29) มาโชว์ใน MCCB Sub
-                const meaColumns = ['__EMPTY_29', '__EMPTY_30', '__EMPTY_31']; // AD, AE, AF
-                const peaColumns = ['__EMPTY_27', '__EMPTY_28', '__EMPTY_29']; // AB, AC, AD
+                // MEA: ใช้ __EMPTY_23, __EMPTY_24, __EMPTY_24 มาโชว์ใน MCCB Sub
+                // PEA: ใช้ MEA. กฟน. 416 V:, __EMPTY_22, __EMPTY_23 มาโชว์ใน MCCB Sub
+                const meaColumns = ['__EMPTY_23', '__EMPTY_24', '__EMPTY_24'];
+                const peaColumns = ['MEA. กฟน. 416 V:', '__EMPTY_22', '__EMPTY_23'];
                 const columns = form.powerAuthority === 'MEA' ? meaColumns : peaColumns;
 
                 console.log('=== MCCB Sub Debug ===');
@@ -972,7 +1004,44 @@ export default function Home(): React.JSX.Element {
 
                     // อ่านค่าจากทั้ง 3 คอลัมน์และแสดงพร้อมกัน
                     const values = columns.map(col => {
-                      const val = row[col] || '-';
+                      let val = (row as any)[col];
+                      // สำหรับ PEA ถ้าต้องการหา 'MEA. กฟน. 416 V:'
+                      if (form.powerAuthority === 'PEA' && col === 'MEA. กฟน. 416 V:') {
+                        // ลองใช้ชื่อคอลัมน์ตรงๆ ก่อน
+                        if (!val || val === '-') {
+                          // ถ้าไม่เจอ ให้หาที่มี "กฟน" แต่ไม่มี "24kV" (เพื่อหลีกเลี่ยง MEA. 24kV/416/240V)
+                          const keys = Object.keys(row);
+                          const foundKey = keys.find(k =>
+                            k.includes('กฟน') &&
+                            k.includes('416') &&
+                            k.includes('V') &&
+                            !k.includes('24kV') &&
+                            !k.includes('240V')
+                          );
+                          if (foundKey) {
+                            val = (row as any)[foundKey];
+                            console.log(`[MCCB Sub ${index + 1}] Found key: ${foundKey} = ${val}`);
+                          }
+                        } else {
+                          // ถ้าเจอแล้ว ตรวจสอบว่าไม่ใช่ MEA. 24kV/416/240V
+                          if (typeof val === 'number' && val > 1000) {
+                            // ถ้าเป็นตัวเลขมากๆ อาจจะเป็นค่าผิด (เช่น 174.95975925537127)
+                            const keys = Object.keys(row);
+                            const foundKey = keys.find(k =>
+                              k.includes('กฟน') &&
+                              k.includes('416') &&
+                              k.includes('V') &&
+                              !k.includes('24kV') &&
+                              !k.includes('240V')
+                            );
+                            if (foundKey) {
+                              val = (row as any)[foundKey];
+                              console.log(`[MCCB Sub ${index + 1}] Fixed: using ${foundKey} = ${val} instead`);
+                            }
+                          }
+                        }
+                      }
+                      if (!val || val === '-') val = '-';
                       console.log(`[MCCB Sub ${index + 1}] Column ${col}:`, val);
                       return val;
                     });
@@ -1002,7 +1071,44 @@ export default function Home(): React.JSX.Element {
 
                   // อ่านค่าจากทั้ง 3 คอลัมน์และแสดงพร้อมกัน (ทุก MCCB Sub แสดงเหมือนกัน)
                   const values = columns.map(col => {
-                    const val = row[col] || '-';
+                    let val = (row as any)[col];
+                    // สำหรับ PEA ถ้าต้องการหา 'MEA. กฟน. 416 V:'
+                    if (form.powerAuthority === 'PEA' && col === 'MEA. กฟน. 416 V:') {
+                      // ลองใช้ชื่อคอลัมน์ตรงๆ ก่อน
+                      if (!val || val === '-') {
+                        // ถ้าไม่เจอ ให้หาที่มี "กฟน" แต่ไม่มี "24kV" (เพื่อหลีกเลี่ยง MEA. 24kV/416/240V)
+                        const keys = Object.keys(row);
+                        const foundKey = keys.find(k =>
+                          k.includes('กฟน') &&
+                          k.includes('416') &&
+                          k.includes('V') &&
+                          !k.includes('24kV') &&
+                          !k.includes('240V')
+                        );
+                        if (foundKey) {
+                          val = (row as any)[foundKey];
+                          console.log(`Found key: ${foundKey} = ${val}`);
+                        }
+                      } else {
+                        // ถ้าเจอแล้ว ตรวจสอบว่าไม่ใช่ MEA. 24kV/416/240V
+                        if (typeof val === 'number' && val > 1000) {
+                          // ถ้าเป็นตัวเลขมากๆ อาจจะเป็นค่าผิด (เช่น 174.95975925537127)
+                          const keys = Object.keys(row);
+                          const foundKey = keys.find(k =>
+                            k.includes('กฟน') &&
+                            k.includes('416') &&
+                            k.includes('V') &&
+                            !k.includes('24kV') &&
+                            !k.includes('240V')
+                          );
+                          if (foundKey) {
+                            val = (row as any)[foundKey];
+                            console.log(`Fixed: using ${foundKey} = ${val} instead`);
+                          }
+                        }
+                      }
+                    }
+                    if (!val || val === '-') val = '-';
                     console.log(`Column ${col}:`, val);
                     return val;
                   });
@@ -1369,9 +1475,9 @@ export default function Home(): React.JSX.Element {
                         // ใช้ row number จาก TR Wiring Size CVs แทน Transformer Size
                         const trWiringRowNum = getTRWiringSizeCVsRowNumber();
                         const trRow = excelData.find(r => r.__rowNum__ === trWiringRowNum);
-                        const mccbMain = trRow ? (trRow.__EMPTY_11 || trRow.__EMPTY_14) : '-';
+                        const mccbMain = trRow ? trRow.__EMPTY_7 : '-';
                         console.log(`MDB (MCCB Main) UI Debug - Using TR Wiring Row ${trWiringRowNum}:`, trRow);
-                        console.log(`MCCB Main UI value (__EMPTY_11 or __EMPTY_14): ${mccbMain}`);
+                        console.log(`MCCB Main UI value (__EMPTY_7): ${mccbMain}`);
                         return mccbMain ? `${mccbMain} A` : '-';
                       })()}
                     </div>
@@ -1534,15 +1640,15 @@ export default function Home(): React.JSX.Element {
                             // ใช้ row number จาก TR Wiring Size CVs แทน Transformer Size
                             const trWiringRowNum = getTRWiringSizeCVsRowNumber();
                             const trRow = excelData.find(r => r.__rowNum__ === trWiringRowNum);
-                            const mccbMain = trRow ? (trRow.__EMPTY_11 || trRow.__EMPTY_14) : '-';
+                            const mccbMain = trRow ? trRow.__EMPTY_7 : '-';
                             console.log(`MDB to Charger MDB Debug - Using TR Wiring Row ${trWiringRowNum}:`, trRow);
-                            console.log(`MCCB Main in MDB to Charger (__EMPTY_11 or __EMPTY_14): ${mccbMain}`);
-                            const main2 = trRow ? trRow.__EMPTY_14 : '-';
+                            console.log(`MCCB Main in MDB to Charger (__EMPTY_7): ${mccbMain}`);
+                            const main2 = trRow ? trRow.__EMPTY_10 : '-';
                             // MCCB Sub
-                            // MEA: ใช้ AD, AE, AF (__EMPTY_29, __EMPTY_30, __EMPTY_31) มาโชว์ใน MCCB Sub
-                            // PEA: ใช้ AB, AC, AD (__EMPTY_27, __EMPTY_28, __EMPTY_29) มาโชว์ใน MCCB Sub
-                            const meaColumns = ['__EMPTY_29', '__EMPTY_30', '__EMPTY_31']; // AD, AE, AF
-                            const peaColumns = ['__EMPTY_27', '__EMPTY_28', '__EMPTY_29']; // AB, AC, AD
+                            // MEA: ใช้ __EMPTY_23, __EMPTY_24, __EMPTY_24 มาโชว์ใน MCCB Sub
+                            // PEA: ใช้ MEA. กฟน. 416 V:, __EMPTY_22, __EMPTY_23 มาโชว์ใน MCCB Sub
+                            const meaColumns = ['__EMPTY_23', '__EMPTY_24', '__EMPTY_24'];
+                            const peaColumns = ['MEA. กฟน. 416 V:', '__EMPTY_22', '__EMPTY_23'];
                             const columns = form.powerAuthority === 'MEA' ? meaColumns : peaColumns;
                             let mccbSubs: string[] = [];
                             if (chargerTypeMode === 'any') {
@@ -1558,7 +1664,48 @@ export default function Home(): React.JSX.Element {
                                 const row = excelData.find(r => r.__rowNum__ === rowNum);
                                 if (!row) return '-';
                                 // อ่านค่าจากทั้ง 3 คอลัมน์และแสดงพร้อมกัน
-                                const values = columns.map(col => row[col] || '-').filter(val => val !== '-');
+                                const values = columns.map(col => {
+                                  let val = (row as any)[col];
+                                  // สำหรับ PEA ถ้าต้องการหา 'MEA. กฟน. 416 V:'
+                                  if (form.powerAuthority === 'PEA' && col === 'MEA. กฟน. 416 V:') {
+                                    // ลองใช้ชื่อคอลัมน์ตรงๆ ก่อน
+                                    if (!val || val === '-') {
+                                      // ถ้าไม่เจอ ให้หาที่มี "กฟน" แต่ไม่มี "24kV" (เพื่อหลีกเลี่ยง MEA. 24kV/416/240V)
+                                      const keys = Object.keys(row);
+                                      const foundKey = keys.find(k =>
+                                        k.includes('กฟน') &&
+                                        k.includes('416') &&
+                                        k.includes('V') &&
+                                        !k.includes('24kV') &&
+                                        !k.includes('240V')
+                                      );
+                                      if (foundKey) {
+                                        val = (row as any)[foundKey];
+                                        console.log(`[MCCB Sub] Found key: ${foundKey} = ${val}`);
+                                      }
+                                    } else {
+                                      // ถ้าเจอแล้ว ตรวจสอบว่าไม่ใช่ MEA. 24kV/416/240V
+                                      if (typeof val === 'number' && val > 1000) {
+                                        // ถ้าเป็นตัวเลขมากๆ อาจจะเป็นค่าผิด (เช่น 174.95975925537127)
+                                        const keys = Object.keys(row);
+                                        const foundKey = keys.find(k =>
+                                          k.includes('กฟน') &&
+                                          k.includes('416') &&
+                                          k.includes('V') &&
+                                          !k.includes('24kV') &&
+                                          !k.includes('240V')
+                                        );
+                                        if (foundKey) {
+                                          val = (row as any)[foundKey];
+                                          console.log(`[MCCB Sub] Fixed: using ${foundKey} = ${val} instead`);
+                                        }
+                                      }
+                                    }
+                                  }
+                                  if (!val || val === '-') val = '-';
+                                  console.log(`[MCCB Sub] Column ${col}:`, val);
+                                  return val;
+                                }).filter(val => val !== '-');
                                 return values.length > 0 ? `${values.join(' ')} A` : '-';
                               });
                             } else {
@@ -1576,7 +1723,48 @@ export default function Home(): React.JSX.Element {
                                 mccbSubs = Array(numChargers).fill('-');
                               } else {
                                 // อ่านค่าจากทั้ง 3 คอลัมน์และแสดงพร้อมกัน (ทุก MCCB Sub แสดงเหมือนกัน)
-                                const values = columns.map(col => row[col] || '-').filter(val => val !== '-');
+                                const values = columns.map(col => {
+                                  let val = (row as any)[col];
+                                  // สำหรับ PEA ถ้าต้องการหา 'MEA. กฟน. 416 V:'
+                                  if (form.powerAuthority === 'PEA' && col === 'MEA. กฟน. 416 V:') {
+                                    // ลองใช้ชื่อคอลัมน์ตรงๆ ก่อน
+                                    if (!val || val === '-') {
+                                      // ถ้าไม่เจอ ให้หาที่มี "กฟน" แต่ไม่มี "24kV" (เพื่อหลีกเลี่ยง MEA. 24kV/416/240V)
+                                      const keys = Object.keys(row);
+                                      const foundKey = keys.find(k =>
+                                        k.includes('กฟน') &&
+                                        k.includes('416') &&
+                                        k.includes('V') &&
+                                        !k.includes('24kV') &&
+                                        !k.includes('240V')
+                                      );
+                                      if (foundKey) {
+                                        val = (row as any)[foundKey];
+                                        console.log(`[MCCB Sub] Found key: ${foundKey} = ${val}`);
+                                      }
+                                    } else {
+                                      // ถ้าเจอแล้ว ตรวจสอบว่าไม่ใช่ MEA. 24kV/416/240V
+                                      if (typeof val === 'number' && val > 1000) {
+                                        // ถ้าเป็นตัวเลขมากๆ อาจจะเป็นค่าผิด (เช่น 174.95975925537127)
+                                        const keys = Object.keys(row);
+                                        const foundKey = keys.find(k =>
+                                          k.includes('กฟน') &&
+                                          k.includes('416') &&
+                                          k.includes('V') &&
+                                          !k.includes('24kV') &&
+                                          !k.includes('240V')
+                                        );
+                                        if (foundKey) {
+                                          val = (row as any)[foundKey];
+                                          console.log(`[MCCB Sub] Fixed: using ${foundKey} = ${val} instead`);
+                                        }
+                                      }
+                                    }
+                                  }
+                                  if (!val || val === '-') val = '-';
+                                  console.log(`[MCCB Sub] Column ${col}:`, val);
+                                  return val;
+                                }).filter(val => val !== '-');
                                 const result = values.length > 0 ? `${values.join(' ')} A` : '-';
                                 const numChargers = parseInt(form.numberOfChargers) || 1;
                                 mccbSubs = Array(numChargers).fill(result);
