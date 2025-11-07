@@ -608,7 +608,7 @@ function MoreDetailCard(props: any) {
     if (bumperPoles === 'yes') {
       const item = stationEquipmentPriceMapping['bumper-poles'];
       if (item) {
-        const quantity = parkingSlotsCount * 2;
+        const quantity = featureChargersCount;
         totals.material += item.materialPrice * quantity;
         totals.labor += item.laborPrice * quantity;
         totals.total += item.totalPrice * quantity;
