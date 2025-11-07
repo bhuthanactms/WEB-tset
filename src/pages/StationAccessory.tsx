@@ -584,6 +584,18 @@ function MoreDetailCard(props: any) {
     return Number.isNaN(parsed) ? 0 : parsed;
   };
 
+  const parsePrice = (value: any) => {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    const normalized = (value ?? '').toString().replace(/[^0-9.\-]/g, '');
+    const parsed = parseFloat(normalized);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  };
+
+  const formatCurrency = (value: number) => {
+    const numericValue = typeof value === 'number' ? value : parsePrice(value);
+    return numericValue.toLocaleString('th-TH');
+  };
+
   const parkingSlotsCount = parseCount(parkingSlots, 1);
   const featureChargersCount = parseCount(props.numberOfChargers, 1);
 
@@ -837,6 +849,450 @@ function MoreDetailCard(props: any) {
     total: equipmentTotals.total + communicationTotals.total + concreteTotals.total + paintingTotals.total + parkingRoofTotals.total + mdbRoofTotals.total + chargerRoofTotals.total
   };
 
+  const transformerTotals = React.useMemo(() => {
+    const emptyTotals = { material: 0, labor: 0, total: 0 };
+    const transformerSize = parseInt(props.transformer || '0', 10) || 0;
+
+    if (!transformerSize) {
+      return emptyTotals;
+    }
+
+    if (props.powerAuthority === 'MEA' && transformerSize <= 400 && lowVoltageRequest === 'low-voltage') {
+      const lowVoltageSheet = getExcelData('ตารางระบบงานแรงสูง');
+      if (!lowVoltageSheet || lowVoltageSheet.length === 0) {
+        return emptyTotals;
+      }
+
+      const row2 = lowVoltageSheet.find((row: any) => row.__rowNum__ === 2);
+      const row3 = lowVoltageSheet.find((row: any) => row.__rowNum__ === 3);
+
+      if (!row2 || !row3) {
+        return emptyTotals;
+      }
+
+      const calculateRowTotals = (row: any, distanceValue: string) => {
+        const quantity = row.__EMPTY_3 || '';
+        const isDistance = typeof quantity === 'string' && (quantity.includes('ม.') || quantity.includes('เมตร'));
+        const distance = parseFloat(distanceValue) || 0;
+        const materialUnit = parseFloat(row.__EMPTY_4 || 0) || 0;
+        const laborUnit = parseFloat(row.__EMPTY_5 || 0) || 0;
+
+        const material = isDistance ? materialUnit * distance : materialUnit;
+        const labor = isDistance ? laborUnit * distance : laborUnit;
+
+        return {
+          material,
+          labor,
+          total: material + labor,
+        };
+      };
+
+      const row2Totals = calculateRowTotals(row2, lowVoltageDistance2);
+      const row3Totals = calculateRowTotals(row3, lowVoltageDistance3);
+
+      return {
+        material: row2Totals.material + row3Totals.material,
+        labor: row2Totals.labor + row3Totals.labor,
+        total: row2Totals.total + row3Totals.total,
+      };
+    }
+
+    if (transformerSelection === 'yes' && transformerPrice) {
+      const material = toNumber(transformerPrice.laborCost); // ค่าของ = ราคาค่าแรง
+      const labor = toNumber(transformerPrice.installationCost); // ค่าแรง = ราคาค่าติดตั้ง
+      const totalInstallation = toNumber(transformerPrice.totalInstallationCost);
+
+      const total = totalInstallation > 0 ? totalInstallation : material + labor;
+
+      return { material, labor, total };
+    }
+
+    return emptyTotals;
+  }, [props.powerAuthority, props.transformer, lowVoltageRequest, lowVoltageDistance2, lowVoltageDistance3, transformerSelection, transformerPrice]);
+
+  const highVoltageTotals = React.useMemo(() => {
+    const emptyTotals = { material: 0, labor: 0, total: 0 };
+    const transformerSize = parseInt(props.transformer || '0', 10) || 0;
+    const shouldShowCard = !(props.powerAuthority === 'MEA' && transformerSize <= 400 && lowVoltageRequest === 'low-voltage');
+
+    if (!shouldShowCard || highVoltageSystem !== 'yes' || !transformerType) {
+      return emptyTotals;
+    }
+
+    const determineRows = () => {
+      const powerAuthority = props.powerAuthority;
+      const currentTransformerType = transformerType;
+
+      if (powerAuthority === 'PEA' && transformerSize <= 250 && currentTransformerType === '22kv-416v') {
+        return { mainRow: 5, detailRows: [7, 8], distanceRow: 13 };
+      }
+
+      if (powerAuthority === 'PEA' && transformerSize >= 315 && transformerSize <= 1000 && currentTransformerType === '22kv-416v') {
+        return { mainRow: 9, detailRows: [11, 12], distanceRow: 13 };
+      }
+
+      if (powerAuthority === 'MEA' && transformerSize >= 315 && transformerSize <= 1000 && currentTransformerType === '22kv-416v') {
+        if (transformerSize <= 400 && lowVoltageRequest !== 'use-transformer') {
+          return null;
+        }
+        return { mainRow: 9, detailRows: [11, 12], distanceRow: 13 };
+      }
+
+      if (powerAuthority === 'PEA' && transformerSize <= 250 && currentTransformerType === '33kv-316v') {
+        return { mainRow: 14, detailRows: [16, 17], distanceRow: 22 };
+      }
+
+      if (powerAuthority === 'PEA' && transformerSize >= 315 && transformerSize <= 1000 && currentTransformerType === '33kv-316v') {
+        return { mainRow: 18, detailRows: [20, 21], distanceRow: 22 };
+      }
+
+      return null;
+    };
+
+    const rows = determineRows();
+
+    if (!rows) {
+      return emptyTotals;
+    }
+
+    const highVoltageSheet = getExcelData('ตารางระบบงานแรงสูง');
+
+    if (!highVoltageSheet || highVoltageSheet.length === 0) {
+      return emptyTotals;
+    }
+
+    const mainRow = highVoltageSheet.find((r: any) => r.__rowNum__ === rows.mainRow);
+    const distanceRow = highVoltageSheet.find((r: any) => r.__rowNum__ === rows.distanceRow);
+    const detailRow1 = highVoltageSheet.find((r: any) => r.__rowNum__ === rows.detailRows[0]);
+    const detailRow2 = highVoltageSheet.find((r: any) => r.__rowNum__ === rows.detailRows[1]);
+    const poleRow = highVoltageSheet.find((r: any) => r.__rowNum__ === 23);
+
+    if (!mainRow || !distanceRow || !detailRow1 || !detailRow2) {
+      return emptyTotals;
+    }
+
+    const mainMaterialPrice = parseFloat(mainRow.__EMPTY_4 || 0) || 0;
+    const mainLaborPrice = parseFloat(mainRow.__EMPTY_5 || 0) || 0;
+    const mainTotalPrice = parseFloat(mainRow.__EMPTY_6 || 0) || 0;
+
+    const distance = parseFloat(highVoltageDistance) || 0;
+    const distanceMaterialPerUnit = parseFloat(distanceRow.__EMPTY_4 || 0) || 0;
+    const distanceLaborPerUnit = parseFloat(distanceRow.__EMPTY_5 || 0) || 0;
+    const distanceTotalPerUnit = parseFloat(distanceRow.__EMPTY_6 || 0) || 0;
+
+    const distanceMaterialPrice = distanceMaterialPerUnit * distance;
+    const distanceLaborPrice = distanceLaborPerUnit * distance;
+    const distanceTotalPrice = distanceTotalPerUnit * distance;
+
+    const poleCount = distance > 30 ? Math.floor((distance - 30) / 30) + 1 : 0;
+    let poleMaterialPrice = 0;
+    let poleLaborPrice = 0;
+    let poleTotalPrice = 0;
+
+    if (poleCount > 0 && poleRow) {
+      const poleMaterialPerUnit = parseFloat(poleRow.__EMPTY_4 || 0) || 0;
+      const poleLaborPerUnit = parseFloat(poleRow.__EMPTY_5 || 0) || 0;
+      const poleTotalPerUnit = parseFloat(poleRow.__EMPTY_6 || 0) || 0;
+
+      poleMaterialPrice = poleMaterialPerUnit * poleCount;
+      poleLaborPrice = poleLaborPerUnit * poleCount;
+      poleTotalPrice = poleTotalPerUnit * poleCount;
+    }
+
+    return {
+      material: mainMaterialPrice + distanceMaterialPrice + poleMaterialPrice,
+      labor: mainLaborPrice + distanceLaborPrice + poleLaborPrice,
+      total: mainTotalPrice + distanceTotalPrice + poleTotalPrice,
+    };
+  }, [props.powerAuthority, props.transformer, lowVoltageRequest, highVoltageSystem, transformerType, highVoltageDistance]);
+
+  const installationTotals = React.useMemo(() => {
+    const emptyTotals = { material: 0, labor: 0, total: 0 };
+
+    if (installationLocation !== 'inside-station') {
+      return emptyTotals;
+    }
+
+    const transformerSizeStr = props.transformer || '';
+    const transformerSize = parseInt(transformerSizeStr, 10) || 0;
+    const powerAuthority = props.powerAuthority;
+
+    const getInstallationRowNumber = (): number | null => {
+      if (powerAuthority === 'MEA') {
+        if (lowVoltageRequest === 'low-voltage') {
+          return 6;
+        }
+        if (transformerSize === 400) return 7;
+        if (transformerSize === 500) return 8;
+        if (transformerSize === 630) return 9;
+        if (transformerSize === 800) return 10;
+        if (transformerSize === 1000) return 11;
+        if (transformerSize === 1250) return 12;
+        if (transformerSize === 1500) return 13;
+      }
+
+      if (powerAuthority === 'PEA') {
+        if (transformerSize === 100) return 3;
+        if (transformerSize === 160) return 4;
+        if (transformerSize === 250) return 5;
+        if (transformerSize === 315) return 6;
+        if (transformerSize === 400) return 7;
+        if (transformerSize === 500) return 8;
+        if (transformerSize === 630) return 9;
+        if (transformerSize === 800) return 10;
+        if (transformerSize === 1000) return 11;
+        if (transformerSize === 1250) return 12;
+        if (transformerSize === 1500) return 13;
+      }
+
+      return null;
+    };
+
+    const rowNum = getInstallationRowNumber();
+
+    if (!rowNum) {
+      return emptyTotals;
+    }
+
+    const availableSheetNames = props.excelData ? Object.keys(props.excelData) : [];
+    const possibleSheetNames = availableSheetNames.filter(name =>
+      (name.includes('DISCONNECTO') || name.includes('DISCONNECTOR')) &&
+      !name.includes('MDB')
+    );
+    const sheetName = possibleSheetNames.length > 0
+      ? possibleSheetNames[0]
+      : 'ตารางขนาดและราคาตู้ DISCONNECTO';
+
+    const disconnectorSheet = getExcelData(sheetName);
+
+    if (!disconnectorSheet || disconnectorSheet.length === 0) {
+      return emptyTotals;
+    }
+
+    const row = disconnectorSheet.find((r: any) => r.__rowNum__ === rowNum);
+
+    if (!row) {
+      return emptyTotals;
+    }
+
+    const cabinetEmptyPrice = parsePrice(row.__EMPTY_20);
+    let brandPrice = 0;
+    if (installationLocationBrand === 'ABB') {
+      brandPrice = parsePrice(row.__EMPTY_22);
+    } else if (installationLocationBrand === 'EATON') {
+      brandPrice = parsePrice(row.__EMPTY_24);
+    } else if (installationLocationBrand === 'LS') {
+      brandPrice = parsePrice(row.__EMPTY_23);
+    }
+
+    const busbarAcc = parsePrice(row.__EMPTY_30);
+    const siteInstallationCost = parsePrice(row.__EMPTY_32);
+
+    const material = cabinetEmptyPrice + brandPrice + busbarAcc;
+    const labor = siteInstallationCost;
+    const total = material + labor;
+
+    return {
+      material,
+      labor,
+      total,
+    };
+  }, [installationLocation, props.transformer, props.powerAuthority, lowVoltageRequest, installationLocationBrand, props.excelData]);
+
+  const trToMdbTotals = React.useMemo(() => {
+    const emptyTotals = { material: 0, labor: 0, total: 0 };
+
+    if (trMdbSelection !== 'yes') {
+      return emptyTotals;
+    }
+
+    const distance = parseFloat(trDistance || '0');
+
+    if (!distance || distance <= 0) {
+      return emptyTotals;
+    }
+
+    const conduit = props.trWiringType === 'ร้อยท่อเดินในอากาศ กลุ่ม 2' ? trWiringGroup2 : '';
+    const priceData = getTrToMdbPrice(
+      props.trWiringType,
+      conduit,
+      props.powerAuthority,
+      props.transformer,
+      distance
+    );
+
+    if (!priceData) {
+      return emptyTotals;
+    }
+
+    return {
+      material: parsePrice(priceData.materialPrice),
+      labor: parsePrice(priceData.laborPrice),
+      total: parsePrice(priceData.totalPrice),
+    };
+  }, [trMdbSelection, trDistance, props.trWiringType, trWiringGroup2, props.powerAuthority, props.transformer, getTrToMdbPrice]);
+
+  const mdbTotals = React.useMemo(() => {
+    const emptyTotals = { material: 0, labor: 0, total: 0 };
+
+    if (mdbSelection !== 'yes' || !mdbConfiguration) {
+      return emptyTotals;
+    }
+
+    let mainPrice = 0;
+    if (mdbConfiguration.product?.MDBMPric && mdbConfiguration.product.MDBMPric !== '-') {
+      mainPrice = parsePrice(mdbConfiguration.product.MDBMPric);
+    }
+
+    let totalSubPrice = 0;
+    if (mccbSubBrand && Array.isArray(props.mdbSubs)) {
+      props.mdbSubs.forEach((val: string) => {
+        const mccbSubData = getMccbSubData(val, mccbSubBrand);
+        if (mccbSubData && Array.isArray(mccbSubData)) {
+          mccbSubData.forEach((item: any) => {
+            if (item.price && item.price !== '-') {
+              totalSubPrice += parsePrice(item.price);
+            }
+          });
+        }
+      });
+    }
+
+    const material = mainPrice + totalSubPrice;
+    const total = material;
+
+    if (total <= 0) {
+      return emptyTotals;
+    }
+
+    return {
+      material,
+      labor: 0,
+      total,
+    };
+  }, [mdbSelection, mdbConfiguration, mccbSubBrand, props.mdbSubs]);
+
+  const mdbToChargerTotals = React.useMemo(() => {
+    const emptyTotals = { material: 0, labor: 0, total: 0 };
+
+    if (chargerSelection !== 'yes') {
+      return emptyTotals;
+    }
+
+    const results = Object.values(chargerResults || {});
+
+    if (!results.length) {
+      return emptyTotals;
+    }
+
+    const material = results.reduce((acc, result: any) => acc + parsePrice(result.materialCost), 0);
+    const labor = results.reduce((acc, result: any) => acc + parsePrice(result.laborCost), 0);
+
+    return {
+      material,
+      labor,
+      total: material + labor,
+    };
+  }, [chargerSelection, chargerResults]);
+
+  const travelTotals = React.useMemo(() => {
+    const total = parsePrice(travelCostResult);
+    return {
+      material: 0,
+      labor: total,
+      total,
+    };
+  }, [travelCostResult]);
+
+  const stationTotals = React.useMemo(() => {
+    const totals = [
+      transformerTotals,
+      highVoltageTotals,
+      installationTotals,
+      trToMdbTotals,
+      mdbTotals,
+      mdbToChargerTotals,
+      additionalFeaturesTotals,
+      travelTotals,
+    ];
+
+    return totals.reduce((acc, current) => {
+      return {
+        material: acc.material + (current?.material || 0),
+        labor: acc.labor + (current?.labor || 0),
+        total: acc.total + (current?.total || 0),
+      };
+    }, { material: 0, labor: 0, total: 0 });
+  }, [transformerTotals, highVoltageTotals, installationTotals, trToMdbTotals, mdbTotals, mdbToChargerTotals, additionalFeaturesTotals, travelTotals]);
+
+  const stationCostSections = React.useMemo(() => ([
+    {
+      key: 'transformer',
+      label: '1. รวมค่าใช้จ่าย ของ Transformer Size (ขนาดหม้อแปลง)',
+      totals: transformerTotals,
+    },
+    {
+      key: 'high-voltage',
+      label: '2. รวมค่าใช้จ่าย ของ ระบบแรงสูง',
+      totals: highVoltageTotals,
+    },
+    {
+      key: 'installation',
+      label: '3. ราคาสินค้า ของ สถานที่การติดตั้ง',
+      totals: installationTotals,
+    },
+    {
+      key: 'tr-to-mdb',
+      label: '4. ราคาสายไฟ จากหม้อแปลงเข้าMDB ของ TR to MDB Configuration (การตั้งค่า TR ไป MDB)',
+      totals: trToMdbTotals,
+    },
+    {
+      key: 'mdb',
+      label: '5. ราคารวม MDB: ของ MDB Configuration (การตั้งค่า MDB)',
+      totals: mdbTotals,
+    },
+    {
+      key: 'mdb-to-charger',
+      label: '6. รวมค่าใช้จ่ายทั้งหมด ของ MDB to Charger Configuration (การตั้งค่า MDB ไป Charger)',
+      totals: mdbToChargerTotals,
+    },
+    {
+      key: 'additional',
+      label: '7. ราคารวมฟีเจอร์และตัวเลือกเพิ่มเติม ของ Additional Features & Options',
+      totals: additionalFeaturesTotals,
+    },
+    {
+      key: 'travel',
+      label: '8. ค่าเดินทาง: ของ ค่าเดินทาง (Travel Cost)',
+      totals: travelTotals,
+    },
+  ]), [
+    transformerTotals,
+    highVoltageTotals,
+    installationTotals,
+    trToMdbTotals,
+    mdbTotals,
+    mdbToChargerTotals,
+    additionalFeaturesTotals,
+    travelTotals,
+  ]);
+
+  const stationSectionsForDisplay = React.useMemo(() => {
+    const enriched = stationCostSections.map((section, index) => {
+      const totals = section.totals || { material: 0, labor: 0, total: 0 };
+      const hasValue = (totals.material || 0) > 0 || (totals.labor || 0) > 0 || (totals.total || 0) > 0;
+      return {
+        ...section,
+        index: index + 1,
+        totals,
+        hasValue,
+      };
+    });
+
+    const nonZeroSections = enriched.filter(section => section.hasValue);
+    return nonZeroSections.length > 0 ? nonZeroSections : enriched;
+  }, [stationCostSections]);
+
   // State สำหรับเก็บสถานะการเปิด/ปิดของแต่ละส่วนใน Additional Features & Options
   const [openSections, setOpenSections] = useState<{ [key: string]: boolean }>({
     'equipment': false,
@@ -853,151 +1309,69 @@ function MoreDetailCard(props: any) {
   // ฟังก์ชันคำนวณค่าเดินทาง
 
   const calculateTravelCost = () => {
-
     const distance = parseFloat(travelDistance) || 0;
+    const numberOfChargers = Math.max(1, Math.min(6, parseInt(props.numberOfChargers) || 1));
 
-    const numberOfChargers = parseInt(props.numberOfChargers) || 1;
-
-
-
-    // ตรวจสอบเงื่อนไข Extra
-
-    const hasTransformer = transformerSelection === 'yes';
-
-    const hasTrMdb = trMdbSelection === 'yes';
-
-    const hasMdb = mdbSelection === 'yes';
-
-    const hasCharger = chargerSelection === 'yes';
-
-
-
-    // Extra1: 62.5 x ระยะ + ค่าแรง 5000+3000 + ค่าที่พัก
-
-    if (!hasTransformer && !hasTrMdb && !hasMdb) {
-
-      const extra1Cost = (62.5 * distance) + 5000 + 3000;
-
-      setTravelCostResult(extra1Cost);
-
-      return extra1Cost;
-
+    const travelSheet = getExcelData('ตารางสรุปต้นทุนค่าเดินทาง , ค่า') || getExcelData('ตารางสรุปต้นทุนค่าเดินทาง');
+    if (!travelSheet || travelSheet.length === 0) {
+      console.warn('ไม่พบข้อมูลใน Sheet "ตารางสรุปต้นทุนค่าเดินทาง"');
+      setTravelCostResult(0);
+      return 0;
     }
 
+    const travelConfig: {
+      threshold: number;
+      belowOrEqualRow: number;
+      aboveRow: number;
+    }[] = [
+        { threshold: 80, belowOrEqualRow: 2, aboveRow: 4 },
+        { threshold: 88, belowOrEqualRow: 6, aboveRow: 8 },
+        { threshold: 78, belowOrEqualRow: 10, aboveRow: 12 },
+        { threshold: 101, belowOrEqualRow: 14, aboveRow: 16 },
+        { threshold: 102, belowOrEqualRow: 18, aboveRow: 20 },
+        { threshold: 102, belowOrEqualRow: 22, aboveRow: 24 },
+      ];
 
-
-    // Extra2: งานติดตั้งเครื่องชาร์จอย่างเดียว
-
-    if (!hasTransformer && !hasTrMdb && !hasMdb && !hasCharger) {
-
-      const extra2Cost = (distance * 40) + 5000 + 3000;
-
-      setTravelCostResult(extra2Cost);
-
-      return extra2Cost;
-
+    const config = travelConfig[numberOfChargers - 1];
+    if (!config) {
+      setTravelCostResult(0);
+      return 0;
     }
 
+    const isWithinThreshold = distance <= config.threshold;
+    const rowNum = isWithinThreshold ? config.belowOrEqualRow : config.aboveRow;
+    const row = travelSheet.find((entry: any) => entry.__rowNum__ === rowNum);
 
+    if (!row) {
+      console.warn(`ไม่พบ row ${rowNum} ใน Sheet "ตารางสรุปต้นทุนค่าเดินทาง"`);
+      setTravelCostResult(0);
+      return 0;
+    }
 
-    // คำนวณตามจำนวน Charger และระยะทาง
+    const materialRate = toNumber(row.__EMPTY_4);
+    const laborRate = toNumber(row.__EMPTY_5);
+    const extraCharge = toNumber(row.__EMPTY_7);
 
     let cost = 0;
-
-
-
-    if (numberOfChargers === 1) {
-
-      if (distance <= 80) {
-
-        cost = distance * 425;
-
-      } else {
-
-        cost = (distance * 156) + 3600 + 18000;
-
-      }
-
-    } else if (numberOfChargers === 2) {
-
-      if (distance <= 88) {
-
-        cost = distance * 715;
-
-      } else {
-
-        cost = (distance * 176) + 7200 + 40000;
-
-      }
-
-    } else if (numberOfChargers === 3) {
-
-      if (distance <= 78) {
-
-        cost = distance * 1075;
-
-      } else {
-
-        cost = (distance * 191) + 9000 + 60000;
-
-      }
-
-    } else if (numberOfChargers === 4) {
-
-      if (distance <= 101) {
-
-        cost = distance * 1290;
-
-      } else {
-
-        cost = (distance * 191) + 12000 + 100000;
-
-      }
-
-    } else if (numberOfChargers === 5) {
-
-      if (distance <= 102) {
-
-        cost = distance * 1565;
-
-      } else {
-
-        cost = (distance * 191) + 15000 + 125000;
-
-      }
-
-    } else if (numberOfChargers === 6) {
-
-      if (distance <= 102) {
-
-        cost = distance * 1840;
-
-      } else {
-
-        cost = (distance * 191) + 18000 + 150000;
-
-      }
-
+    if (isWithinThreshold) {
+      cost = (materialRate + laborRate) * distance;
+    } else {
+      cost = (materialRate * distance) + laborRate + extraCharge;
     }
-
-
-
-    // บวกเพิ่มงานฝึกอบรม (1วัน) ถ้าเลือก
 
     if (trainingWork === 'yes') {
-
-      const trainingCost = (distance * 15) + 2600 + 1000;
-
-      cost += trainingCost;
-
+      const trainingRow = travelSheet.find((entry: any) => entry.__rowNum__ === 2);
+      if (trainingRow) {
+        const trainingMaterial = toNumber(trainingRow.__EMPTY_4);
+        const trainingLabor = toNumber(trainingRow.__EMPTY_5);
+        const trainingExtra = toNumber(trainingRow.__EMPTY_7);
+        const trainingCost = (trainingMaterial * distance) + trainingLabor + trainingExtra;
+        cost += trainingCost;
+      }
     }
 
-
-
     setTravelCostResult(cost);
-
     return cost;
-
   };
 
 
@@ -1582,52 +1956,37 @@ function MoreDetailCard(props: any) {
                                   </CollapsibleTrigger>
                                   <CollapsibleContent>
                                     <div className="px-4 pb-4">
-                                      <div className="grid grid-cols-3 gap-4">
-                                        <div>
-                                          <div className="text-sm text-gray-600 mb-1">ค่าของรวม:</div>
-                                          <div className="text-xl font-bold text-gray-800">
-                                            {(() => {
-                                              const materialCost = typeof transformerPrice.installationCost === 'number'
-                                                ? transformerPrice.installationCost
-                                                : parseFloat(transformerPrice.installationCost || 0) || 0;
-                                              return materialCost.toLocaleString('th-TH');
-                                            })()} บาท
+                                      {(() => {
+                                        const laborValue = toNumber(transformerPrice.laborCost);
+                                        const installationValue = toNumber(transformerPrice.installationCost);
+                                        const totalOverride = toNumber(transformerPrice.totalInstallationCost);
+                                        const materialDisplay = laborValue; // ค่าของควรอิงราคาค่าแรงจากไฟล์ Excel
+                                        const laborDisplay = installationValue; // ค่าแรงแสดงราคาค่าติดตั้ง
+                                        const totalDisplay = totalOverride > 0 ? totalOverride : materialDisplay + laborDisplay;
+
+                                        return (
+                                          <div className="grid grid-cols-3 gap-4">
+                                            <div>
+                                              <div className="text-sm text-gray-600 mb-1">ค่าของรวม:</div>
+                                              <div className="text-xl font-bold text-gray-800">
+                                                {materialDisplay.toLocaleString('th-TH')} บาท
+                                              </div>
+                                            </div>
+                                            <div>
+                                              <div className="text-sm text-gray-600 mb-1">ค่าแรงรวม:</div>
+                                              <div className="text-xl font-bold text-gray-800">
+                                                {laborDisplay.toLocaleString('th-TH')} บาท
+                                              </div>
+                                            </div>
+                                            <div>
+                                              <div className="text-sm text-blue-700 font-semibold mb-1">ราคารวม:</div>
+                                              <div className="text-2xl font-bold text-blue-700">
+                                                {totalDisplay.toLocaleString('th-TH')} บาท
+                                              </div>
+                                            </div>
                                           </div>
-                                        </div>
-                                        <div>
-                                          <div className="text-sm text-gray-600 mb-1">ค่าแรงรวม:</div>
-                                          <div className="text-xl font-bold text-gray-800">
-                                            {(() => {
-                                              const laborCost = typeof transformerPrice.laborCost === 'number'
-                                                ? transformerPrice.laborCost
-                                                : parseFloat(transformerPrice.laborCost || 0) || 0;
-                                              return laborCost.toLocaleString('th-TH');
-                                            })()} บาท
-                                          </div>
-                                        </div>
-                                        <div>
-                                          <div className="text-sm text-blue-700 font-semibold mb-1">ราคารวม:</div>
-                                          <div className="text-2xl font-bold text-blue-700">
-                                            {(() => {
-                                              let total = 0;
-                                              if (transformerPrice.totalInstallationCost && transformerPrice.totalInstallationCost > 0) {
-                                                total = typeof transformerPrice.totalInstallationCost === 'number'
-                                                  ? transformerPrice.totalInstallationCost
-                                                  : parseFloat(transformerPrice.totalInstallationCost || 0) || 0;
-                                              } else {
-                                                const materialCost = typeof transformerPrice.installationCost === 'number'
-                                                  ? transformerPrice.installationCost
-                                                  : parseFloat(transformerPrice.installationCost || 0) || 0;
-                                                const laborCost = typeof transformerPrice.laborCost === 'number'
-                                                  ? transformerPrice.laborCost
-                                                  : parseFloat(transformerPrice.laborCost || 0) || 0;
-                                                total = materialCost + laborCost;
-                                              }
-                                              return total.toLocaleString('th-TH');
-                                            })()} บาท
-                                          </div>
-                                        </div>
-                                      </div>
+                                        );
+                                      })()}
                                     </div>
                                   </CollapsibleContent>
                                 </div>
@@ -5901,6 +6260,102 @@ function MoreDetailCard(props: any) {
         </CardContent>
 
       </Card >
+
+      <Card className="shadow-xl border-0 overflow-hidden mt-6">
+        <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 border-b">
+          <CardTitle className="flex items-center justify-between text-slate-800">
+            <span>รวมค่าใช้จ่ายการสร้างสถานี</span>
+            <span className="text-xs text-slate-500">ภาพรวมต้นทุนทั้งหมด</span>
+          </CardTitle>
+          <CardDescription className="text-slate-600">
+            ตรวจดูยอดรวมของค่าของ ค่าแรง และราคาสุทธิจากทุกหมวดงาน
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-6 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-5 rounded-xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white shadow-sm">
+              <div className="text-sm text-slate-200/80 mb-2">ราคารวมสร้างสถานี</div>
+              <div className="text-3xl font-bold tracking-tight">{formatCurrency(stationTotals.total)} บาท</div>
+              <div className="text-xs text-slate-200/60 mt-2">รวมค่าของและค่าแรงทุกหมวด</div>
+            </div>
+            <div className="p-5 rounded-xl bg-gradient-to-br from-slate-100 via-white to-slate-50 border border-slate-200 text-slate-800 shadow-sm">
+              <div className="text-sm text-slate-500 mb-2">ค่าของสร้างสถานี</div>
+              <div className="text-2xl font-semibold">{formatCurrency(stationTotals.material)} บาท</div>
+              <div className="text-xs text-slate-400 mt-2">รวมค่าวัสดุ อุปกรณ์ และสินค้า</div>
+            </div>
+            <div className="p-5 rounded-xl bg-gradient-to-br from-slate-100 via-white to-slate-50 border border-slate-200 text-slate-800 shadow-sm">
+              <div className="text-sm text-slate-500 mb-2">ค่าแรงสร้างสถานี</div>
+              <div className="text-2xl font-semibold">{formatCurrency(stationTotals.labor)} บาท</div>
+              <div className="text-xs text-slate-400 mt-2">รวมค่าแรงงานติดตั้งทุกประเภท</div>
+            </div>
+          </div>
+
+          <Separator />
+
+          <div className="space-y-3">
+            {stationSectionsForDisplay.map((section) => {
+              const sectionKey = `station-summary-${section.key}`;
+              const isOpen = openItems[sectionKey] ?? false;
+              const sectionTotal = section.totals.total || 0;
+
+              return (
+                <Collapsible
+                  key={section.key}
+                  open={isOpen}
+                  onOpenChange={(open) => setOpenItems(prev => ({ ...prev, [sectionKey]: open }))}
+                >
+                  <div className={`rounded-xl border transition-colors ${section.hasValue ? 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50' : 'border-slate-100 bg-slate-50 text-slate-400'}`}>
+                    <CollapsibleTrigger className="w-full px-5 py-4 text-left">
+                      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold ${section.hasValue ? 'bg-slate-700 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                            {section.index}
+                          </div>
+                          <div className="text-sm font-semibold text-slate-700 md:text-base">
+                            {section.label}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4 md:gap-6">
+                          <div className="text-xs text-slate-500 md:text-sm">ราคารวม</div>
+                          <div className={`text-lg font-bold ${section.hasValue ? 'text-slate-800' : 'text-slate-400'}`}>
+                            {formatCurrency(sectionTotal)} บาท
+                          </div>
+                          <div className="text-slate-500">
+                            {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                          </div>
+                        </div>
+                      </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="px-5 pb-5">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                          <div className="rounded-lg border border-slate-100 bg-slate-50 p-4">
+                            <div className="text-xs text-slate-500 uppercase tracking-wide">ค่าของรวม</div>
+                            <div className="mt-2 text-xl font-semibold text-slate-800">{formatCurrency(section.totals.material)} บาท</div>
+                          </div>
+                          <div className="rounded-lg border border-slate-100 bg-slate-50 p-4">
+                            <div className="text-xs text-slate-500 uppercase tracking-wide">ค่าแรงรวม</div>
+                            <div className="mt-2 text-xl font-semibold text-slate-800">{formatCurrency(section.totals.labor)} บาท</div>
+                          </div>
+                          <div className="rounded-lg border border-slate-100 bg-slate-50 p-4">
+                            <div className="text-xs text-slate-500 uppercase tracking-wide">ราคารวม</div>
+                            <div className="mt-2 text-2xl font-bold text-slate-900">{formatCurrency(sectionTotal)} บาท</div>
+                          </div>
+                        </div>
+                        {!section.hasValue && (
+                          <div className="mt-3 text-xs text-slate-400">
+                            ไม่มีค่าใช้จ่ายในหัวข้อนี้จากเงื่อนไขที่เลือกไว้
+                          </div>
+                        )}
+                      </div>
+                    </CollapsibleContent>
+                  </div>
+                </Collapsible>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
 
     </div >
 
