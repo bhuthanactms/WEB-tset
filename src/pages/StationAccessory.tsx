@@ -1306,13 +1306,14 @@ function MoreDetailCard(props: any) {
 
   // State สำหรับเก็บสถานะการเปิด/ปิดของแต่ละรายการย่อย
   const [openItems, setOpenItems] = useState<{ [key: string]: boolean }>({});
+  const [travelCostBreakdown, setTravelCostBreakdown] = useState<string>('');
   // ฟังก์ชันคำนวณค่าเดินทาง
 
   const calculateTravelCost = () => {
     const distance = parseFloat(travelDistance) || 0;
     const numberOfChargers = Math.max(1, Math.min(6, parseInt(props.numberOfChargers) || 1));
 
-    const travelSheet = getExcelData('ตารางสรุปต้นทุนค่าเดินทาง , ค่า') || getExcelData('ตารางสรุปต้นทุนค่าเดินทาง');
+    const travelSheet = getExcelData('ตารางสรุปต้นทุนค่าเดินทาง');
     if (!travelSheet || travelSheet.length === 0) {
       console.warn('ไม่พบข้อมูลใน Sheet "ตารางสรุปต้นทุนค่าเดินทาง"');
       setTravelCostResult(0);
@@ -1350,7 +1351,7 @@ function MoreDetailCard(props: any) {
 
     const materialRate = toNumber(row.__EMPTY_4);
     const laborRate = toNumber(row.__EMPTY_5);
-    const extraCharge = toNumber(row.__EMPTY_7);
+    const extraCharge = toNumber(row.__EMPTY_6);
 
     let cost = 0;
     if (isWithinThreshold) {
@@ -1359,18 +1360,29 @@ function MoreDetailCard(props: any) {
       cost = (materialRate * distance) + laborRate + extraCharge;
     }
 
+    let travelCostDetails = '';
+
+    if (isWithinThreshold) {
+      travelCostDetails = `ค่าเดินทางตามจำนวนเครื่องชาร์จ: (${materialRate.toLocaleString('th-TH')} + ${laborRate.toLocaleString('th-TH')}) × ${distance.toLocaleString('th-TH')} km`;
+    } else {
+      travelCostDetails = `ค่าเดินทางตามจำนวนเครื่องชาร์จ: (${materialRate.toLocaleString('th-TH')} × ${distance.toLocaleString('th-TH')} km) + ${laborRate.toLocaleString('th-TH')} + ${extraCharge.toLocaleString('th-TH')}`;
+    }
+
     if (trainingWork === 'yes') {
-      const trainingRow = travelSheet.find((entry: any) => entry.__rowNum__ === 2);
+      const trainingRow = travelSheet.find((entry: any) => entry.__rowNum__ === 30);
       if (trainingRow) {
         const trainingMaterial = toNumber(trainingRow.__EMPTY_4);
         const trainingLabor = toNumber(trainingRow.__EMPTY_5);
-        const trainingExtra = toNumber(trainingRow.__EMPTY_7);
+        const trainingExtra = toNumber(trainingRow.__EMPTY_6);
         const trainingCost = (trainingMaterial * distance) + trainingLabor + trainingExtra;
         cost += trainingCost;
+
+        travelCostDetails += `\nงานฝึกอบรม (1 วัน): (${trainingMaterial.toLocaleString('th-TH')} × ${distance.toLocaleString('th-TH')} km) + ${trainingLabor.toLocaleString('th-TH')} + ${trainingExtra.toLocaleString('th-TH')}`;
       }
     }
 
     setTravelCostResult(cost);
+    setTravelCostBreakdown(travelCostDetails);
     return cost;
   };
 
@@ -6236,16 +6248,16 @@ function MoreDetailCard(props: any) {
                       </div>
 
                       {/* แสดงรายละเอียดการคำนวณ */}
-                      <div className="mt-3 p-3 bg-white rounded border text-xs space-y-1">
+                      <div className="mt-3 p-3 bg-white rounded border text-xs space-y-2">
                         <div className="font-medium text-gray-700">รายละเอียดการคำนวณ:</div>
                         <div>• ระยะทาง: {travelDistance} กม.</div>
                         <div>• จำนวน Charger: {props.numberOfChargers} Unit</div>
-                        {trainingWork === 'yes' && (
-                          <div className="text-green-600">
-                            • รวมงานฝึกอบรม: {(parseFloat(travelDistance) * 15 + 2600 + 1000).toLocaleString('th-TH')} บาท
+                        {travelCostBreakdown && travelCostBreakdown.split('\n').map((line, idx) => (
+                          <div key={idx} className="text-blue-600">
+                            • {line}
                           </div>
-                        )}
-                        <div className="font-medium text-blue-600">
+                        ))}
+                        <div className="font-medium text-blue-800">
                           • ยอดรวมทั้งหมด: {travelCostResult.toLocaleString('th-TH')} บาท
                         </div>
                       </div>
