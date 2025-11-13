@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 
-import { Zap, Car, Paintbrush, Shield, Home, Wrench, MapPin, ChevronDown, ChevronUp } from 'lucide-react'
+import { Zap, Car, Paintbrush, Shield, Home, Wrench, MapPin, ChevronDown, ChevronUp, Box, Package, Settings, Ruler } from 'lucide-react'
 
 import { useLocation } from 'react-router-dom'
 
@@ -56,7 +56,8 @@ function MoreDetailCard(props: any) {
       150: 6,
       225: 7,
       300: 8,
-      350: 9,
+      350: 18,
+      400: 9,
       450: 10,
       630: 11,
       900: 13,
@@ -1132,6 +1133,90 @@ function MoreDetailCard(props: any) {
     };
   }, [trMdbSelection, trDistance, props.trWiringType, trWiringGroup2, props.powerAuthority, props.transformer, getTrToMdbPrice]);
 
+  // ฟังก์ชันดึงข้อมูลตู้ MDB จาก Sheet "ตารางขนาดและราคาตู้ MDB"
+  const getMdbCabinetData = React.useMemo(() => {
+    if (mdbSelection !== 'yes') {
+      return null;
+    }
+
+    const transformerSize = parseInt(props.transformer || '0', 10) || 0;
+    const powerAuthority = props.powerAuthority;
+
+    // หา row number ตามเงื่อนไข
+    let rowNum: number | null = null;
+
+    if (powerAuthority === 'MEA') {
+      if (lowVoltageRequest === 'low-voltage') {
+        rowNum = 7;
+      } else {
+        if (transformerSize === 400) rowNum = 8;
+        else if (transformerSize === 500) rowNum = 9;
+        else if (transformerSize === 630) rowNum = 10;
+        else if (transformerSize === 800) rowNum = 11;
+        else if (transformerSize === 1000) rowNum = 12;
+        else if (transformerSize === 1250) rowNum = 13;
+        else if (transformerSize === 1500) rowNum = 14;
+      }
+    } else if (powerAuthority === 'PEA') {
+      if (transformerSize === 100) rowNum = 4;
+      else if (transformerSize === 160) rowNum = 5;
+      else if (transformerSize === 250) rowNum = 6;
+      else if (transformerSize === 315) rowNum = 7;
+      else if (transformerSize === 400) rowNum = 8;
+      else if (transformerSize === 500) rowNum = 9;
+      else if (transformerSize === 630) rowNum = 10;
+      else if (transformerSize === 800) rowNum = 11;
+      else if (transformerSize === 1000) rowNum = 12;
+      else if (transformerSize === 1250) rowNum = 13;
+      else if (transformerSize === 1500) rowNum = 14;
+    }
+
+    if (!rowNum) {
+      return null;
+    }
+
+    const mdbCabinetSheet = getExcelData('ตารางขนาดและราคาตู้ MDB');
+    if (!mdbCabinetSheet || mdbCabinetSheet.length === 0) {
+      console.warn('ไม่พบข้อมูลใน Sheet "ตารางขนาดและราคาตู้ MDB"');
+      return null;
+    }
+
+    const row = mdbCabinetSheet.find((r: any) => r.__rowNum__ === rowNum);
+    if (!row) {
+      console.warn(`ไม่พบ row ${rowNum} ใน Sheet "ตารางขนาดและราคาตู้ MDB" สำหรับ Transformer ${transformerSize} kVA, Power Authority: ${powerAuthority}`);
+      return null;
+    }
+
+    // ดึงข้อมูลขนาดตู้ (กว้าง ยาว ลึก) จาก __EMPTY_9 ถึง __EMPTY_13
+    const cabinetSize = [
+      row.__EMPTY_9,
+      row.__EMPTY_10,
+      row.__EMPTY_11,
+      row.__EMPTY_12,
+      row.__EMPTY_13,
+    ].filter(val => val !== undefined && val !== null && val !== '').join(' ');
+
+    const emptyCabinetPrice = parsePrice(row.__EMPTY_16); // ราคาตู้เปล่า
+    const groundPrice = parsePrice(row.__EMPTY_18); // ราคาGround
+    const siteInstallationCost = parsePrice(row.__EMPTY_28); // ค่าติดตั้งหน้าSite
+
+    // ราคาค่าของตู้ MDB = ขนาดตู้ + ราคาตู้เปล่า + ราคาGround
+    // หมายเหตุ: ขนาดตู้เป็นข้อมูลข้อความ ไม่ใช่ราคา ดังนั้นราคาค่าของ = ราคาตู้เปล่า + ราคาGround
+    const materialPrice = emptyCabinetPrice + groundPrice;
+    const laborPrice = siteInstallationCost;
+    const totalPrice = materialPrice + laborPrice;
+
+    return {
+      cabinetSize,
+      emptyCabinetPrice,
+      groundPrice,
+      siteInstallationCost,
+      materialPrice,
+      laborPrice,
+      totalPrice,
+    };
+  }, [mdbSelection, props.transformer, props.powerAuthority, lowVoltageRequest, getExcelData]);
+
   const mdbTotals = React.useMemo(() => {
     const emptyTotals = { material: 0, labor: 0, total: 0 };
 
@@ -1158,8 +1243,17 @@ function MoreDetailCard(props: any) {
       });
     }
 
-    const material = mainPrice + totalSubPrice;
-    const total = material;
+    // เพิ่มราคาตู้ MDB
+    let mdbCabinetMaterial = 0;
+    let mdbCabinetLabor = 0;
+    if (getMdbCabinetData) {
+      mdbCabinetMaterial = getMdbCabinetData.materialPrice;
+      mdbCabinetLabor = getMdbCabinetData.laborPrice;
+    }
+
+    const material = mainPrice + totalSubPrice + mdbCabinetMaterial;
+    const labor = mdbCabinetLabor;
+    const total = material + labor;
 
     if (total <= 0) {
       return emptyTotals;
@@ -1167,10 +1261,10 @@ function MoreDetailCard(props: any) {
 
     return {
       material,
-      labor: 0,
+      labor,
       total,
     };
-  }, [mdbSelection, mdbConfiguration, mccbSubBrand, props.mdbSubs]);
+  }, [mdbSelection, mdbConfiguration, mccbSubBrand, props.mdbSubs, getMdbCabinetData]);
 
   const mdbToChargerTotals = React.useMemo(() => {
     const emptyTotals = { material: 0, labor: 0, total: 0 };
@@ -1225,46 +1319,451 @@ function MoreDetailCard(props: any) {
     }, { material: 0, labor: 0, total: 0 });
   }, [transformerTotals, highVoltageTotals, installationTotals, trToMdbTotals, mdbTotals, mdbToChargerTotals, additionalFeaturesTotals, travelTotals]);
 
+  // ฟังก์ชันดึงรายละเอียดสินค้าสำหรับแต่ละหัวข้อ
+  const getSectionProductDetails = React.useCallback((sectionKey: string) => {
+    const products: Array<{
+      type?: string;
+      code?: string;
+      productName?: string;
+      distance?: string;
+      materialTotal: number;
+      laborTotal: number;
+      totalPrice: number;
+      quantity?: string;
+    }> = [];
+
+    if (sectionKey === 'transformer') {
+      const transformerSize = parseInt(props.transformer || '0', 10) || 0;
+
+      if (props.powerAuthority === 'MEA' && transformerSize <= 400 && lowVoltageRequest === 'low-voltage') {
+        const lowVoltageSheet = getExcelData('ตารางระบบงานแรงสูง');
+        if (lowVoltageSheet && lowVoltageSheet.length > 0) {
+          const row2 = lowVoltageSheet.find((row: any) => row.__rowNum__ === 2);
+          const row3 = lowVoltageSheet.find((row: any) => row.__rowNum__ === 3);
+
+          if (row2) {
+            const quantity = row2.__EMPTY_3 || '';
+            const isDistance = typeof quantity === 'string' && (quantity.includes('ม.') || quantity.includes('เมตร'));
+            const distance = parseFloat(lowVoltageDistance2) || 0;
+            const materialUnit = parseFloat(row2.__EMPTY_4 || 0) || 0;
+            const laborUnit = parseFloat(row2.__EMPTY_5 || 0) || 0;
+            const material = isDistance ? materialUnit * distance : materialUnit;
+            const labor = isDistance ? laborUnit * distance : laborUnit;
+
+            products.push({
+              type: row2.__EMPTY || '',
+              code: row2.__EMPTY || '',
+              productName: row2.__EMPTY || '',
+              distance: isDistance ? `${distance} km` : undefined,
+              materialTotal: material,
+              laborTotal: labor,
+              totalPrice: material + labor,
+              quantity: quantity || undefined,
+            });
+          }
+
+          if (row3) {
+            const quantity = row3.__EMPTY_3 || '';
+            const isDistance = typeof quantity === 'string' && (quantity.includes('ม.') || quantity.includes('เมตร'));
+            const distance = parseFloat(lowVoltageDistance3) || 0;
+            const materialUnit = parseFloat(row3.__EMPTY_4 || 0) || 0;
+            const laborUnit = parseFloat(row3.__EMPTY_5 || 0) || 0;
+            const material = isDistance ? materialUnit * distance : materialUnit;
+            const labor = isDistance ? laborUnit * distance : laborUnit;
+
+            products.push({
+              type: row3.__EMPTY || '',
+              code: row3.__EMPTY || '',
+              productName: row3.__EMPTY || '',
+              distance: isDistance ? `${distance} km` : undefined,
+              materialTotal: material,
+              laborTotal: labor,
+              totalPrice: material + labor,
+              quantity: quantity || undefined,
+            });
+          }
+        }
+      } else if (transformerSelection === 'yes' && transformerPrice) {
+        products.push({
+          type: transformerPrice.type === '22kv-416v' ? '22 (24) kV / 416 V' : '33 kV / 316 V',
+          code: transformerPrice.productCode || transformerPrice.productName || '',
+          productName: transformerPrice.productName || '',
+          materialTotal: toNumber(transformerPrice.laborCost),
+          laborTotal: toNumber(transformerPrice.installationCost),
+          totalPrice: toNumber(transformerPrice.totalInstallationCost) || (toNumber(transformerPrice.laborCost) + toNumber(transformerPrice.installationCost)),
+          quantity: '1',
+        });
+      }
+    } else if (sectionKey === 'high-voltage') {
+      const transformerSize = parseInt(props.transformer || '0', 10) || 0;
+      const shouldShowCard = !(props.powerAuthority === 'MEA' && transformerSize <= 400 && lowVoltageRequest === 'low-voltage');
+
+      if (shouldShowCard && highVoltageSystem === 'yes' && transformerType) {
+        const determineRows = () => {
+          const powerAuthority = props.powerAuthority;
+          const currentTransformerType = transformerType;
+
+          if (powerAuthority === 'PEA' && transformerSize <= 250 && currentTransformerType === '22kv-416v') {
+            return { mainRow: 5, detailRows: [7, 8], distanceRow: 13 };
+          }
+          if (powerAuthority === 'PEA' && transformerSize >= 315 && transformerSize <= 1000 && currentTransformerType === '22kv-416v') {
+            return { mainRow: 9, detailRows: [11, 12], distanceRow: 13 };
+          }
+          if (powerAuthority === 'MEA' && transformerSize >= 315 && transformerSize <= 1000 && currentTransformerType === '22kv-416v') {
+            if (transformerSize <= 400 && lowVoltageRequest !== 'use-transformer') {
+              return null;
+            }
+            return { mainRow: 9, detailRows: [11, 12], distanceRow: 13 };
+          }
+          if (powerAuthority === 'PEA' && transformerSize <= 250 && currentTransformerType === '33kv-316v') {
+            return { mainRow: 14, detailRows: [16, 17], distanceRow: 22 };
+          }
+          if (powerAuthority === 'PEA' && transformerSize >= 315 && transformerSize <= 1000 && currentTransformerType === '33kv-316v') {
+            return { mainRow: 18, detailRows: [20, 21], distanceRow: 22 };
+          }
+          return null;
+        };
+
+        const rows = determineRows();
+        if (rows) {
+          const highVoltageSheet = getExcelData('ตารางระบบงานแรงสูง');
+          if (highVoltageSheet && highVoltageSheet.length > 0) {
+            const mainRow = highVoltageSheet.find((r: any) => r.__rowNum__ === rows.mainRow);
+            const distanceRow = highVoltageSheet.find((r: any) => r.__rowNum__ === rows.distanceRow);
+            const detailRow1 = highVoltageSheet.find((r: any) => r.__rowNum__ === rows.detailRows[0]);
+            const detailRow2 = highVoltageSheet.find((r: any) => r.__rowNum__ === rows.detailRows[1]);
+            const poleRow = highVoltageSheet.find((r: any) => r.__rowNum__ === 23);
+
+            if (mainRow) {
+              products.push({
+                type: mainRow.__EMPTY || '',
+                code: mainRow.__EMPTY || '',
+                productName: mainRow.__EMPTY || '',
+                materialTotal: parseFloat(mainRow.__EMPTY_4 || 0) || 0,
+                laborTotal: parseFloat(mainRow.__EMPTY_5 || 0) || 0,
+                totalPrice: parseFloat(mainRow.__EMPTY_6 || 0) || 0,
+                quantity: mainRow.__EMPTY_3 || undefined,
+              });
+            }
+
+            if (distanceRow && highVoltageDistance) {
+              const distance = parseFloat(highVoltageDistance) || 0;
+              const materialUnit = parseFloat(distanceRow.__EMPTY_4 || 0) || 0;
+              const laborUnit = parseFloat(distanceRow.__EMPTY_5 || 0) || 0;
+              products.push({
+                type: distanceRow.__EMPTY || '',
+                code: distanceRow.__EMPTY || '',
+                productName: distanceRow.__EMPTY || '',
+                distance: `${distance} km`,
+                materialTotal: materialUnit * distance,
+                laborTotal: laborUnit * distance,
+                totalPrice: (parseFloat(distanceRow.__EMPTY_6 || 0) || 0) * distance,
+                quantity: distanceRow.__EMPTY_3 || undefined,
+              });
+            }
+
+            if (detailRow1) {
+              products.push({
+                type: detailRow1.__EMPTY || '',
+                code: detailRow1.__EMPTY || '',
+                productName: detailRow1.__EMPTY || '',
+                materialTotal: parseFloat(detailRow1.__EMPTY_4 || 0) || 0,
+                laborTotal: parseFloat(detailRow1.__EMPTY_5 || 0) || 0,
+                totalPrice: parseFloat(detailRow1.__EMPTY_6 || 0) || 0,
+                quantity: detailRow1.__EMPTY_3 || undefined,
+              });
+            }
+
+            if (detailRow2) {
+              products.push({
+                type: detailRow2.__EMPTY || '',
+                code: detailRow2.__EMPTY || '',
+                productName: detailRow2.__EMPTY || '',
+                materialTotal: parseFloat(detailRow2.__EMPTY_4 || 0) || 0,
+                laborTotal: parseFloat(detailRow2.__EMPTY_5 || 0) || 0,
+                totalPrice: parseFloat(detailRow2.__EMPTY_6 || 0) || 0,
+                quantity: detailRow2.__EMPTY_3 || undefined,
+              });
+            }
+
+            if (poleRow && highVoltageDistance) {
+              const distance = parseFloat(highVoltageDistance) || 0;
+              const poleCount = distance > 30 ? Math.floor((distance - 30) / 30) + 1 : 0;
+              if (poleCount > 0) {
+                const poleMaterialPerUnit = parseFloat(poleRow.__EMPTY_4 || 0) || 0;
+                const poleLaborPerUnit = parseFloat(poleRow.__EMPTY_5 || 0) || 0;
+                products.push({
+                  type: poleRow.__EMPTY || '',
+                  code: poleRow.__EMPTY || '',
+                  productName: poleRow.__EMPTY || '',
+                  materialTotal: poleMaterialPerUnit * poleCount,
+                  laborTotal: poleLaborPerUnit * poleCount,
+                  totalPrice: (parseFloat(poleRow.__EMPTY_6 || 0) || 0) * poleCount,
+                  quantity: `${poleCount}`,
+                });
+              }
+            }
+          }
+        }
+      }
+    } else if (sectionKey === 'installation') {
+      if (installationLocation === 'inside-station') {
+        const transformerSizeStr = props.transformer || '';
+        const transformerSize = parseInt(transformerSizeStr, 10) || 0;
+        const powerAuthority = props.powerAuthority;
+
+        const getInstallationRowNumber = (): number | null => {
+          if (powerAuthority === 'MEA') {
+            if (lowVoltageRequest === 'low-voltage') return 6;
+            if (transformerSize === 400) return 7;
+            if (transformerSize === 500) return 8;
+            if (transformerSize === 630) return 9;
+            if (transformerSize === 800) return 10;
+            if (transformerSize === 1000) return 11;
+            if (transformerSize === 1250) return 12;
+            if (transformerSize === 1500) return 13;
+          }
+          if (powerAuthority === 'PEA') {
+            if (transformerSize === 100) return 3;
+            if (transformerSize === 160) return 4;
+            if (transformerSize === 250) return 5;
+            if (transformerSize === 315) return 6;
+            if (transformerSize === 400) return 7;
+            if (transformerSize === 500) return 8;
+            if (transformerSize === 630) return 9;
+            if (transformerSize === 800) return 10;
+            if (transformerSize === 1000) return 11;
+            if (transformerSize === 1250) return 12;
+            if (transformerSize === 1500) return 13;
+          }
+          return null;
+        };
+
+        const rowNum = getInstallationRowNumber();
+        if (rowNum) {
+          const availableSheetNames = props.excelData ? Object.keys(props.excelData) : [];
+          const possibleSheetNames = availableSheetNames.filter(name =>
+            (name.includes('DISCONNECTO') || name.includes('DISCONNECTOR')) &&
+            !name.includes('MDB')
+          );
+          const sheetName = possibleSheetNames.length > 0
+            ? possibleSheetNames[0]
+            : 'ตารางขนาดและราคาตู้ DISCONNECTO';
+
+          const disconnectorSheet = getExcelData(sheetName);
+          if (disconnectorSheet && disconnectorSheet.length > 0) {
+            const row = disconnectorSheet.find((r: any) => r.__rowNum__ === rowNum);
+            if (row) {
+              const cabinetEmptyPrice = parsePrice(row.__EMPTY_20);
+              let brandPrice = 0;
+              if (installationLocationBrand === 'ABB') {
+                brandPrice = parsePrice(row.__EMPTY_22);
+              } else if (installationLocationBrand === 'EATON') {
+                brandPrice = parsePrice(row.__EMPTY_24);
+              } else if (installationLocationBrand === 'LS') {
+                brandPrice = parsePrice(row.__EMPTY_23);
+              }
+              const busbarAcc = parsePrice(row.__EMPTY_30);
+              const siteInstallationCost = parsePrice(row.__EMPTY_32);
+
+              products.push({
+                type: row.__EMPTY || '',
+                code: row.__EMPTY || '',
+                productName: row.__EMPTY || '',
+                materialTotal: cabinetEmptyPrice + brandPrice + busbarAcc,
+                laborTotal: siteInstallationCost,
+                totalPrice: cabinetEmptyPrice + brandPrice + busbarAcc + siteInstallationCost,
+                quantity: '1',
+              });
+            }
+          }
+        }
+      }
+    } else if (sectionKey === 'tr-to-mdb') {
+      if (trMdbSelection === 'yes' && trDistance) {
+        const distance = parseFloat(trDistance || '0');
+        if (distance > 0) {
+          const conduit = props.trWiringType === 'ร้อยท่อเดินในอากาศ กลุ่ม 2' ? trWiringGroup2 : '';
+          const priceData = getTrToMdbPrice(
+            props.trWiringType,
+            conduit,
+            props.powerAuthority,
+            props.transformer,
+            distance
+          );
+
+          if (priceData) {
+            products.push({
+              type: props.trWiringType || '',
+              code: priceData.code || '',
+              productName: priceData.code || '',
+              distance: `${distance} km`,
+              materialTotal: parsePrice(priceData.materialPrice),
+              laborTotal: parsePrice(priceData.laborPrice),
+              totalPrice: parsePrice(priceData.totalPrice),
+              quantity: '1',
+            });
+          }
+        }
+      }
+    } else if (sectionKey === 'mdb') {
+      if (mdbSelection === 'yes' && mdbConfiguration) {
+        let mainPrice = 0;
+        if (mdbConfiguration.product?.MDBMPric && mdbConfiguration.product.MDBMPric !== '-') {
+          mainPrice = parsePrice(mdbConfiguration.product.MDBMPric);
+        }
+
+        products.push({
+          type: 'MDB Configuration',
+          code: mdbConfiguration.product?.MDBMCode || '',
+          productName: mdbConfiguration.product?.MDBMName || '',
+          materialTotal: mainPrice,
+          laborTotal: 0,
+          totalPrice: mainPrice,
+          quantity: '1',
+        });
+
+        if (mccbSubBrand && Array.isArray(props.mdbSubs)) {
+          props.mdbSubs.forEach((val: string) => {
+            const mccbSubData = getMccbSubData(val, mccbSubBrand);
+            if (mccbSubData && Array.isArray(mccbSubData)) {
+              mccbSubData.forEach((item: any) => {
+                if (item.price && item.price !== '-') {
+                  products.push({
+                    type: 'MCCB Sub',
+                    code: item.model || '',
+                    productName: item.model || '',
+                    materialTotal: parsePrice(item.price),
+                    laborTotal: 0,
+                    totalPrice: parsePrice(item.price),
+                    quantity: item.quantity || '1',
+                  });
+                }
+              });
+            }
+          });
+        }
+
+        // เพิ่มตู้ MDB
+        if (getMdbCabinetData) {
+          products.push({
+            type: 'ตู้ MDB',
+            code: 'ตู้ MDB',
+            productName: 'ตู้ MDB',
+            materialTotal: getMdbCabinetData.materialPrice,
+            laborTotal: getMdbCabinetData.laborPrice,
+            totalPrice: getMdbCabinetData.totalPrice,
+            quantity: '1',
+          });
+        }
+      }
+    } else if (sectionKey === 'mdb-to-charger') {
+      if (chargerSelection === 'yes' && chargerResults) {
+        const results = Object.values(chargerResults || {});
+        results.forEach((result: any) => {
+          products.push({
+            type: 'MDB to Charger',
+            code: result.code || '',
+            productName: result.code || '',
+            distance: result.distance ? `${result.distance} km` : undefined,
+            materialTotal: parsePrice(result.materialCost),
+            laborTotal: parsePrice(result.laborCost),
+            totalPrice: parsePrice(result.materialCost) + parsePrice(result.laborCost),
+            quantity: '1',
+          });
+        });
+      }
+    } else if (sectionKey === 'additional') {
+      // Additional features are complex, we'll show a summary
+      if (additionalFeaturesTotals.total > 0) {
+        products.push({
+          type: 'Additional Features & Options',
+          code: 'รวมฟีเจอร์และตัวเลือกเพิ่มเติม',
+          productName: 'รวมฟีเจอร์และตัวเลือกเพิ่มเติม',
+          materialTotal: additionalFeaturesTotals.material,
+          laborTotal: additionalFeaturesTotals.labor,
+          totalPrice: additionalFeaturesTotals.total,
+          quantity: '1',
+        });
+      }
+    } else if (sectionKey === 'travel') {
+      if (travelCostResult > 0) {
+        products.push({
+          type: 'ค่าเดินทาง',
+          code: 'ค่าเดินทาง',
+          productName: 'ค่าเดินทาง',
+          distance: travelDistance ? `${travelDistance} km` : undefined,
+          materialTotal: 0,
+          laborTotal: parsePrice(travelCostResult),
+          totalPrice: parsePrice(travelCostResult),
+          quantity: '1',
+        });
+      }
+    }
+
+    return products;
+  }, [
+    props.transformer, props.powerAuthority, props.trWiringType, props.mdbSubs,
+    lowVoltageRequest, lowVoltageDistance2, lowVoltageDistance3, transformerSelection, transformerPrice,
+    highVoltageSystem, transformerType, highVoltageDistance,
+    installationLocation, installationLocationBrand,
+    trMdbSelection, trDistance, trWiringGroup2, getTrToMdbPrice,
+    mdbSelection, mdbConfiguration, mccbSubBrand, getMccbSubData,
+    chargerSelection, chargerResults,
+    additionalFeaturesTotals,
+    travelCostResult, travelDistance,
+    getMdbCabinetData,
+    getExcelData
+  ]);
+
   const stationCostSections = React.useMemo(() => ([
     {
       key: 'transformer',
       label: '1. รวมค่าใช้จ่าย ของ Transformer Size (ขนาดหม้อแปลง)',
       totals: transformerTotals,
+      products: getSectionProductDetails('transformer'),
     },
     {
       key: 'high-voltage',
       label: '2. รวมค่าใช้จ่าย ของ ระบบแรงสูง',
       totals: highVoltageTotals,
+      products: getSectionProductDetails('high-voltage'),
     },
     {
       key: 'installation',
       label: '3. ราคาสินค้า ของ สถานที่การติดตั้ง',
       totals: installationTotals,
+      products: getSectionProductDetails('installation'),
     },
     {
       key: 'tr-to-mdb',
       label: '4. ราคาสายไฟ จากหม้อแปลงเข้าMDB ของ TR to MDB Configuration (การตั้งค่า TR ไป MDB)',
       totals: trToMdbTotals,
+      products: getSectionProductDetails('tr-to-mdb'),
     },
     {
       key: 'mdb',
       label: '5. ราคารวม MDB: ของ MDB Configuration (การตั้งค่า MDB)',
       totals: mdbTotals,
+      products: getSectionProductDetails('mdb'),
     },
     {
       key: 'mdb-to-charger',
       label: '6. รวมค่าใช้จ่ายทั้งหมด ของ MDB to Charger Configuration (การตั้งค่า MDB ไป Charger)',
       totals: mdbToChargerTotals,
+      products: getSectionProductDetails('mdb-to-charger'),
     },
     {
       key: 'additional',
       label: '7. ราคารวมฟีเจอร์และตัวเลือกเพิ่มเติม ของ Additional Features & Options',
       totals: additionalFeaturesTotals,
+      products: getSectionProductDetails('additional'),
     },
     {
       key: 'travel',
       label: '8. ค่าเดินทาง: ของ ค่าเดินทาง (Travel Cost)',
       totals: travelTotals,
+      products: getSectionProductDetails('travel'),
     },
   ]), [
     transformerTotals,
@@ -1275,6 +1774,7 @@ function MoreDetailCard(props: any) {
     mdbToChargerTotals,
     additionalFeaturesTotals,
     travelTotals,
+    getSectionProductDetails,
   ]);
 
   const stationSectionsForDisplay = React.useMemo(() => {
@@ -2229,12 +2729,18 @@ function MoreDetailCard(props: any) {
                         </CollapsibleTrigger>
                         <CollapsibleContent>
                           <div className="px-4 pb-4 space-y-2 text-sm">
-                            <div><span className="font-medium">จำนวน:</span> {mainQuantity || '-'}</div>
+                            <div><span className="font-medium">จำนวน:</span> {mainRow.__EMPTY_3 || '-'}</div>
                             <div className="mt-2">
                               <div className="font-medium mb-1">รายละเอียด:</div>
                               <div className="pl-4 space-y-1">
-                                <div>{detailRow1.__EMPTY || '-'}</div>
-                                <div>{detailRow2.__EMPTY || '-'}</div>
+                                <div>
+                                  {detailRow1.__EMPTY || '-'}
+                                  {detailRow1.__EMPTY_3 && ` (จำนวน: ${detailRow1.__EMPTY_3})`}
+                                </div>
+                                <div>
+                                  {detailRow2.__EMPTY || '-'}
+                                  {detailRow2.__EMPTY_3 && ` (จำนวน: ${detailRow2.__EMPTY_3})`}
+                                </div>
                               </div>
                             </div>
                             <div><span className="font-medium">ค่าของ:</span> {mainMaterialPrice.toLocaleString('th-TH')} บาท</div>
@@ -2921,9 +3427,6 @@ function MoreDetailCard(props: any) {
                               <div className="p-4 bg-green-50 rounded-lg border border-green-200 space-y-4">
                                 {/* Header */}
                                 <div>
-                                  <div className="text-lg font-semibold text-green-800">
-                                    ราคาสายไฟ จากหม้อแปลงเข้าMDB
-                                  </div>
                                   <div className="text-xs text-gray-500 mt-1">
                                     ประเภท: {wiringTypeDisplay}
                                   </div>
@@ -3122,6 +3625,169 @@ function MoreDetailCard(props: any) {
                 </div>
 
               </div>
+
+              {/* แสดงข้อมูลตู้ MDB */}
+              {mdbSelection === 'yes' && (
+                <>
+                  {getMdbCabinetData ? (
+                    <div className="mt-4">
+                      <Collapsible
+                        open={openItems['mdb-cabinet-info']}
+                        onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'mdb-cabinet-info': open }))}
+                      >
+                        <div className="bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 rounded-xl border-2 border-emerald-200 shadow-lg overflow-hidden">
+                          <CollapsibleTrigger className="w-full p-5 text-left hover:bg-emerald-100/50 transition-all duration-200">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="p-2 bg-emerald-500 rounded-lg shadow-md">
+                                  <Box className="h-5 w-5 text-white" />
+                                </div>
+                                <div>
+                                  <div className="text-xl font-bold text-emerald-900">ตู้ MDB</div>
+                                  <div className="text-xs text-emerald-700 mt-0.5">ข้อมูลตู้และราคา</div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {openItems['mdb-cabinet-info'] ? (
+                                  <ChevronUp className="h-5 w-5 text-emerald-600" />
+                                ) : (
+                                  <ChevronDown className="h-5 w-5 text-emerald-600" />
+                                )}
+                              </div>
+                            </div>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <div className="px-5 pb-5 space-y-5 bg-white/50">
+                              {/* ขนาดตู้และรายละเอียดราคา - แสดงในบรรทัดเดียวกัน */}
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                                {/* ขนาดตู้ */}
+                                {getMdbCabinetData.cabinetSize && (
+                                  <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200 shadow-sm">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <Ruler className="h-4 w-4 text-blue-600" />
+                                      <div className="text-xs font-semibold text-blue-900 uppercase tracking-wide">ขนาดตู้</div>
+                                    </div>
+                                    <div className="text-base font-bold text-gray-800">{getMdbCabinetData.cabinetSize}</div>
+                                    <div className="text-xs text-gray-500 mt-1">(กว้าง × ยาว × ลึก)</div>
+                                  </div>
+                                )}
+
+                                {/* ราคาตู้เปล่า */}
+                                <div className="p-4 bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="text-xs text-gray-500 uppercase tracking-wide">ราคาตู้เปล่า</div>
+                                    <Settings className="h-4 w-4 text-gray-400" />
+                                  </div>
+                                  <div className="text-xl font-bold text-gray-800">
+                                    {getMdbCabinetData.emptyCabinetPrice.toLocaleString('th-TH')}
+                                  </div>
+                                  <div className="text-xs text-gray-500 mt-1">บาท</div>
+                                </div>
+
+                                {/* ราคาGround */}
+                                <div className="p-4 bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="text-xs text-gray-500 uppercase tracking-wide">ราคาGround</div>
+                                    <Shield className="h-4 w-4 text-gray-400" />
+                                  </div>
+                                  <div className="text-xl font-bold text-gray-800">
+                                    {getMdbCabinetData.groundPrice.toLocaleString('th-TH')}
+                                  </div>
+                                  <div className="text-xs text-gray-500 mt-1">บาท</div>
+                                </div>
+
+                                {/* ค่าติดตั้งหน้าSite */}
+                                <div className="p-4 bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="text-xs text-gray-500 uppercase tracking-wide">ค่าติดตั้งหน้าSite</div>
+                                    <Wrench className="h-4 w-4 text-gray-400" />
+                                  </div>
+                                  <div className="text-xl font-bold text-gray-800">
+                                    {getMdbCabinetData.siteInstallationCost.toLocaleString('th-TH')}
+                                  </div>
+                                  <div className="text-xs text-gray-500 mt-1">บาท</div>
+                                </div>
+                              </div>
+
+                              {/* สรุปราคา */}
+                              <div className="pt-4 border-t-2 border-emerald-200">
+                                <div className="space-y-3">
+                                  <div className="p-4 bg-gradient-to-r from-slate-50 to-gray-50 rounded-lg border border-slate-200">
+                                    <div className="flex items-center justify-between mb-1">
+                                      <span className="text-sm font-semibold text-gray-700">ราคาค่าของตู้ MDB</span>
+                                      <span className="text-lg font-bold text-gray-800">
+                                        {getMdbCabinetData.materialPrice.toLocaleString('th-TH')} บาท
+                                      </span>
+                                    </div>
+                                    <div className="text-xs text-gray-500 pl-1">
+                                      (ราคาตู้เปล่า + ราคาGround)
+                                    </div>
+                                  </div>
+                                  <div className="p-4 bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg border-2 border-emerald-300 shadow-md">
+                                    <div className="flex items-center justify-between mb-1">
+                                      <span className="text-sm font-semibold text-emerald-900">ราคารวมตู้ MDB</span>
+                                      <span className="text-xl font-bold text-emerald-700">
+                                        {getMdbCabinetData.totalPrice.toLocaleString('th-TH')} บาท
+                                      </span>
+                                    </div>
+                                    <div className="text-xs text-emerald-600 pl-1">
+                                      (ราคาค่าของตู้ MDB + ค่าติดตั้งหน้าSite)
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* สรุปค่าใช้จ่าย */}
+                              <div className="pt-4 border-t-2 border-emerald-200">
+                                <div className="mb-3">
+                                  <div className="text-sm font-semibold text-gray-700 uppercase tracking-wide">สรุปค่าใช้จ่าย</div>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                  <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border-2 border-blue-200 shadow-md">
+                                    <div className="text-xs text-blue-700 uppercase tracking-wide mb-2 font-semibold">ค่าของรวม</div>
+                                    <div className="text-2xl font-bold text-blue-900">
+                                      {getMdbCabinetData.materialPrice.toLocaleString('th-TH')}
+                                    </div>
+                                    <div className="text-xs text-blue-600 mt-1">บาท</div>
+                                  </div>
+                                  <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg border-2 border-purple-200 shadow-md">
+                                    <div className="text-xs text-purple-700 uppercase tracking-wide mb-2 font-semibold">ค่าแรงรวม</div>
+                                    <div className="text-2xl font-bold text-purple-900">
+                                      {getMdbCabinetData.laborPrice.toLocaleString('th-TH')}
+                                    </div>
+                                    <div className="text-xs text-purple-600 mt-1">บาท</div>
+                                  </div>
+                                  <div className="p-4 bg-gradient-to-br from-emerald-500 to-green-600 rounded-lg border-2 border-emerald-600 shadow-lg">
+                                    <div className="text-xs text-white uppercase tracking-wide mb-2 font-semibold">ราคารวม</div>
+                                    <div className="text-3xl font-bold text-white">
+                                      {getMdbCabinetData.totalPrice.toLocaleString('th-TH')}
+                                    </div>
+                                    <div className="text-xs text-emerald-100 mt-1">บาท</div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </CollapsibleContent>
+                        </div>
+                      </Collapsible>
+                    </div>
+                  ) : (
+                    <div className="mt-4 p-4 bg-gradient-to-r from-yellow-50 to-amber-50 rounded-xl border-2 border-yellow-300 shadow-md">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-yellow-400 rounded-lg">
+                          <Shield className="h-5 w-5 text-yellow-900" />
+                        </div>
+                        <div>
+                          <div className="text-sm font-semibold text-yellow-900">ไม่พบข้อมูลตู้ MDB</div>
+                          <div className="text-xs text-yellow-700 mt-1">
+                            Transformer: {props.transformer || '-'} kVA | Power Authority: {props.powerAuthority || '-'}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
 
               {/* แสดงตัวเลือกยี่ห้อ MCCB Main */}
 
@@ -3463,7 +4129,7 @@ function MoreDetailCard(props: any) {
                 )}
 
                 {/* ราคารวม MDB */}
-                {mdbConfiguration && mccbSubBrand && Array.isArray(props.mdbSubs) && props.mdbSubs.length > 0 && (() => {
+                {mdbConfiguration && (() => {
                   // คำนวณราคา MDB Main
                   let mainPrice = 0;
                   if (mdbConfiguration.product?.MDBMPric && mdbConfiguration.product.MDBMPric !== '-') {
@@ -3476,27 +4142,51 @@ function MoreDetailCard(props: any) {
 
                   // คำนวณราคารวม MCCB Sub
                   let totalSubPrice = 0;
-                  props.mdbSubs.forEach((val: string) => {
-                    const mccbSubData = getMccbSubData(val, mccbSubBrand);
-                    if (mccbSubData && Array.isArray(mccbSubData)) {
-                      mccbSubData.forEach((item: any) => {
-                        if (item.price && item.price !== '-') {
-                          const priceStr = String(item.price).replace(/[,\s]/g, '');
-                          const priceNum = parseFloat(priceStr);
-                          if (!isNaN(priceNum)) {
-                            totalSubPrice += priceNum;
+                  if (mccbSubBrand && Array.isArray(props.mdbSubs) && props.mdbSubs.length > 0) {
+                    props.mdbSubs.forEach((val: string) => {
+                      const mccbSubData = getMccbSubData(val, mccbSubBrand);
+                      if (mccbSubData && Array.isArray(mccbSubData)) {
+                        mccbSubData.forEach((item: any) => {
+                          if (item.price && item.price !== '-') {
+                            const priceStr = String(item.price).replace(/[,\s]/g, '');
+                            const priceNum = parseFloat(priceStr);
+                            if (!isNaN(priceNum)) {
+                              totalSubPrice += priceNum;
+                            }
                           }
-                        }
-                      });
-                    }
-                  });
+                        });
+                      }
+                    });
+                  }
 
-                  const totalMdbPrice = mainPrice + totalSubPrice;
+                  // เพิ่มราคาตู้ MDB
+                  let mdbCabinetMaterial = 0;
+                  let mdbCabinetLabor = 0;
+                  if (getMdbCabinetData) {
+                    mdbCabinetMaterial = getMdbCabinetData.materialPrice;
+                    mdbCabinetLabor = getMdbCabinetData.laborPrice;
+                  }
+
+                  const totalMaterial = mainPrice + totalSubPrice + mdbCabinetMaterial;
+                  const totalLabor = mdbCabinetLabor;
+                  const totalMdbPrice = totalMaterial + totalLabor;
+
                   return totalMdbPrice > 0 ? (
-                    <div className="mt-4 p-3 bg-blue-100 rounded-lg border border-blue-300">
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-blue-800">ราคารวม MDB:</span>
-                        <span className="text-lg font-bold text-blue-700">{totalMdbPrice.toLocaleString()} บาท</span>
+                    <div className="mt-4 p-4 bg-blue-100 rounded-lg border border-blue-300">
+                      <div className="text-lg font-semibold text-blue-800 mb-3">ราคารวม MDB:</div>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <div className="text-sm text-gray-600 mb-1">ค่าของรวม:</div>
+                          <div className="text-xl font-bold text-gray-800">{totalMaterial.toLocaleString('th-TH')} บาท</div>
+                        </div>
+                        <div>
+                          <div className="text-sm text-gray-600 mb-1">ค่าแรงรวม:</div>
+                          <div className="text-xl font-bold text-gray-800">{totalLabor.toLocaleString('th-TH')} บาท</div>
+                        </div>
+                        <div>
+                          <div className="text-sm text-blue-700 font-semibold mb-1">ราคารวม:</div>
+                          <div className="text-2xl font-bold text-blue-700">{totalMdbPrice.toLocaleString('th-TH')} บาท</div>
+                        </div>
                       </div>
                     </div>
                   ) : null;
@@ -6340,7 +7030,7 @@ function MoreDetailCard(props: any) {
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                       <div className="px-5 pb-5">
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 mb-4">
                           <div className="rounded-lg border border-slate-100 bg-slate-50 p-4">
                             <div className="text-xs text-slate-500 uppercase tracking-wide">ค่าของรวม</div>
                             <div className="mt-2 text-xl font-semibold text-slate-800">{formatCurrency(section.totals.material)} บาท</div>
@@ -6354,6 +7044,44 @@ function MoreDetailCard(props: any) {
                             <div className="mt-2 text-2xl font-bold text-slate-900">{formatCurrency(sectionTotal)} บาท</div>
                           </div>
                         </div>
+
+                        {/* แสดงรายละเอียดสินค้า */}
+                        {section.products && section.products.length > 0 && (
+                          <div className="mt-4 space-y-3">
+                            <div className="text-sm font-semibold text-slate-700 mb-3">รายละเอียดสินค้า:</div>
+                            <div className="overflow-x-auto">
+                              <table className="w-full border-collapse">
+                                <thead>
+                                  <tr className="bg-slate-100 border-b-2 border-slate-200">
+                                    <th className="text-left p-3 text-xs font-semibold text-slate-700 uppercase">ประเภท</th>
+                                    <th className="text-left p-3 text-xs font-semibold text-slate-700 uppercase">รหัส</th>
+                                    <th className="text-left p-3 text-xs font-semibold text-slate-700 uppercase">รายการสินค้า</th>
+                                    <th className="text-left p-3 text-xs font-semibold text-slate-700 uppercase">ระยะทาง</th>
+                                    <th className="text-right p-3 text-xs font-semibold text-slate-700 uppercase">ค่าของรวม</th>
+                                    <th className="text-right p-3 text-xs font-semibold text-slate-700 uppercase">ค่าแรงรวม</th>
+                                    <th className="text-right p-3 text-xs font-semibold text-slate-700 uppercase">ราคารวม</th>
+                                    <th className="text-center p-3 text-xs font-semibold text-slate-700 uppercase">จำนวนชิ้น</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {section.products.map((product, idx) => (
+                                    <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                                      <td className="p-3 text-sm text-slate-800">{product.type || '-'}</td>
+                                      <td className="p-3 text-sm text-slate-800">{product.code || '-'}</td>
+                                      <td className="p-3 text-sm text-slate-800">{product.productName || product.code || '-'}</td>
+                                      <td className="p-3 text-sm text-slate-800">{product.distance || '-'}</td>
+                                      <td className="p-3 text-sm text-slate-800 text-right font-medium">{formatCurrency(product.materialTotal)} บาท</td>
+                                      <td className="p-3 text-sm text-slate-800 text-right font-medium">{formatCurrency(product.laborTotal)} บาท</td>
+                                      <td className="p-3 text-sm text-slate-900 text-right font-bold">{formatCurrency(product.totalPrice)} บาท</td>
+                                      <td className="p-3 text-sm text-slate-800 text-center">{product.quantity || '-'}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+
                         {!section.hasValue && (
                           <div className="mt-3 text-xs text-slate-400">
                             ไม่มีค่าใช้จ่ายในหัวข้อนี้จากเงื่อนไขที่เลือกไว้
@@ -7202,6 +7930,7 @@ function StationAccessory() {
       225: 7,
       300: 8,
       350: 9,
+      400: 12,
       450: 10,
       630: 11,
       900: 13,
