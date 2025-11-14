@@ -273,14 +273,32 @@ export default function Home(): React.JSX.Element {
     const googleSheetsUrl = 'https://docs.google.com/spreadsheets/d/1yxZvBr0O9ZzFpQCgBeZIcQrKGq_x2wQz/edit?usp=sharing&ouid=111737986991833013743&rtpof=true&sd=true';
     const fileId = googleSheetsUrl.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1];
     const excelFileUrl = `https://docs.google.com/spreadsheets/d/${fileId}/export?format=xlsx&usp=sharing`;
+
+    console.log('🔄 กำลังโหลดข้อมูลจาก Google Sheets...');
+    console.log('📄 Google Sheets URL:', googleSheetsUrl);
+    console.log('📥 Excel File URL:', excelFileUrl);
+    console.log('🆔 File ID:', fileId);
+
     try {
       const response = await axios.get(excelFileUrl, { responseType: 'arraybuffer' });
+      console.log('✅ ดาวน์โหลดข้อมูลสำเร็จ, ขนาด:', response.data.byteLength, 'bytes');
+
       const workbook = XLSX.read(response.data, { type: 'array' });
+      console.log('📊 จำนวน Sheets ทั้งหมด:', workbook.SheetNames.length);
+      console.log('📋 รายชื่อ Sheets:', workbook.SheetNames);
+
       const sheetName = workbook.SheetNames[0];
+      console.log('📝 Sheet ที่ใช้:', sheetName);
+
       const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+      console.log('✅ อ่านข้อมูล Excel สำเร็จ');
+      console.log('📊 จำนวนแถวข้อมูล:', jsonData.length);
+      console.log('🔍 ตัวอย่างข้อมูล 5 แถวแรก:', jsonData.slice(0, 5));
+
       setExcelData(jsonData);
+      console.log('✅ บันทึกข้อมูลลง state สำเร็จ');
     } catch (error) {
-      console.error("Error fetching Excel file:", error);
+      console.error("❌ Error fetching Excel file:", error);
     }
   };
 
@@ -472,11 +490,16 @@ export default function Home(): React.JSX.Element {
     console.log(`Columns to check:`, cols);
 
     // ดึงค่าทุกคอลัมน์มาต่อกัน (เว้นวรรค)
-    const values = cols.map(col => {
+    let values = cols.map(col => {
       const val = trRow[col];
       console.log(`Column ${col}: ${val}`);
       return val;
     }).filter(Boolean).join(' ');
+
+    // เพิ่ม " )" ต่อท้ายสำหรับ "ร้อยท่อเดินในอากาศ กลุ่ม 2"
+    if (form.trWiringType === 'ร้อยท่อเดินในอากาศ กลุ่ม 2' && values) {
+      values = values + ' )';
+    }
 
     console.log(`Final TR Wiring Size: "${values}"`);
     return values;
@@ -607,11 +630,16 @@ export default function Home(): React.JSX.Element {
     console.log(`Columns to check:`, cols);
 
     // ดึงค่าทุกคอลัมน์มาต่อกัน (เว้นวรรค)
-    const value = cols.map(col => {
+    let value = cols.map(col => {
       const val = trRow[col];
       console.log(`Column ${col}: ${val}`);
       return val;
     }).filter(Boolean).join(' ');
+
+    // เพิ่ม " )" ต่อท้ายสำหรับ "ร้อยท่อเดินในอากาศ กลุ่ม 2"
+    if (form.trWiringType === 'ร้อยท่อเดินในอากาศ กลุ่ม 2' && value) {
+      value = value + ' )';
+    }
 
     console.log(`Final TR Wiring Size CVs: "${value}"`);
 
@@ -678,19 +706,19 @@ export default function Home(): React.JSX.Element {
     const wiringTypeToCols: Record<string, string[]> = form.powerAuthority === 'MEA'
       ? {
         'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ': [
-          '__EMPTY_31', '__EMPTY_32', '__EMPTY_33', '__EMPTY_34', '__EMPTY_35', '__EMPTY_36', '__EMPTY_37', '__EMPTY_38'
-        ], // __EMPTY_31 to __EMPTY_38
+          '__EMPTY_27', '__EMPTY_28', '__EMPTY_29', '__EMPTY_30', '__EMPTY_31', '__EMPTY_32', '__EMPTY_33', '__EMPTY_34', '__EMPTY_35', '__EMPTY_36', '__EMPTY_37', '__EMPTY_38', '__EMPTY_39'
+        ], // __EMPTY_27 to __EMPTY_39
         'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน': [
-          '__EMPTY_55', '__EMPTY_56', '__EMPTY_57', '__EMPTY_58', '__EMPTY_59', '__EMPTY_60', '__EMPTY_61', '__EMPTY_62'
-        ], // __EMPTY_55 to __EMPTY_62
+          '__EMPTY_51', '__EMPTY_52', '__EMPTY_53', '__EMPTY_54', '__EMPTY_55', '__EMPTY_56', '__EMPTY_57', '__EMPTY_58', '__EMPTY_59', '__EMPTY_60', '__EMPTY_61', '__EMPTY_62', '__EMPTY_63'
+        ], // __EMPTY_51 to __EMPTY_63
       }
       : {
         'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ': [
-          '__EMPTY_29', '__EMPTY_30', '__EMPTY_31', '__EMPTY_32', '__EMPTY_33', '__EMPTY_34', '__EMPTY_35', '__EMPTY_36'
-        ], // __EMPTY_29 to __EMPTY_36
+          '__EMPTY_25', '__EMPTY_26', '__EMPTY_27', '__EMPTY_28', '__EMPTY_29', '__EMPTY_30', '__EMPTY_31', '__EMPTY_32', '__EMPTY_33', '__EMPTY_34', '__EMPTY_35', '__EMPTY_36', '__EMPTY_37'
+        ], // __EMPTY_25 to __EMPTY_37
         'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน': [
-          '__EMPTY_53', '__EMPTY_54', '__EMPTY_55', '__EMPTY_56', '__EMPTY_57', '__EMPTY_58', '__EMPTY_59', '__EMPTY_60'
-        ], // __EMPTY_53 to __EMPTY_60
+          '__EMPTY_49', '__EMPTY_50', '__EMPTY_51', '__EMPTY_52', '__EMPTY_53', '__EMPTY_54', '__EMPTY_55', '__EMPTY_56', '__EMPTY_57', '__EMPTY_58', '__EMPTY_59', '__EMPTY_60', '__EMPTY_61'
+        ], // __EMPTY_49 to __EMPTY_61
       };
 
     const cols = wiringTypeToCols[form.chargerWiringType];
@@ -741,8 +769,8 @@ export default function Home(): React.JSX.Element {
     // เงื่อนไข MEA
     if (form.powerAuthority === 'MEA') {
       if (form.chargerWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ') {
-        // คอลัมน์ AY-BD (index 50-55) = ['__EMPTY_50', '__EMPTY_51', '__EMPTY_52', '__EMPTY_53', '__EMPTY_54', '__EMPTY_55']
-        const cols = ['__EMPTY_50', '__EMPTY_51', '__EMPTY_52', '__EMPTY_53', '__EMPTY_54', '__EMPTY_55'];
+        // Fields: __EMPTY_44 to __EMPTY_49
+        const cols = ['__EMPTY_44', '__EMPTY_45', '__EMPTY_46', '__EMPTY_47', '__EMPTY_48', '__EMPTY_49'];
         if (chargerTypeMode === 'any') {
           return multiChargers
             .filter(name => name !== '')
@@ -771,8 +799,8 @@ export default function Home(): React.JSX.Element {
         }
       }
       if (form.chargerWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน') {
-        // คอลัมน์ BW-CB (index 74-79) = ['__EMPTY_74', '__EMPTY_75', '__EMPTY_76', '__EMPTY_77', '__EMPTY_78', '__EMPTY_79']
-        const cols = ['__EMPTY_74', '__EMPTY_75', '__EMPTY_76', '__EMPTY_77', '__EMPTY_78', '__EMPTY_79'];
+        // Fields: __EMPTY_68 to __EMPTY_73
+        const cols = ['__EMPTY_68', '__EMPTY_69', '__EMPTY_70', '__EMPTY_71', '__EMPTY_72', '__EMPTY_73'];
         if (chargerTypeMode === 'any') {
           return multiChargers
             .filter(name => name !== '')
@@ -804,8 +832,8 @@ export default function Home(): React.JSX.Element {
     // เงื่อนไข PEA
     if (form.powerAuthority === 'PEA') {
       if (form.chargerWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ') {
-        // คอลัมน์ AW-BB (index 48-53) = ['__EMPTY_48', '__EMPTY_49', '__EMPTY_50', '__EMPTY_51', '__EMPTY_52', '__EMPTY_53']
-        const cols = ['__EMPTY_48', '__EMPTY_49', '__EMPTY_50', '__EMPTY_51', '__EMPTY_52', '__EMPTY_53'];
+        // Fields: __EMPTY_42 to __EMPTY_47
+        const cols = ['__EMPTY_42', '__EMPTY_43', '__EMPTY_44', '__EMPTY_45', '__EMPTY_46', '__EMPTY_47'];
         if (chargerTypeMode === 'any') {
           return multiChargers
             .filter(name => name !== '')
@@ -834,8 +862,8 @@ export default function Home(): React.JSX.Element {
         }
       }
       if (form.chargerWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน') {
-        // คอลัมน์ BU-BZ (index 72-77) = ['__EMPTY_72', '__EMPTY_73', '__EMPTY_74', '__EMPTY_75', '__EMPTY_76', '__EMPTY_77']
-        const cols = ['__EMPTY_72', '__EMPTY_73', '__EMPTY_74', '__EMPTY_75', '__EMPTY_76', '__EMPTY_77'];
+        // Fields: __EMPTY_66 to __EMPTY_71
+        const cols = ['__EMPTY_66', '__EMPTY_67', '__EMPTY_68', '__EMPTY_69', '__EMPTY_70', '__EMPTY_71'];
         if (chargerTypeMode === 'any') {
           return multiChargers
             .filter(name => name !== '')

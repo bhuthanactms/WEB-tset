@@ -619,9 +619,9 @@ function MoreDetailCard(props: any) {
     if (wheelStops === 'yes') {
       const item = stationEquipmentPriceMapping['wheel-stops'];
       if (item) {
-        totals.material += item.materialPrice * parkingSlotsCount;
-        totals.labor += item.laborPrice * parkingSlotsCount;
-        totals.total += item.totalPrice * parkingSlotsCount;
+        totals.material += item.materialPrice * featureChargersCount;
+        totals.labor += item.laborPrice * featureChargersCount;
+        totals.total += item.totalPrice * featureChargersCount;
       }
     }
 
@@ -1351,10 +1351,10 @@ function MoreDetailCard(props: any) {
             const labor = isDistance ? laborUnit * distance : laborUnit;
 
             products.push({
-              type: row2.__EMPTY || '',
+              type: `หม้อแปลง ${row2.__EMPTY || ''}`,
               code: row2.__EMPTY || '',
-              productName: row2.__EMPTY || '',
-              distance: isDistance ? `${distance} km` : undefined,
+              productName: `Transformer Size: ${transformerSize} kVA`,
+              distance: isDistance ? `${distance} เมตร` : undefined,
               materialTotal: material,
               laborTotal: labor,
               totalPrice: material + labor,
@@ -1372,10 +1372,10 @@ function MoreDetailCard(props: any) {
             const labor = isDistance ? laborUnit * distance : laborUnit;
 
             products.push({
-              type: row3.__EMPTY || '',
+              type: `หม้อแปลง ${row3.__EMPTY || ''}`,
               code: row3.__EMPTY || '',
-              productName: row3.__EMPTY || '',
-              distance: isDistance ? `${distance} km` : undefined,
+              productName: `Transformer Size: ${transformerSize} kVA`,
+              distance: isDistance ? `${distance} เมตร` : undefined,
               materialTotal: material,
               laborTotal: labor,
               totalPrice: material + labor,
@@ -1385,9 +1385,9 @@ function MoreDetailCard(props: any) {
         }
       } else if (transformerSelection === 'yes' && transformerPrice) {
         products.push({
-          type: transformerPrice.type === '22kv-416v' ? '22 (24) kV / 416 V' : '33 kV / 316 V',
+          type: `หม้อแปลง ${transformerPrice.type === '22kv-416v' ? '22 (24) kV / 416 V' : '33 kV / 316 V'}`,
           code: transformerPrice.productCode || transformerPrice.productName || '',
-          productName: transformerPrice.productName || '',
+          productName: `Transformer Size: ${transformerSize} kVA`,
           materialTotal: toNumber(transformerPrice.laborCost),
           laborTotal: toNumber(transformerPrice.installationCost),
           totalPrice: toNumber(transformerPrice.totalInstallationCost) || (toNumber(transformerPrice.laborCost) + toNumber(transformerPrice.installationCost)),
@@ -1437,8 +1437,8 @@ function MoreDetailCard(props: any) {
             if (mainRow) {
               products.push({
                 type: mainRow.__EMPTY || '',
-                code: mainRow.__EMPTY || '',
-                productName: mainRow.__EMPTY || '',
+                code: '-',
+                productName: '-',
                 materialTotal: parseFloat(mainRow.__EMPTY_4 || 0) || 0,
                 laborTotal: parseFloat(mainRow.__EMPTY_5 || 0) || 0,
                 totalPrice: parseFloat(mainRow.__EMPTY_6 || 0) || 0,
@@ -1452,9 +1452,9 @@ function MoreDetailCard(props: any) {
               const laborUnit = parseFloat(distanceRow.__EMPTY_5 || 0) || 0;
               products.push({
                 type: distanceRow.__EMPTY || '',
-                code: distanceRow.__EMPTY || '',
-                productName: distanceRow.__EMPTY || '',
-                distance: `${distance} km`,
+                code: '-',
+                productName: '-',
+                distance: `${distance} เมตร`,
                 materialTotal: materialUnit * distance,
                 laborTotal: laborUnit * distance,
                 totalPrice: (parseFloat(distanceRow.__EMPTY_6 || 0) || 0) * distance,
@@ -1465,8 +1465,8 @@ function MoreDetailCard(props: any) {
             if (detailRow1) {
               products.push({
                 type: detailRow1.__EMPTY || '',
-                code: detailRow1.__EMPTY || '',
-                productName: detailRow1.__EMPTY || '',
+                code: '-',
+                productName: '-',
                 materialTotal: parseFloat(detailRow1.__EMPTY_4 || 0) || 0,
                 laborTotal: parseFloat(detailRow1.__EMPTY_5 || 0) || 0,
                 totalPrice: parseFloat(detailRow1.__EMPTY_6 || 0) || 0,
@@ -1477,8 +1477,8 @@ function MoreDetailCard(props: any) {
             if (detailRow2) {
               products.push({
                 type: detailRow2.__EMPTY || '',
-                code: detailRow2.__EMPTY || '',
-                productName: detailRow2.__EMPTY || '',
+                code: '-',
+                productName: '-',
                 materialTotal: parseFloat(detailRow2.__EMPTY_4 || 0) || 0,
                 laborTotal: parseFloat(detailRow2.__EMPTY_5 || 0) || 0,
                 totalPrice: parseFloat(detailRow2.__EMPTY_6 || 0) || 0,
@@ -1494,8 +1494,8 @@ function MoreDetailCard(props: any) {
                 const poleLaborPerUnit = parseFloat(poleRow.__EMPTY_5 || 0) || 0;
                 products.push({
                   type: poleRow.__EMPTY || '',
-                  code: poleRow.__EMPTY || '',
-                  productName: poleRow.__EMPTY || '',
+                  code: '-',
+                  productName: '-',
                   materialTotal: poleMaterialPerUnit * poleCount,
                   laborTotal: poleLaborPerUnit * poleCount,
                   totalPrice: (parseFloat(poleRow.__EMPTY_6 || 0) || 0) * poleCount,
@@ -1566,13 +1566,34 @@ function MoreDetailCard(props: any) {
               const busbarAcc = parsePrice(row.__EMPTY_30);
               const siteInstallationCost = parsePrice(row.__EMPTY_32);
 
+              // ดึงข้อมูลขนาดตู้ (กว้าง ยาว ลึก) จาก __EMPTY_13 ถึง __EMPTY_17
+              const cabinetSize = [
+                row.__EMPTY_13,
+                row.__EMPTY_14,
+                row.__EMPTY_15,
+                row.__EMPTY_16,
+                row.__EMPTY_17
+              ].filter(v => v !== undefined && v !== null && v !== '').join(' ');
+
+              // 1. ตู้ Disconnecter
               products.push({
-                type: row.__EMPTY || '',
-                code: row.__EMPTY || '',
-                productName: row.__EMPTY || '',
-                materialTotal: cabinetEmptyPrice + brandPrice + busbarAcc,
-                laborTotal: siteInstallationCost,
-                totalPrice: cabinetEmptyPrice + brandPrice + busbarAcc + siteInstallationCost,
+                type: 'ตู้ Disconnecter',
+                code: row.__EMPTY_9 || '', // ตู้เปล่า
+                productName: cabinetSize || '-', // ขนาดตู้ (กว้าง ยาว ลึก)
+                materialTotal: cabinetEmptyPrice, // ราคาตู้เปล่า
+                laborTotal: 0, // ไม่มีค่าแรง
+                totalPrice: cabinetEmptyPrice,
+                quantity: '1',
+              });
+
+              // 2. เบรกเกอร์
+              products.push({
+                type: 'เบรกเกอร์',
+                code: '-', // ไม่มีรหัส
+                productName: installationLocationBrand || '', // แบรนด์ที่เลือก
+                materialTotal: brandPrice + busbarAcc, // ราคาแบรนด์ + Busbar+ACC
+                laborTotal: siteInstallationCost, // ค่าติดตั้งหน้าSite
+                totalPrice: brandPrice + busbarAcc + siteInstallationCost,
                 quantity: '1',
               });
             }
@@ -1593,11 +1614,21 @@ function MoreDetailCard(props: any) {
           );
 
           if (priceData) {
+            // สร้างรายการสินค้า: ขนาดสาย (CV/THW) + ท่อ
+            let productNameParts: string[] = [];
+            if (props.trWiringSize) {
+              productNameParts.push(`ขนาดสาย (CV/THW): ${props.trWiringSize}`);
+            }
+            if (props.trWireConduit || conduit) {
+              productNameParts.push(`ท่อ: ${props.trWireConduit || conduit}`);
+            }
+            const productName = productNameParts.length > 0 ? productNameParts.join(', ') : '-';
+
             products.push({
               type: props.trWiringType || '',
-              code: priceData.code || '',
-              productName: priceData.code || '',
-              distance: `${distance} km`,
+              code: priceData.productCode || priceData.code || '',
+              productName: productName,
+              distance: `${distance} เมตร`,
               materialTotal: parsePrice(priceData.materialPrice),
               laborTotal: parsePrice(priceData.laborPrice),
               totalPrice: parsePrice(priceData.totalPrice),
@@ -1613,16 +1644,18 @@ function MoreDetailCard(props: any) {
           mainPrice = parsePrice(mdbConfiguration.product.MDBMPric);
         }
 
+        // 5.1 MDB MAIN - เอาข้อมูลจาก MCCB Main
         products.push({
           type: 'MDB Configuration',
-          code: mdbConfiguration.product?.MDBMCode || '',
-          productName: mdbConfiguration.product?.MDBMName || '',
+          code: mdbConfiguration.header?.productCodeHeader || '', // รหัสสินค้า
+          productName: mdbConfiguration.mccbBrand || '', // ประเภท
           materialTotal: mainPrice,
           laborTotal: 0,
           totalPrice: mainPrice,
           quantity: '1',
         });
 
+        // 5.2 MCCB SUB แต่ละอัน
         if (mccbSubBrand && Array.isArray(props.mdbSubs)) {
           props.mdbSubs.forEach((val: string) => {
             const mccbSubData = getMccbSubData(val, mccbSubBrand);
@@ -1632,7 +1665,7 @@ function MoreDetailCard(props: any) {
                   products.push({
                     type: 'MCCB Sub',
                     code: item.model || '',
-                    productName: item.model || '',
+                    productName: `MCCB SUB ${item.value || val}`, // MCCB SUB C (ค่า A)
                     materialTotal: parsePrice(item.price),
                     laborTotal: 0,
                     totalPrice: parsePrice(item.price),
@@ -1644,12 +1677,14 @@ function MoreDetailCard(props: any) {
           });
         }
 
-        // เพิ่มตู้ MDB
+        // 5.3 ตู้ MDB
         if (getMdbCabinetData) {
+          const cabinetSizeText = getMdbCabinetData.cabinetSize || '-';
+          const priceText = `(ราคาตู้เปล่า + ราคาGROUND: ${(getMdbCabinetData.emptyCabinetPrice + getMdbCabinetData.groundPrice).toLocaleString('th-TH')} บาท)`;
           products.push({
             type: 'ตู้ MDB',
             code: 'ตู้ MDB',
-            productName: 'ตู้ MDB',
+            productName: `${cabinetSizeText} ${priceText}`, // ขนาดตู้ (ต่อท้าย (ราคาตู้เปล่า + ราคาGROUND))
             materialTotal: getMdbCabinetData.materialPrice,
             laborTotal: getMdbCabinetData.laborPrice,
             totalPrice: getMdbCabinetData.totalPrice,
@@ -1660,12 +1695,19 @@ function MoreDetailCard(props: any) {
     } else if (sectionKey === 'mdb-to-charger') {
       if (chargerSelection === 'yes' && chargerResults) {
         const results = Object.values(chargerResults || {});
-        results.forEach((result: any) => {
+        const cables: string[] = Array.isArray(props.chargerWiringCableAll) ? props.chargerWiringCableAll : (props.chargerWiringCable ? [props.chargerWiringCable] : []);
+
+        results.forEach((result: any, idx: number) => {
+          const distance = parseFloat(chargerLineDistances[idx] || '0') || 0;
+          const cable = cables[idx] || cables[0] || '';
+          // ลบ "ChargerX: " ออกจาก cable ถ้ามี
+          const cableSize = cable.replace(/^Charger\d+:\s*/, '').trim();
+
           products.push({
-            type: 'MDB to Charger',
+            type: props.chargerWiringType || 'MDB to Charger',
             code: result.code || '',
-            productName: result.code || '',
-            distance: result.distance ? `${result.distance} km` : undefined,
+            productName: cableSize ? `ขนาดสาย (CV/THW): ${cableSize}` : '-',
+            distance: distance > 0 ? `${distance} เมตร` : undefined,
             materialTotal: parsePrice(result.materialCost),
             laborTotal: parsePrice(result.laborCost),
             totalPrice: parsePrice(result.materialCost) + parsePrice(result.laborCost),
@@ -1687,12 +1729,15 @@ function MoreDetailCard(props: any) {
         });
       }
     } else if (sectionKey === 'travel') {
-      if (travelCostResult > 0) {
+      if (travelCostResult > 0 && travelDistance) {
+        // travelDistance เป็น km (จาก label "ระยะทาง (กิโลเมตร)") แปลงเป็นเมตร
+        const distanceKm = parseFloat(travelDistance) || 0;
+        const distanceMeter = distanceKm * 1000;
         products.push({
           type: 'ค่าเดินทาง',
           code: 'ค่าเดินทาง',
           productName: 'ค่าเดินทาง',
-          distance: travelDistance ? `${travelDistance} km` : undefined,
+          distance: distanceMeter > 0 ? `${distanceMeter.toLocaleString('th-TH')} เมตร` : undefined,
           materialTotal: 0,
           laborTotal: parsePrice(travelCostResult),
           totalPrice: parsePrice(travelCostResult),
@@ -1709,11 +1754,12 @@ function MoreDetailCard(props: any) {
     installationLocation, installationLocationBrand,
     trMdbSelection, trDistance, trWiringGroup2, getTrToMdbPrice,
     mdbSelection, mdbConfiguration, mccbSubBrand, getMccbSubData,
-    chargerSelection, chargerResults,
+    chargerSelection, chargerResults, chargerLineDistances,
     additionalFeaturesTotals,
     travelCostResult, travelDistance,
     getMdbCabinetData,
-    getExcelData
+    getExcelData,
+    props.trWiringSize, props.trWireConduit, props.chargerWiringCableAll, props.chargerWiringCable, props.chargerWiringType
   ]);
 
   const stationCostSections = React.useMemo(() => ([
@@ -3911,7 +3957,7 @@ function MoreDetailCard(props: any) {
                         <CollapsibleTrigger className="w-full p-4 text-left hover:bg-blue-100 transition-colors rounded-lg">
                           <div className="flex items-center justify-between">
                             <div className="text-lg font-semibold text-blue-800">
-                              ข้อมูล MCCB สำหรับ {mdbConfiguration.transformerSize} kVA
+                              ข้อมูล MCCB Main {mdbConfiguration.transformerSize} kVA
                             </div>
                             <div className="ml-4">
                               {openItems['mdb-mccb-info'] ? (
@@ -3979,7 +4025,7 @@ function MoreDetailCard(props: any) {
                 {mccbMainBrand && props.transformer && !mdbConfiguration && (
                   <div className="mt-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
                     <div className="text-sm text-yellow-700">
-                      ⚠️ ไม่พบข้อมูล MCCB สำหรับ {props.transformer} kVA ยี่ห้อ {mccbMainBrand} ใน Sheet "ตารางแสดงราคา MAIN MCCB ของ MDB"
+                      ⚠️ ไม่พบข้อมูล MCCB Main {props.transformer} kVA ยี่ห้อ {mccbMainBrand} ใน Sheet "ตารางแสดงราคา MAIN MCCB ของ MDB"
                     </div>
                   </div>
                 )}
@@ -4909,12 +4955,20 @@ function MoreDetailCard(props: any) {
                           <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                             <div
                               className={`flex items-center space-x-2 px-3 py-1 rounded-lg border cursor-pointer ${equipmentSelection === 'yes' ? 'bg-green-100 border-green-300' : 'hover:bg-gray-50'}`}
-                              onClick={() => setEquipmentSelection('yes')}
+                              onClick={() => {
+                                setEquipmentSelection('yes');
+                                setOpenSections(prev => ({ ...prev, 'equipment': true }));
+                              }}
                             >
                               <Checkbox
                                 id="equipment-yes"
                                 checked={equipmentSelection === 'yes'}
-                                onCheckedChange={(checked) => { if (checked) setEquipmentSelection('yes'); }}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setEquipmentSelection('yes');
+                                    setOpenSections(prev => ({ ...prev, 'equipment': true }));
+                                  }
+                                }}
                                 className="border-green-400 data-[state=checked]:bg-green-500"
                               />
                               <Label htmlFor="equipment-yes" className="font-medium cursor-pointer text-sm">มี</Label>
@@ -4993,7 +5047,7 @@ function MoreDetailCard(props: any) {
                                   <CollapsibleTrigger className="w-full p-3 text-left hover:bg-green-100 transition-colors rounded-lg">
                                     <div className="flex items-center justify-between">
                                       <span className="font-semibold">
-                                        {parkingSlotsCount * 2} <span className="text-sm">ชิ้น</span>
+                                        {featureChargersCount * 2} <span className="text-sm">ชิ้น</span>
                                       </span>
                                       <div className="ml-4">
                                         {openItems['bumper-poles'] ? (
@@ -5009,9 +5063,9 @@ function MoreDetailCard(props: any) {
                                       {stationEquipmentPriceMapping['bumper-poles'] && (
                                         <div className="text-xs space-y-1 mt-2">
                                           <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['bumper-poles'].productCode}</div>
-                                          <div><span className="font-medium">ราคาค่าของ:</span> {(stationEquipmentPriceMapping['bumper-poles'].materialPrice * (parkingSlotsCount * 2)).toLocaleString('th-TH')} บาท</div>
-                                          <div><span className="font-medium">ราคาค่าแรง:</span> {(stationEquipmentPriceMapping['bumper-poles'].laborPrice * (parkingSlotsCount * 2)).toLocaleString('th-TH')} บาท</div>
-                                          <div><span className="font-medium">ราคารวม:</span> {(stationEquipmentPriceMapping['bumper-poles'].totalPrice * (parkingSlotsCount * 2)).toLocaleString('th-TH')} บาท</div>
+                                          <div><span className="font-medium">ราคาค่าของ:</span> {(stationEquipmentPriceMapping['bumper-poles'].materialPrice * (featureChargersCount * 2)).toLocaleString('th-TH')} บาท</div>
+                                          <div><span className="font-medium">ราคาค่าแรง:</span> {(stationEquipmentPriceMapping['bumper-poles'].laborPrice * (featureChargersCount * 2)).toLocaleString('th-TH')} บาท</div>
+                                          <div><span className="font-medium">ราคารวม:</span> {(stationEquipmentPriceMapping['bumper-poles'].totalPrice * (featureChargersCount * 2)).toLocaleString('th-TH')} บาท</div>
                                         </div>
                                       )}
                                     </div>
@@ -5065,7 +5119,7 @@ function MoreDetailCard(props: any) {
                                   <CollapsibleTrigger className="w-full p-3 text-left hover:bg-green-100 transition-colors rounded-lg">
                                     <div className="flex items-center justify-between">
                                       <span className="font-semibold">
-                                        {parkingSlotsCount} <span className="text-sm">ชิ้น</span>
+                                        {featureChargersCount} <span className="text-sm">ชิ้น</span>
                                       </span>
                                       <div className="ml-4">
                                         {openItems['wheel-stops'] ? (
@@ -5081,9 +5135,9 @@ function MoreDetailCard(props: any) {
                                       {stationEquipmentPriceMapping['wheel-stops'] && (
                                         <div className="text-xs space-y-1 mt-2">
                                           <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['wheel-stops'].productCode}</div>
-                                          <div><span className="font-medium">ราคาค่าของ:</span> {(stationEquipmentPriceMapping['wheel-stops'].materialPrice * parkingSlotsCount).toLocaleString('th-TH')} บาท</div>
-                                          <div><span className="font-medium">ราคาค่าแรง:</span> {(stationEquipmentPriceMapping['wheel-stops'].laborPrice * parkingSlotsCount).toLocaleString('th-TH')} บาท</div>
-                                          <div><span className="font-medium">ราคารวม:</span> {(stationEquipmentPriceMapping['wheel-stops'].totalPrice * parkingSlotsCount).toLocaleString('th-TH')} บาท</div>
+                                          <div><span className="font-medium">ราคาค่าของ:</span> {(stationEquipmentPriceMapping['wheel-stops'].materialPrice * featureChargersCount).toLocaleString('th-TH')} บาท</div>
+                                          <div><span className="font-medium">ราคาค่าแรง:</span> {(stationEquipmentPriceMapping['wheel-stops'].laborPrice * featureChargersCount).toLocaleString('th-TH')} บาท</div>
+                                          <div><span className="font-medium">ราคารวม:</span> {(stationEquipmentPriceMapping['wheel-stops'].totalPrice * featureChargersCount).toLocaleString('th-TH')} บาท</div>
                                         </div>
                                       )}
                                     </div>
@@ -5286,12 +5340,20 @@ function MoreDetailCard(props: any) {
                           <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                             <div
                               className={`flex items-center space-x-2 px-3 py-1 rounded-lg border cursor-pointer ${communicationSelection === 'yes' ? 'bg-green-100 border-green-300' : 'hover:bg-gray-50'}`}
-                              onClick={() => setCommunicationSelection('yes')}
+                              onClick={() => {
+                                setCommunicationSelection('yes');
+                                setOpenSections(prev => ({ ...prev, 'communication': true }));
+                              }}
                             >
                               <Checkbox
                                 id="communication-yes"
                                 checked={communicationSelection === 'yes'}
-                                onCheckedChange={(checked) => { if (checked) setCommunicationSelection('yes'); }}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setCommunicationSelection('yes');
+                                    setOpenSections(prev => ({ ...prev, 'communication': true }));
+                                  }
+                                }}
                                 className="border-green-400 data-[state=checked]:bg-green-500"
                               />
                               <Label htmlFor="communication-yes" className="font-medium cursor-pointer text-sm">มี</Label>
@@ -5641,12 +5703,20 @@ function MoreDetailCard(props: any) {
                           <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                             <div
                               className={`flex items-center space-x-2 px-3 py-1 rounded-lg border cursor-pointer ${concreteSelection === 'yes' ? 'bg-green-100 border-green-300' : 'hover:bg-gray-50'}`}
-                              onClick={() => setConcreteSelection('yes')}
+                              onClick={() => {
+                                setConcreteSelection('yes');
+                                setOpenSections(prev => ({ ...prev, 'concrete': true }));
+                              }}
                             >
                               <Checkbox
                                 id="concrete-yes"
                                 checked={concreteSelection === 'yes'}
-                                onCheckedChange={(checked) => { if (checked) setConcreteSelection('yes'); }}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setConcreteSelection('yes');
+                                    setOpenSections(prev => ({ ...prev, 'concrete': true }));
+                                  }
+                                }}
                                 className="border-green-400 data-[state=checked]:bg-green-500"
                               />
                               <Label htmlFor="concrete-yes" className="font-medium cursor-pointer text-sm">มี</Label>
@@ -6018,12 +6088,20 @@ function MoreDetailCard(props: any) {
                           <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                             <div
                               className={`flex items-center space-x-2 px-3 py-1 rounded-lg border cursor-pointer ${paintingSelection === 'yes' ? 'bg-green-100 border-green-300' : 'hover:bg-gray-50'}`}
-                              onClick={() => setPaintingSelection('yes')}
+                              onClick={() => {
+                                setPaintingSelection('yes');
+                                setOpenSections(prev => ({ ...prev, 'painting': true }));
+                              }}
                             >
                               <Checkbox
                                 id="painting-yes"
                                 checked={paintingSelection === 'yes'}
-                                onCheckedChange={(checked) => { if (checked) setPaintingSelection('yes'); }}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setPaintingSelection('yes');
+                                    setOpenSections(prev => ({ ...prev, 'painting': true }));
+                                  }
+                                }}
                                 className="border-green-400 data-[state=checked]:bg-green-500"
                               />
                               <Label htmlFor="painting-yes" className="font-medium cursor-pointer text-sm">มี</Label>
@@ -6398,7 +6476,13 @@ function MoreDetailCard(props: any) {
 
                           className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-blue-50 cursor-pointer ${roofCoverType === 'yes' ? 'bg-blue-100 border-blue-300' : ''}`}
 
-                          onClick={() => setRoofCoverType(roofCoverType === 'yes' ? 'no' : 'yes')}
+                          onClick={() => {
+                            const newValue = roofCoverType === 'yes' ? 'no' : 'yes';
+                            setRoofCoverType(newValue);
+                            if (newValue === 'yes') {
+                              setOpenSections(prev => ({ ...prev, 'roof-cover': true }));
+                            }
+                          }}
 
                         >
 
@@ -6409,9 +6493,10 @@ function MoreDetailCard(props: any) {
                             checked={roofCoverType === 'yes'}
 
                             onCheckedChange={(checked) => {
-
-                              if (checked) setRoofCoverType('yes');
-
+                              if (checked) {
+                                setRoofCoverType('yes');
+                                setOpenSections(prev => ({ ...prev, 'roof-cover': true }));
+                              }
                             }}
 
                             className="text-blue-500 border-blue-400 data-[state=checked]:bg-blue-500"
@@ -6512,7 +6597,13 @@ function MoreDetailCard(props: any) {
 
                           className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-blue-50 cursor-pointer ${mdbRoof === 'yes' ? 'bg-blue-100 border-blue-300' : ''}`}
 
-                          onClick={() => setMdbRoof(mdbRoof === 'yes' ? 'no' : 'yes')}
+                          onClick={() => {
+                            const newValue = mdbRoof === 'yes' ? 'no' : 'yes';
+                            setMdbRoof(newValue);
+                            if (newValue === 'yes') {
+                              setOpenSections(prev => ({ ...prev, 'mdb-roof': true }));
+                            }
+                          }}
 
                         >
 
@@ -6523,9 +6614,10 @@ function MoreDetailCard(props: any) {
                             checked={mdbRoof === 'yes'}
 
                             onCheckedChange={(checked) => {
-
-                              if (checked) setMdbRoof('yes');
-
+                              if (checked) {
+                                setMdbRoof('yes');
+                                setOpenSections(prev => ({ ...prev, 'mdb-roof': true }));
+                              }
                             }}
 
                             className="text-blue-500 border-blue-400 data-[state=checked]:bg-blue-500"
@@ -6626,7 +6718,10 @@ function MoreDetailCard(props: any) {
 
                           className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer ${chargerRoofType === 'normal' ? 'bg-gray-100 border-gray-300' : ''}`}
 
-                          onClick={() => setChargerRoofType('normal')}
+                          onClick={() => {
+                            setChargerRoofType('normal');
+                            setOpenSections(prev => ({ ...prev, 'charger-roof': true }));
+                          }}
 
                         >
 
@@ -6637,9 +6732,10 @@ function MoreDetailCard(props: any) {
                             checked={chargerRoofType === 'normal'}
 
                             onCheckedChange={(checked) => {
-
-                              if (checked) setChargerRoofType('normal');
-
+                              if (checked) {
+                                setChargerRoofType('normal');
+                                setOpenSections(prev => ({ ...prev, 'charger-roof': true }));
+                              }
                             }}
 
                             className="border-gray-400 data-[state=checked]:bg-gray-500"
@@ -6654,7 +6750,10 @@ function MoreDetailCard(props: any) {
 
                           className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-green-50 cursor-pointer ${chargerRoofType === 'composite' ? 'bg-green-100 border-green-300' : ''}`}
 
-                          onClick={() => setChargerRoofType('composite')}
+                          onClick={() => {
+                            setChargerRoofType('composite');
+                            setOpenSections(prev => ({ ...prev, 'charger-roof': true }));
+                          }}
 
                         >
 
@@ -6665,9 +6764,10 @@ function MoreDetailCard(props: any) {
                             checked={chargerRoofType === 'composite'}
 
                             onCheckedChange={(checked) => {
-
-                              if (checked) setChargerRoofType('composite');
-
+                              if (checked) {
+                                setChargerRoofType('composite');
+                                setOpenSections(prev => ({ ...prev, 'charger-roof': true }));
+                              }
                             }}
 
                             className="text-green-500 border-green-400 data-[state=checked]:bg-green-500"
@@ -6682,7 +6782,10 @@ function MoreDetailCard(props: any) {
 
                           className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-red-50 cursor-pointer ${chargerRoofType === 'no' ? 'bg-red-100 border-red-300' : ''}`}
 
-                          onClick={() => setChargerRoofType('no')}
+                          onClick={() => {
+                            setChargerRoofType('no');
+                            setOpenSections(prev => ({ ...prev, 'charger-roof': true }));
+                          }}
 
                         >
 
@@ -6693,9 +6796,10 @@ function MoreDetailCard(props: any) {
                             checked={chargerRoofType === 'no'}
 
                             onCheckedChange={(checked) => {
-
-                              if (checked) setChargerRoofType('no');
-
+                              if (checked) {
+                                setChargerRoofType('no');
+                                setOpenSections(prev => ({ ...prev, 'charger-roof': true }));
+                              }
                             }}
 
                             className="text-red-500 border-red-400 data-[state=checked]:bg-red-500"
@@ -7056,7 +7160,7 @@ function MoreDetailCard(props: any) {
                                     <th className="text-left p-3 text-xs font-semibold text-slate-700 uppercase">ประเภท</th>
                                     <th className="text-left p-3 text-xs font-semibold text-slate-700 uppercase">รหัส</th>
                                     <th className="text-left p-3 text-xs font-semibold text-slate-700 uppercase">รายการสินค้า</th>
-                                    <th className="text-left p-3 text-xs font-semibold text-slate-700 uppercase">ระยะทาง</th>
+                                    <th className="text-left p-3 text-xs font-semibold text-slate-700 uppercase">ระยะ</th>
                                     <th className="text-right p-3 text-xs font-semibold text-slate-700 uppercase">ค่าของรวม</th>
                                     <th className="text-right p-3 text-xs font-semibold text-slate-700 uppercase">ค่าแรงรวม</th>
                                     <th className="text-right p-3 text-xs font-semibold text-slate-700 uppercase">ราคารวม</th>
