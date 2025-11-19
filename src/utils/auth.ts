@@ -19,7 +19,13 @@ const DEMO_USERS: Array<{ username: string; password: string }> = [
   { username: 'sale02', password: 'Ctmssale01' },
   { username: 'sale03', password: 'Saleei01' },
   { username: 'sale04', password: 'Eicsale02' },
-  { username: 'sale05', password: 'Ctmssale02' }
+  { username: 'sale05', password: 'Ctmssale02' },
+  // เพิ่ม Sale Users จาก getSaleUsers() ให้ใช้งานได้
+  { username: 'Sale_game', password: 'game1234' },
+  { username: 'Sale_Ton', password: 'Ton2345' },
+  { username: 'Sale_Tak', password: 'Tak3456' },
+  { username: 'sale.sp', password: 'Sale001' },
+  { username: 'Technic_A', password: 'tech4567' }
 ]
 
 // Storage key used to persist the authenticated user
