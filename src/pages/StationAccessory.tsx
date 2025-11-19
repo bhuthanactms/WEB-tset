@@ -7078,26 +7078,6 @@ function MoreDetailCard(props: any) {
           </CardDescription>
         </CardHeader>
         <CardContent className="p-6 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-5 rounded-xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white shadow-sm">
-              <div className="text-sm text-slate-200/80 mb-2">ราคารวมสร้างสถานี</div>
-              <div className="text-3xl font-bold tracking-tight">{formatCurrency(stationTotals.total)} บาท</div>
-              <div className="text-xs text-slate-200/60 mt-2">รวมค่าของและค่าแรงทุกหมวด</div>
-            </div>
-            <div className="p-5 rounded-xl bg-gradient-to-br from-slate-100 via-white to-slate-50 border border-slate-200 text-slate-800 shadow-sm">
-              <div className="text-sm text-slate-500 mb-2">ค่าของสร้างสถานี</div>
-              <div className="text-2xl font-semibold">{formatCurrency(stationTotals.material)} บาท</div>
-              <div className="text-xs text-slate-400 mt-2">รวมค่าวัสดุ อุปกรณ์ และสินค้า</div>
-            </div>
-            <div className="p-5 rounded-xl bg-gradient-to-br from-slate-100 via-white to-slate-50 border border-slate-200 text-slate-800 shadow-sm">
-              <div className="text-sm text-slate-500 mb-2">ค่าแรงสร้างสถานี</div>
-              <div className="text-2xl font-semibold">{formatCurrency(stationTotals.labor)} บาท</div>
-              <div className="text-xs text-slate-400 mt-2">รวมค่าแรงงานติดตั้งทุกประเภท</div>
-            </div>
-          </div>
-
-          <Separator />
-
           <div className="space-y-3">
             {stationSectionsForDisplay.map((section) => {
               const sectionKey = `station-summary-${section.key}`;
@@ -7197,6 +7177,26 @@ function MoreDetailCard(props: any) {
                 </Collapsible>
               );
             })}
+          </div>
+
+          <Separator />
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-5 rounded-xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white shadow-sm">
+              <div className="text-sm text-slate-200/80 mb-2">ราคารวมสร้างสถานี</div>
+              <div className="text-3xl font-bold tracking-tight">{formatCurrency(stationTotals.total)} บาท</div>
+              <div className="text-xs text-slate-200/60 mt-2">รวมค่าของและค่าแรงทุกหมวด</div>
+            </div>
+            <div className="p-5 rounded-xl bg-gradient-to-br from-slate-100 via-white to-slate-50 border border-slate-200 text-slate-800 shadow-sm">
+              <div className="text-sm text-slate-500 mb-2">ค่าของสร้างสถานี</div>
+              <div className="text-2xl font-semibold">{formatCurrency(stationTotals.material)} บาท</div>
+              <div className="text-xs text-slate-400 mt-2">รวมค่าวัสดุ อุปกรณ์ และสินค้า</div>
+            </div>
+            <div className="p-5 rounded-xl bg-gradient-to-br from-slate-100 via-white to-slate-50 border border-slate-200 text-slate-800 shadow-sm">
+              <div className="text-sm text-slate-500 mb-2">ค่าแรงสร้างสถานี</div>
+              <div className="text-2xl font-semibold">{formatCurrency(stationTotals.labor)} บาท</div>
+              <div className="text-xs text-slate-400 mt-2">รวมค่าแรงงานติดตั้งทุกประเภท</div>
+            </div>
           </div>
         </CardContent>
       </Card>
