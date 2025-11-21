@@ -680,6 +680,41 @@ function MoreDetailCard(props: any) {
     return row?.__EMPTY_1 || '';
   };
 
+  // Sheet for concrete work (งานปูน)
+  const concreteSheet = useMemo(() => {
+    return props.excelData?.['ต้นทุนงานปูน'] || [];
+  }, [props.excelData]);
+
+  // Helper functions for concrete work (งานปูน)
+  const getConcretePricing = (rowNum: number, quantity: number): AccessoryPricing | null => {
+    if (!rowNum || quantity <= 0) return null;
+    if (!concreteSheet || concreteSheet.length === 0) return null;
+
+    const row = concreteSheet.find((entry: any) => entry.__rowNum__ === rowNum);
+    if (!row) return null;
+
+    const materialUnit = parsePrice(row.__EMPTY_41);
+    const laborUnit = parsePrice(row.__EMPTY_43);
+    const totalUnit = parsePrice(row.__EMPTY_45);
+
+    return {
+      row,
+      quantity,
+      materialUnit,
+      laborUnit,
+      totalUnit,
+      materialTotal: materialUnit * quantity,
+      laborTotal: laborUnit * quantity,
+      total: totalUnit * quantity,
+    };
+  };
+
+  const getConcreteRowName = (rowNum: number) => {
+    if (!rowNum || !concreteSheet || concreteSheet.length === 0) return '';
+    const row = concreteSheet.find((entry: any) => entry.__rowNum__ === rowNum);
+    return row?.__EMPTY_1 || '';
+  };
+
   const getAccessoryProductCode = (row: any) => {
     if (!row) return '-';
     return row['รหัสสินค้า'] || row['code'] || row['Code'] || row['CODE'] || row.__EMPTY_2 || row.__EMPTY_1 || row.__EMPTY || '-';
@@ -819,50 +854,54 @@ function MoreDetailCard(props: any) {
     return totals;
   })();
 
-  const concreteTotals = (() => {
+  const concreteTotals = useMemo(() => {
     const totals = { material: 0, labor: 0, total: 0 };
-    if (concreteSelection !== 'yes' || !stationEquipmentPriceMapping) {
+    if (concreteSelection !== 'yes') {
       return totals;
     }
 
+    // 3.1 ฐานปูน MDB 200 x 200 x 20 ซม. - rowNum: 3, quantity: 1
     if (mdbConcreteBase === 'yes') {
-      const item = stationEquipmentPriceMapping['mdb-concrete-base'];
-      if (item) {
-        totals.material += item.materialPrice;
-        totals.labor += item.laborPrice;
-        totals.total += item.totalPrice;
+      const pricing = getConcretePricing(3, 1);
+      if (pricing) {
+        totals.material += pricing.materialTotal;
+        totals.labor += pricing.laborTotal;
+        totals.total += pricing.total;
       }
     }
 
+    // 3.2 ฐานปูน CHARGER 150 x 150 x 20 ซม. - rowNum: 4, quantity: featureChargersCount
     if (chargerConcreteBase === 'yes') {
-      const item = stationEquipmentPriceMapping['charger-concrete-base'];
-      if (item) {
-        totals.material += item.materialPrice * featureChargersCount;
-        totals.labor += item.laborPrice * featureChargersCount;
-        totals.total += item.totalPrice * featureChargersCount;
+      const pricing = getConcretePricing(4, featureChargersCount);
+      if (pricing) {
+        totals.material += pricing.materialTotal;
+        totals.labor += pricing.laborTotal;
+        totals.total += pricing.total;
       }
     }
 
+    // 3.3 พื้นปูน ลานจอดรถ 300 x 600 x 10 ซม. - rowNum: 5, quantity: parkingSlotsCount
     if (parkingConcreteFloor === 'yes') {
-      const item = stationEquipmentPriceMapping['parking-concrete-floor'];
-      if (item) {
-        totals.material += item.materialPrice * parkingSlotsCount;
-        totals.labor += item.laborPrice * parkingSlotsCount;
-        totals.total += item.totalPrice * parkingSlotsCount;
+      const pricing = getConcretePricing(5, parkingSlotsCount);
+      if (pricing) {
+        totals.material += pricing.materialTotal;
+        totals.labor += pricing.laborTotal;
+        totals.total += pricing.total;
       }
     }
 
+    // 3.4 ปูนแท่นสถานี 2 ช่องจอด - rowNum: 6, quantity: featureChargersCount
     if (generalConcreteFloor === 'yes') {
-      const item = stationEquipmentPriceMapping['general-concrete-floor'];
-      if (item) {
-        totals.material += item.materialPrice;
-        totals.labor += item.laborPrice;
-        totals.total += item.totalPrice;
+      const pricing = getConcretePricing(6, featureChargersCount);
+      if (pricing) {
+        totals.material += pricing.materialTotal;
+        totals.labor += pricing.laborTotal;
+        totals.total += pricing.total;
       }
     }
 
     return totals;
-  })();
+  }, [concreteSelection, mdbConcreteBase, chargerConcreteBase, parkingConcreteFloor, generalConcreteFloor, featureChargersCount, parkingSlotsCount]);
 
   const paintingTotals = (() => {
     const totals = { material: 0, labor: 0, total: 0 };
@@ -6145,14 +6184,34 @@ function MoreDetailCard(props: any) {
                                   </CollapsibleTrigger>
                                   <CollapsibleContent>
                                     <div className="px-3 pb-3">
-                                      {stationEquipmentPriceMapping['mdb-concrete-base'] && (
-                                        <div className="text-xs space-y-1 mt-2">
-                                          <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['mdb-concrete-base'].productCode}</div>
-                                          <div><span className="font-medium">ราคาค่าของ:</span> {(stationEquipmentPriceMapping['mdb-concrete-base'].materialPrice * 1).toLocaleString('th-TH')} บาท</div>
-                                          <div><span className="font-medium">ราคาค่าแรง:</span> {(stationEquipmentPriceMapping['mdb-concrete-base'].laborPrice * 1).toLocaleString('th-TH')} บาท</div>
-                                          <div><span className="font-medium">ราคารวม:</span> {(stationEquipmentPriceMapping['mdb-concrete-base'].totalPrice * 1).toLocaleString('th-TH')} บาท</div>
-                                        </div>
-                                      )}
+                                      {(() => {
+                                        const pricing = getConcretePricing(3, 1);
+                                        if (!pricing) return <div className="text-xs text-red-500 mt-2">ไม่พบข้อมูล</div>;
+                                        return (
+                                          <div className="text-xs space-y-2 mt-2">
+                                            <div><span className="font-medium">รายการ:</span> {getConcreteRowName(3) || '-'}</div>
+                                            <div className="grid grid-cols-3 gap-2 pt-2 border-t">
+                                              <div>
+                                                <div className="text-gray-600 mb-1">ราคาค่าของ/ชิ้น:</div>
+                                                <div className="font-semibold">{pricing.materialUnit.toLocaleString('th-TH')} บาท</div>
+                                              </div>
+                                              <div>
+                                                <div className="text-gray-600 mb-1">ราคาค่าแรง/ชิ้น:</div>
+                                                <div className="font-semibold">{pricing.laborUnit.toLocaleString('th-TH')} บาท</div>
+                                              </div>
+                                              <div>
+                                                <div className="text-gray-600 mb-1">ราคารวม/ชิ้น:</div>
+                                                <div className="font-semibold">{pricing.totalUnit.toLocaleString('th-TH')} บาท</div>
+                                              </div>
+                                            </div>
+                                            <div className="pt-2 border-t space-y-1">
+                                              <div><span className="font-medium">ค่าของรวม:</span> {pricing.materialTotal.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium">ค่าแรงรวม:</span> {pricing.laborTotal.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium">ราคารวม:</span> {pricing.total.toLocaleString('th-TH')} บาท</div>
+                                            </div>
+                                          </div>
+                                        );
+                                      })()}
                                     </div>
                                   </CollapsibleContent>
                                 </div>
@@ -6218,14 +6277,34 @@ function MoreDetailCard(props: any) {
                                   </CollapsibleTrigger>
                                   <CollapsibleContent>
                                     <div className="px-3 pb-3">
-                                      {stationEquipmentPriceMapping['charger-concrete-base'] && (
-                                        <div className="text-xs space-y-1 mt-2">
-                                          <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['charger-concrete-base'].productCode}</div>
-                                          <div><span className="font-medium">ราคาค่าของ:</span> {(stationEquipmentPriceMapping['charger-concrete-base'].materialPrice * featureChargersCount).toLocaleString('th-TH')} บาท</div>
-                                          <div><span className="font-medium">ราคาค่าแรง:</span> {(stationEquipmentPriceMapping['charger-concrete-base'].laborPrice * featureChargersCount).toLocaleString('th-TH')} บาท</div>
-                                          <div><span className="font-medium">ราคารวม:</span> {(stationEquipmentPriceMapping['charger-concrete-base'].totalPrice * featureChargersCount).toLocaleString('th-TH')} บาท</div>
-                                        </div>
-                                      )}
+                                      {(() => {
+                                        const pricing = getConcretePricing(4, featureChargersCount);
+                                        if (!pricing) return <div className="text-xs text-red-500 mt-2">ไม่พบข้อมูล</div>;
+                                        return (
+                                          <div className="text-xs space-y-2 mt-2">
+                                            <div><span className="font-medium">รายการ:</span> {getConcreteRowName(4) || '-'}</div>
+                                            <div className="grid grid-cols-3 gap-2 pt-2 border-t">
+                                              <div>
+                                                <div className="text-gray-600 mb-1">ราคาค่าของ/ชิ้น:</div>
+                                                <div className="font-semibold">{pricing.materialUnit.toLocaleString('th-TH')} บาท</div>
+                                              </div>
+                                              <div>
+                                                <div className="text-gray-600 mb-1">ราคาค่าแรง/ชิ้น:</div>
+                                                <div className="font-semibold">{pricing.laborUnit.toLocaleString('th-TH')} บาท</div>
+                                              </div>
+                                              <div>
+                                                <div className="text-gray-600 mb-1">ราคารวม/ชิ้น:</div>
+                                                <div className="font-semibold">{pricing.totalUnit.toLocaleString('th-TH')} บาท</div>
+                                              </div>
+                                            </div>
+                                            <div className="pt-2 border-t space-y-1">
+                                              <div><span className="font-medium">ค่าของรวม:</span> {pricing.materialTotal.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium">ค่าแรงรวม:</span> {pricing.laborTotal.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium">ราคารวม:</span> {pricing.total.toLocaleString('th-TH')} บาท</div>
+                                            </div>
+                                          </div>
+                                        );
+                                      })()}
                                     </div>
                                   </CollapsibleContent>
                                 </div>
@@ -6291,14 +6370,34 @@ function MoreDetailCard(props: any) {
                                   </CollapsibleTrigger>
                                   <CollapsibleContent>
                                     <div className="px-3 pb-3">
-                                      {stationEquipmentPriceMapping['parking-concrete-floor'] && (
-                                        <div className="text-xs space-y-1 mt-2">
-                                          <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['parking-concrete-floor'].productCode}</div>
-                                          <div><span className="font-medium">ราคาค่าของ:</span> {(stationEquipmentPriceMapping['parking-concrete-floor'].materialPrice * parkingSlotsCount).toLocaleString('th-TH')} บาท</div>
-                                          <div><span className="font-medium">ราคาค่าแรง:</span> {(stationEquipmentPriceMapping['parking-concrete-floor'].laborPrice * parkingSlotsCount).toLocaleString('th-TH')} บาท</div>
-                                          <div><span className="font-medium">ราคารวม:</span> {(stationEquipmentPriceMapping['parking-concrete-floor'].totalPrice * parkingSlotsCount).toLocaleString('th-TH')} บาท</div>
-                                        </div>
-                                      )}
+                                      {(() => {
+                                        const pricing = getConcretePricing(5, parkingSlotsCount);
+                                        if (!pricing) return <div className="text-xs text-red-500 mt-2">ไม่พบข้อมูล</div>;
+                                        return (
+                                          <div className="text-xs space-y-2 mt-2">
+                                            <div><span className="font-medium">รายการ:</span> {getConcreteRowName(5) || '-'}</div>
+                                            <div className="grid grid-cols-3 gap-2 pt-2 border-t">
+                                              <div>
+                                                <div className="text-gray-600 mb-1">ราคาค่าของ/ชิ้น:</div>
+                                                <div className="font-semibold">{pricing.materialUnit.toLocaleString('th-TH')} บาท</div>
+                                              </div>
+                                              <div>
+                                                <div className="text-gray-600 mb-1">ราคาค่าแรง/ชิ้น:</div>
+                                                <div className="font-semibold">{pricing.laborUnit.toLocaleString('th-TH')} บาท</div>
+                                              </div>
+                                              <div>
+                                                <div className="text-gray-600 mb-1">ราคารวม/ชิ้น:</div>
+                                                <div className="font-semibold">{pricing.totalUnit.toLocaleString('th-TH')} บาท</div>
+                                              </div>
+                                            </div>
+                                            <div className="pt-2 border-t space-y-1">
+                                              <div><span className="font-medium">ค่าของรวม:</span> {pricing.materialTotal.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium">ค่าแรงรวม:</span> {pricing.laborTotal.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium">ราคารวม:</span> {pricing.total.toLocaleString('th-TH')} บาท</div>
+                                            </div>
+                                          </div>
+                                        );
+                                      })()}
                                     </div>
                                   </CollapsibleContent>
                                 </div>
@@ -6308,12 +6407,12 @@ function MoreDetailCard(props: any) {
 
                           </div>
 
-                          {/* 3.4 เทพื้นปูนทั่วไป */}
+                          {/* 3.4 ปูนแท่นสถานี 2 ช่องจอด */}
 
                           <div className="space-y-2">
                             {/* Item name and toggle buttons */}
                             <div className="flex items-center justify-between mb-2">
-                              <span className="text-base font-semibold text-gray-800">เทพื้นปูนทั่วไป 100 x 100 x 10 ซม.</span>
+                              <span className="text-base font-semibold text-gray-800">ปูนแท่นสถานี 2 ช่องจอด</span>
                               <div className="flex items-center gap-2">
                                 <div
                                   className={`flex items-center space-x-2 px-3 py-1 rounded-lg border cursor-pointer ${generalConcreteFloor === 'yes' ? 'bg-green-100 border-green-300' : 'hover:bg-gray-50'}`}
@@ -6350,7 +6449,9 @@ function MoreDetailCard(props: any) {
                                 <div className="bg-green-50 rounded-lg border border-green-200">
                                   <CollapsibleTrigger className="w-full p-3 text-left hover:bg-green-100 transition-colors rounded-lg">
                                     <div className="flex items-center justify-between">
-                                      <span className="font-semibold">แล้วแต่กำหนด</span>
+                                      <span className="font-semibold">
+                                        {featureChargersCount} <span className="text-sm">ชิ้น</span>
+                                      </span>
                                       <div className="ml-4">
                                         {openItems['general-concrete-floor'] ? (
                                           <ChevronUp className="h-4 w-4 text-green-600" />
@@ -6362,14 +6463,34 @@ function MoreDetailCard(props: any) {
                                   </CollapsibleTrigger>
                                   <CollapsibleContent>
                                     <div className="px-3 pb-3">
-                                      {stationEquipmentPriceMapping['general-concrete-floor'] && (
-                                        <div className="text-xs space-y-1 mt-2">
-                                          <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['general-concrete-floor'].productCode}</div>
-                                          <div><span className="font-medium">ราคาค่าของ:</span> {stationEquipmentPriceMapping['general-concrete-floor'].materialPrice.toLocaleString('th-TH')} บาท</div>
-                                          <div><span className="font-medium">ราคาค่าแรง:</span> {stationEquipmentPriceMapping['general-concrete-floor'].laborPrice.toLocaleString('th-TH')} บาท</div>
-                                          <div><span className="font-medium">ราคารวม:</span> {stationEquipmentPriceMapping['general-concrete-floor'].totalPrice.toLocaleString('th-TH')} บาท</div>
-                                        </div>
-                                      )}
+                                      {(() => {
+                                        const pricing = getConcretePricing(6, featureChargersCount);
+                                        if (!pricing) return <div className="text-xs text-red-500 mt-2">ไม่พบข้อมูล</div>;
+                                        return (
+                                          <div className="text-xs space-y-2 mt-2">
+                                            <div><span className="font-medium">รายการ:</span> {getConcreteRowName(6) || '-'}</div>
+                                            <div className="grid grid-cols-3 gap-2 pt-2 border-t">
+                                              <div>
+                                                <div className="text-gray-600 mb-1">ราคาค่าของ/ชิ้น:</div>
+                                                <div className="font-semibold">{pricing.materialUnit.toLocaleString('th-TH')} บาท</div>
+                                              </div>
+                                              <div>
+                                                <div className="text-gray-600 mb-1">ราคาค่าแรง/ชิ้น:</div>
+                                                <div className="font-semibold">{pricing.laborUnit.toLocaleString('th-TH')} บาท</div>
+                                              </div>
+                                              <div>
+                                                <div className="text-gray-600 mb-1">ราคารวม/ชิ้น:</div>
+                                                <div className="font-semibold">{pricing.totalUnit.toLocaleString('th-TH')} บาท</div>
+                                              </div>
+                                            </div>
+                                            <div className="pt-2 border-t space-y-1">
+                                              <div><span className="font-medium">ค่าของรวม:</span> {pricing.materialTotal.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium">ค่าแรงรวม:</span> {pricing.laborTotal.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium">ราคารวม:</span> {pricing.total.toLocaleString('th-TH')} บาท</div>
+                                            </div>
+                                          </div>
+                                        );
+                                      })()}
                                     </div>
                                   </CollapsibleContent>
                                 </div>
