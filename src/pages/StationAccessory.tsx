@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 
 import { Zap, Car, Paintbrush, Shield, Home, Wrench, MapPin, ChevronDown, ChevronUp, Box, Package, Settings, Ruler } from 'lucide-react'
 
@@ -24,6 +24,17 @@ import * as XLSX from 'xlsx'
 
 
 
+
+type AccessoryPricing = {
+  row: any;
+  quantity: number;
+  materialUnit: number;
+  laborUnit: number;
+  totalUnit: number;
+  materialTotal: number;
+  laborTotal: number;
+  total: number;
+};
 
 function MoreDetailCard(props: any) {
   const { stationEquipmentPriceMapping, roofCostMapping, getParkingRoofData, getTrToMdbPrice, trToMdbMapping } = props;
@@ -542,12 +553,18 @@ function MoreDetailCard(props: any) {
   const [wheelStops, setWheelStops] = useState(props.wheelStops || 'no');
   const [fireExtinguisherCabinet, setFireExtinguisherCabinet] = useState(props.fireExtinguisherCabinet || 'no');
   const [signage, setSignage] = useState(props.signage || 'no');
+  const [routerType, setRouterType] = useState<'router-sim' | 'router-sim-hub'>(props.routerType || 'router-sim-hub');
+  const [routerCableDistance, setRouterCableDistance] = useState(props.routerCableDistance || '');
+  const [cctvCableDistance, setCctvCableDistance] = useState(props.cctvCableDistance || '');
+  const [lightingCableDistance, setLightingCableDistance] = useState(props.lightingCableDistance || '');
+  const [bumperPoleMaterial, setBumperPoleMaterial] = useState<'steel' | 'stainless'>('steel');
+  const [wheelStopMaterial, setWheelStopMaterial] = useState<'rubber' | 'concrete'>('rubber');
+  const [fireExtinguisherType, setFireExtinguisherType] = useState<'abc' | 'co2'>('abc');
 
   // Section 2: ระบบสื่อสาร (yes=มี, no=ไม่มี)
   const [wifi4gHub, setWifi4gHub] = useState(props.wifi4gHub || 'no');
   const [cctv, setCctv] = useState(props.cctv || 'no');
   const [lighting, setLighting] = useState(props.lighting || 'no');
-  const [accSystem, setAccSystem] = useState(props.accSystem || 'no');
 
   // Section 3: งานปูน (yes=มี, no=ไม่มี)
   const [mdbConcreteBase, setMdbConcreteBase] = useState(props.mdbConcreteBase || 'no');
@@ -557,8 +574,12 @@ function MoreDetailCard(props: any) {
   const [generalConcreteFloorArea, setGeneralConcreteFloorArea] = useState(props.generalConcreteFloorArea || '');
 
   // Section 4: งานทาสีช่องจอด (yes=มี, no=ไม่มี)
-  const [parkingPaintType, setParkingPaintType] = useState(props.parkingPaintType || '');
-  const [hasSelectedParkingPaintType, setHasSelectedParkingPaintType] = useState(props.parkingPaintType !== undefined);
+  const [parkingPaintType, setParkingPaintType] = useState(() => {
+    if (props.parkingPaintType) {
+      return props.parkingPaintType === '' ? 'none' : props.parkingPaintType;
+    }
+    return '';
+  });
   const [sideLineMarking, setSideLineMarking] = useState(props.sideLineMarking || 'no');
   const [centerPattern, setCenterPattern] = useState(props.centerPattern || '');
   const [centerPatternOriginal, setCenterPatternOriginal] = useState(props.centerPatternOriginal || 'no');
@@ -566,10 +587,9 @@ function MoreDetailCard(props: any) {
 
   const handleParkingPaintTypeChange = (value: string) => {
     setParkingPaintType(value);
-    setHasSelectedParkingPaintType(true);
   };
 
-  const selectedPaintItem = stationEquipmentPriceMapping
+  const selectedPaintItem = stationEquipmentPriceMapping && parkingPaintType && parkingPaintType !== 'none'
     ? stationEquipmentPriceMapping[`paint-${parkingPaintType}`]
     : undefined;
 
@@ -577,6 +597,14 @@ function MoreDetailCard(props: any) {
     if (typeof value === 'number' && Number.isFinite(value)) return value;
     const parsed = parseInt((value ?? '').toString(), 10);
     return Number.isNaN(parsed) || parsed <= 0 ? fallback : parsed;
+  };
+
+  const parsePositiveNumber = (value: string | number | undefined) => {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value > 0 ? value : 0;
+    }
+    const parsed = parseFloat((value ?? '').toString());
+    return Number.isNaN(parsed) || parsed <= 0 ? 0 : parsed;
   };
 
   const toNumber = (value: any) => {
@@ -592,6 +620,91 @@ function MoreDetailCard(props: any) {
     return Number.isNaN(parsed) ? 0 : parsed;
   };
 
+  const accessoriesSheet = useMemo(() => {
+    return props.excelData?.['ต้นทุน อุปกรณ์ ACCESSORIES'] || [];
+  }, [props.excelData]);
+
+  const getAccessoryPricing = (rowNum: number, quantity: number): AccessoryPricing | null => {
+    if (!rowNum || quantity <= 0) return null;
+    if (!accessoriesSheet || accessoriesSheet.length === 0) return null;
+
+    const row = accessoriesSheet.find((entry: any) => entry.__rowNum__ === rowNum);
+    if (!row) return null;
+
+    const materialUnit = parsePrice(row.__EMPTY_10);
+    const laborUnit = parsePrice(row.__EMPTY_12);
+    const totalUnit = parsePrice(row.__EMPTY_14);
+
+    return {
+      row,
+      quantity,
+      materialUnit,
+      laborUnit,
+      totalUnit,
+      materialTotal: materialUnit * quantity,
+      laborTotal: laborUnit * quantity,
+      total: totalUnit * quantity,
+    };
+  };
+
+  const communicationSheet = useMemo(() => {
+    return props.excelData?.['ต้นทุนระบบสื่อสาร'] || [];
+  }, [props.excelData]);
+
+  const getCommunicationPricing = (rowNum: number, quantity: number): AccessoryPricing | null => {
+    if (!rowNum || quantity <= 0) return null;
+    if (!communicationSheet || communicationSheet.length === 0) return null;
+
+    const row = communicationSheet.find((entry: any) => entry.__rowNum__ === rowNum);
+    if (!row) return null;
+
+    const materialUnit = parsePrice(row.__EMPTY_10);
+    const laborUnit = parsePrice(row.__EMPTY_12);
+    const totalUnit = parsePrice(row.__EMPTY_14);
+
+    return {
+      row,
+      quantity,
+      materialUnit,
+      laborUnit,
+      totalUnit,
+      materialTotal: materialUnit * quantity,
+      laborTotal: laborUnit * quantity,
+      total: totalUnit * quantity,
+    };
+  };
+
+  const getCommunicationRowName = (rowNum: number) => {
+    if (!rowNum || !communicationSheet || communicationSheet.length === 0) return '';
+    const row = communicationSheet.find((entry: any) => entry.__rowNum__ === rowNum);
+    return row?.__EMPTY_1 || '';
+  };
+
+  const getAccessoryProductCode = (row: any) => {
+    if (!row) return '-';
+    return row['รหัสสินค้า'] || row['code'] || row['Code'] || row['CODE'] || row.__EMPTY_2 || row.__EMPTY_1 || row.__EMPTY || '-';
+  };
+
+  const getInstallationBrandInfo = (row: any): { brandPrice: number; brandCode: string } => {
+    const info = { brandPrice: 0, brandCode: '' };
+    if (!row) {
+      return info;
+    }
+
+    if (installationLocationBrand === 'ABB') {
+      info.brandPrice = parsePrice(row.__EMPTY_23);
+      info.brandCode = row.__EMPTY_22 || '';
+    } else if (installationLocationBrand === 'EATON') {
+      info.brandPrice = parsePrice(row.__EMPTY_25);
+      info.brandCode = row.__EMPTY_24 || '';
+    } else if (installationLocationBrand === 'LS') {
+      info.brandPrice = parsePrice(row.__EMPTY_27);
+      info.brandCode = row.__EMPTY_26 || '';
+    }
+
+    return info;
+  };
+
   const formatCurrency = (value: number) => {
     const numericValue = typeof value === 'number' ? value : parsePrice(value);
     return numericValue.toLocaleString('th-TH');
@@ -600,95 +713,108 @@ function MoreDetailCard(props: any) {
   const parkingSlotsCount = parseCount(parkingSlots, 1);
   const featureChargersCount = parseCount(props.numberOfChargers, 1);
 
+  const bumperPoleQuantity = featureChargersCount;
+  const wheelStopQuantity = parkingSlotsCount;
+  const fireExtinguisherQuantity = featureChargersCount;
+  const signageQuantity = featureChargersCount;
+
+  const bumperPoleRowNum = bumperPoleMaterial === 'steel' ? 7 : 8;
+  const wheelStopRowNum = wheelStopMaterial === 'rubber' ? 5 : 6;
+  const fireExtinguisherRowNum = fireExtinguisherType === 'abc' ? 3 : 4;
+
+  const bumperPolePricing = bumperPoles === 'yes'
+    ? getAccessoryPricing(bumperPoleRowNum, bumperPoleQuantity)
+    : null;
+  const wheelStopPricing = wheelStops === 'yes'
+    ? getAccessoryPricing(wheelStopRowNum, wheelStopQuantity)
+    : null;
+  const fireExtinguisherPricing = fireExtinguisherCabinet === 'yes'
+    ? getAccessoryPricing(fireExtinguisherRowNum, fireExtinguisherQuantity)
+    : null;
+  const signagePricing = signage === 'yes'
+    ? getAccessoryPricing(9, signageQuantity)
+    : null;
+
+  const routerBaseRowNum = routerType === 'router-sim' ? 3 : 5;
+  const routerBaseLabel = getCommunicationRowName(routerBaseRowNum) || 'ROUTER';
+  const routerBaseQuantity = 1;
+  const routerBasePricing = wifi4gHub === 'yes'
+    ? getCommunicationPricing(routerBaseRowNum, routerBaseQuantity)
+    : null;
+  const routerCableRowNum = 7;
+  const routerCableLabel = getCommunicationRowName(routerCableRowNum);
+  const routerCableLengthValue = wifi4gHub === 'yes' ? parsePositiveNumber(routerCableDistance) : 0;
+  const routerCablePricing = wifi4gHub === 'yes' && routerCableLengthValue > 0
+    ? getCommunicationPricing(routerCableRowNum, routerCableLengthValue)
+    : null;
+
+  const cctvBaseRowNum = 9;
+  const cctvBaseLabel = getCommunicationRowName(cctvBaseRowNum) || 'CCTV';
+  const cctvQuantityMultiplier = Math.max(1, Math.ceil(parkingSlotsCount / 6));
+  const cctvQuantity = cctvQuantityMultiplier * 4;
+  const cctvBasePricing = cctv === 'yes'
+    ? getCommunicationPricing(cctvBaseRowNum, cctvQuantity)
+    : null;
+  const cctvCableRowNum = 10;
+  const cctvCableLabel = getCommunicationRowName(cctvCableRowNum);
+  const cctvCableLengthValue = cctv === 'yes' ? parsePositiveNumber(cctvCableDistance) : 0;
+  const cctvCablePricing = cctv === 'yes' && cctvCableLengthValue > 0
+    ? getCommunicationPricing(cctvCableRowNum, cctvCableLengthValue)
+    : null;
+
+  const lightingBaseRowNum = 12;
+  const lightingBaseLabel = getCommunicationRowName(lightingBaseRowNum) || 'Lighting';
+  const lightingQuantity = Math.max(1, featureChargersCount) * 6;
+  const lightingBasePricing = lighting === 'yes'
+    ? getCommunicationPricing(lightingBaseRowNum, lightingQuantity)
+    : null;
+  const lightingCableRowNum = 13;
+  const lightingCableLabel = getCommunicationRowName(lightingCableRowNum);
+  const lightingCableLengthValue = lighting === 'yes' ? parsePositiveNumber(lightingCableDistance) : 0;
+  const lightingCablePricing = lighting === 'yes' && lightingCableLengthValue > 0
+    ? getCommunicationPricing(lightingCableRowNum, lightingCableLengthValue)
+    : null;
+
   const equipmentTotals = (() => {
     const totals = { material: 0, labor: 0, total: 0 };
-    if (equipmentSelection !== 'yes' || !stationEquipmentPriceMapping) {
+    if (equipmentSelection !== 'yes') {
       return totals;
     }
 
-    if (bumperPoles === 'yes') {
-      const item = stationEquipmentPriceMapping['bumper-poles'];
-      if (item) {
-        const quantity = featureChargersCount;
-        totals.material += item.materialPrice * quantity;
-        totals.labor += item.laborPrice * quantity;
-        totals.total += item.totalPrice * quantity;
-      }
-    }
+    const addTotals = (pricing: AccessoryPricing | null) => {
+      if (!pricing) return;
+      totals.material += pricing.materialTotal;
+      totals.labor += pricing.laborTotal;
+      totals.total += pricing.total;
+    };
 
-    if (wheelStops === 'yes') {
-      const item = stationEquipmentPriceMapping['wheel-stops'];
-      if (item) {
-        totals.material += item.materialPrice * featureChargersCount;
-        totals.labor += item.laborPrice * featureChargersCount;
-        totals.total += item.totalPrice * featureChargersCount;
-      }
-    }
-
-    if (fireExtinguisherCabinet === 'yes') {
-      const item = stationEquipmentPriceMapping['fire-extinguisher'];
-      if (item) {
-        totals.material += item.materialPrice * featureChargersCount;
-        totals.labor += item.laborPrice * featureChargersCount;
-        totals.total += item.totalPrice * featureChargersCount;
-      }
-    }
-
-    if (signage === 'yes') {
-      const item = stationEquipmentPriceMapping['signage'];
-      if (item) {
-        totals.material += item.materialPrice * featureChargersCount;
-        totals.labor += item.laborPrice * featureChargersCount;
-        totals.total += item.totalPrice * featureChargersCount;
-      }
-    }
+    addTotals(bumperPolePricing);
+    addTotals(wheelStopPricing);
+    addTotals(fireExtinguisherPricing);
+    addTotals(signagePricing);
 
     return totals;
   })();
 
   const communicationTotals = (() => {
     const totals = { material: 0, labor: 0, total: 0 };
-    if (communicationSelection !== 'yes' || !stationEquipmentPriceMapping) {
+    if (communicationSelection !== 'yes') {
       return totals;
     }
 
-    if (wifi4gHub === 'yes') {
-      const item = stationEquipmentPriceMapping['wifi-4g-hub'];
-      if (item) {
-        totals.material += item.materialPrice;
-        totals.labor += item.laborPrice;
-        totals.total += item.totalPrice;
-      }
-    }
+    const addTotals = (pricing: AccessoryPricing | null) => {
+      if (!pricing) return;
+      totals.material += pricing.materialTotal;
+      totals.labor += pricing.laborTotal;
+      totals.total += pricing.total;
+    };
 
-    if (cctv === 'yes') {
-      const item = stationEquipmentPriceMapping['cctv'];
-      if (item) {
-        const quantity = 4;
-        totals.material += item.materialPrice * quantity;
-        totals.labor += item.laborPrice * quantity;
-        totals.total += item.totalPrice * quantity;
-      }
-    }
-
-    if (lighting === 'yes') {
-      const item = stationEquipmentPriceMapping['lighting'];
-      if (item) {
-        const quantity = 3;
-        totals.material += item.materialPrice * quantity;
-        totals.labor += item.laborPrice * quantity;
-        totals.total += item.totalPrice * quantity;
-      }
-    }
-
-    if (accSystem === 'yes') {
-      const item = stationEquipmentPriceMapping['acc-system'];
-      if (item) {
-        totals.material += item.materialPrice;
-        totals.labor += item.laborPrice;
-        totals.total += item.totalPrice;
-      }
-    }
+    addTotals(routerBasePricing);
+    addTotals(routerCablePricing);
+    addTotals(cctvBasePricing);
+    addTotals(cctvCablePricing);
+    addTotals(lightingBasePricing);
+    addTotals(lightingCablePricing);
 
     return totals;
   })();
@@ -1077,14 +1203,7 @@ function MoreDetailCard(props: any) {
     }
 
     const cabinetEmptyPrice = parsePrice(row.__EMPTY_20);
-    let brandPrice = 0;
-    if (installationLocationBrand === 'ABB') {
-      brandPrice = parsePrice(row.__EMPTY_22);
-    } else if (installationLocationBrand === 'EATON') {
-      brandPrice = parsePrice(row.__EMPTY_24);
-    } else if (installationLocationBrand === 'LS') {
-      brandPrice = parsePrice(row.__EMPTY_23);
-    }
+    const { brandPrice } = getInstallationBrandInfo(row);
 
     const busbarAcc = parsePrice(row.__EMPTY_30);
     const siteInstallationCost = parsePrice(row.__EMPTY_32);
@@ -1555,14 +1674,7 @@ function MoreDetailCard(props: any) {
             const row = disconnectorSheet.find((r: any) => r.__rowNum__ === rowNum);
             if (row) {
               const cabinetEmptyPrice = parsePrice(row.__EMPTY_20);
-              let brandPrice = 0;
-              if (installationLocationBrand === 'ABB') {
-                brandPrice = parsePrice(row.__EMPTY_22);
-              } else if (installationLocationBrand === 'EATON') {
-                brandPrice = parsePrice(row.__EMPTY_24);
-              } else if (installationLocationBrand === 'LS') {
-                brandPrice = parsePrice(row.__EMPTY_23);
-              }
+              const { brandPrice, brandCode } = getInstallationBrandInfo(row);
               const busbarAcc = parsePrice(row.__EMPTY_30);
               const siteInstallationCost = parsePrice(row.__EMPTY_32);
 
@@ -1589,7 +1701,7 @@ function MoreDetailCard(props: any) {
               // 2. เบรกเกอร์
               products.push({
                 type: 'เบรกเกอร์',
-                code: '-', // ไม่มีรหัส
+                code: brandCode || '-', // รหัสสินค้า
                 productName: installationLocationBrand || '', // แบรนด์ที่เลือก
                 materialTotal: brandPrice + busbarAcc, // ราคาแบรนด์ + Busbar+ACC
                 laborTotal: siteInstallationCost, // ค่าติดตั้งหน้าSite
@@ -3086,14 +3198,7 @@ function MoreDetailCard(props: any) {
             const cabinetEmptyPrice = parseFloat(row.__EMPTY_20 || 0) || 0;
 
             // ราคาตามแบรนด์
-            let brandPrice = 0;
-            if (installationLocationBrand === 'ABB') {
-              brandPrice = parseFloat(row.__EMPTY_22 || 0) || 0;
-            } else if (installationLocationBrand === 'EATON') {
-              brandPrice = parseFloat(row.__EMPTY_24 || 0) || 0;
-            } else if (installationLocationBrand === 'LS') {
-              brandPrice = parseFloat(row.__EMPTY_23 || 0) || 0;
-            }
+            const { brandPrice, brandCode } = getInstallationBrandInfo(row);
 
             const busbarAcc = parseFloat(row.__EMPTY_30 || 0) || 0;
             const siteInstallationCost = parseFloat(row.__EMPTY_32 || 0) || 0;
@@ -3210,6 +3315,9 @@ function MoreDetailCard(props: any) {
                       <div className="px-4 pb-4 space-y-4">
                         {/* ราคาแบรนด์ */}
                         <div className="p-3 bg-gray-50 rounded-lg">
+                          <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">
+                            codeสินค้า: {brandCode || '-'}
+                          </div>
                           <div className="text-lg font-semibold text-gray-800">
                             <span className="text-sm text-gray-600 font-medium">ราคา {installationLocationBrand}:</span> {brandPrice.toLocaleString('th-TH')} บาท
                           </div>
@@ -5039,39 +5147,62 @@ function MoreDetailCard(props: any) {
                             </div>
 
                             {bumperPoles === 'yes' && (
-                              <Collapsible
-                                open={openItems['bumper-poles']}
-                                onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'bumper-poles': open }))}
-                              >
-                                <div className="bg-green-50 rounded-lg border border-green-200">
-                                  <CollapsibleTrigger className="w-full p-3 text-left hover:bg-green-100 transition-colors rounded-lg">
-                                    <div className="flex items-center justify-between">
-                                      <span className="font-semibold">
-                                        {featureChargersCount * 2} <span className="text-sm">ชิ้น</span>
-                                      </span>
-                                      <div className="ml-4">
-                                        {openItems['bumper-poles'] ? (
-                                          <ChevronUp className="h-4 w-4 text-green-600" />
+                              <>
+                                <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600 mb-2">
+                                  <span className="font-medium">เลือกวัสดุ:</span>
+                                  <Select value={bumperPoleMaterial} onValueChange={(value) => setBumperPoleMaterial(value as 'steel' | 'stainless')}>
+                                    <SelectTrigger className="w-36 h-9">
+                                      <SelectValue placeholder="เลือกวัสดุ" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="steel">เหล็ก</SelectItem>
+                                      <SelectItem value="stainless">สแตนเลส</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <Collapsible
+                                  open={openItems['bumper-poles']}
+                                  onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'bumper-poles': open }))}
+                                >
+                                  <div className="bg-green-50 rounded-lg border border-green-200">
+                                    <CollapsibleTrigger className="w-full p-3 text-left hover:bg-green-100 transition-colors rounded-lg">
+                                      <div className="flex items-center justify-between">
+                                        <span className="font-semibold">
+                                          {(bumperPolePricing?.quantity ?? bumperPoleQuantity).toLocaleString('th-TH')} <span className="text-sm">ชิ้น</span>
+                                        </span>
+                                        <div className="ml-4">
+                                          {openItems['bumper-poles'] ? (
+                                            <ChevronUp className="h-4 w-4 text-green-600" />
+                                          ) : (
+                                            <ChevronDown className="h-4 w-4 text-green-600" />
+                                          )}
+                                        </div>
+                                      </div>
+                                    </CollapsibleTrigger>
+                                    <CollapsibleContent>
+                                      <div className="px-3 pb-3">
+                                        {bumperPolePricing ? (
+                                          <div className="text-xs mt-2 space-y-2">
+                                            <div><span className="font-medium">codeสินค้า:</span> {getAccessoryProductCode(bumperPolePricing.row)}</div>
+                                            <div className="grid grid-cols-3 gap-2">
+                                              <div><span className="font-medium">ราคาค่าของ/ชิ้น:</span> {bumperPolePricing.materialUnit.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium">ราคาค่าแรง/ชิ้น:</span> {bumperPolePricing.laborUnit.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium">ราคารวม/ชิ้น:</span> {bumperPolePricing.totalUnit.toLocaleString('th-TH')} บาท</div>
+                                            </div>
+                                            <div className="pt-2 border-t border-green-100 mt-2">
+                                              <div><span className="font-medium">ค่าของรวม:</span> {bumperPolePricing.materialTotal.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium">ค่าแรงรวม:</span> {bumperPolePricing.laborTotal.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium text-green-800">ราคารวม:</span> {bumperPolePricing.total.toLocaleString('th-TH')} บาท</div>
+                                            </div>
+                                          </div>
                                         ) : (
-                                          <ChevronDown className="h-4 w-4 text-green-600" />
+                                          <div className="text-xs text-yellow-700">ไม่พบข้อมูลจาก sheet "ต้นทุน อุปกรณ์ ACCESSORIES" (row {bumperPoleRowNum})</div>
                                         )}
                                       </div>
-                                    </div>
-                                  </CollapsibleTrigger>
-                                  <CollapsibleContent>
-                                    <div className="px-3 pb-3">
-                                      {stationEquipmentPriceMapping['bumper-poles'] && (
-                                        <div className="text-xs space-y-1 mt-2">
-                                          <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['bumper-poles'].productCode}</div>
-                                          <div><span className="font-medium">ราคาค่าของ:</span> {(stationEquipmentPriceMapping['bumper-poles'].materialPrice * (featureChargersCount * 2)).toLocaleString('th-TH')} บาท</div>
-                                          <div><span className="font-medium">ราคาค่าแรง:</span> {(stationEquipmentPriceMapping['bumper-poles'].laborPrice * (featureChargersCount * 2)).toLocaleString('th-TH')} บาท</div>
-                                          <div><span className="font-medium">ราคารวม:</span> {(stationEquipmentPriceMapping['bumper-poles'].totalPrice * (featureChargersCount * 2)).toLocaleString('th-TH')} บาท</div>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </CollapsibleContent>
-                                </div>
-                              </Collapsible>
+                                    </CollapsibleContent>
+                                  </div>
+                                </Collapsible>
+                              </>
                             )}
 
                           </div>
@@ -5111,39 +5242,62 @@ function MoreDetailCard(props: any) {
                             </div>
 
                             {wheelStops === 'yes' && (
-                              <Collapsible
-                                open={openItems['wheel-stops']}
-                                onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'wheel-stops': open }))}
-                              >
-                                <div className="bg-green-50 rounded-lg border border-green-200">
-                                  <CollapsibleTrigger className="w-full p-3 text-left hover:bg-green-100 transition-colors rounded-lg">
-                                    <div className="flex items-center justify-between">
-                                      <span className="font-semibold">
-                                        {featureChargersCount} <span className="text-sm">ชิ้น</span>
-                                      </span>
-                                      <div className="ml-4">
-                                        {openItems['wheel-stops'] ? (
-                                          <ChevronUp className="h-4 w-4 text-green-600" />
+                              <>
+                                <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600 mb-2">
+                                  <span className="font-medium">เลือกวัสดุ:</span>
+                                  <Select value={wheelStopMaterial} onValueChange={(value) => setWheelStopMaterial(value as 'rubber' | 'concrete')}>
+                                    <SelectTrigger className="w-36 h-9">
+                                      <SelectValue placeholder="เลือกวัสดุ" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="rubber">ยาง</SelectItem>
+                                      <SelectItem value="concrete">ปูน</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <Collapsible
+                                  open={openItems['wheel-stops']}
+                                  onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'wheel-stops': open }))}
+                                >
+                                  <div className="bg-green-50 rounded-lg border border-green-200">
+                                    <CollapsibleTrigger className="w-full p-3 text-left hover:bg-green-100 transition-colors rounded-lg">
+                                      <div className="flex items-center justify-between">
+                                        <span className="font-semibold">
+                                          {(wheelStopPricing?.quantity ?? wheelStopQuantity).toLocaleString('th-TH')} <span className="text-sm">ชิ้น</span>
+                                        </span>
+                                        <div className="ml-4">
+                                          {openItems['wheel-stops'] ? (
+                                            <ChevronUp className="h-4 w-4 text-green-600" />
+                                          ) : (
+                                            <ChevronDown className="h-4 w-4 text-green-600" />
+                                          )}
+                                        </div>
+                                      </div>
+                                    </CollapsibleTrigger>
+                                    <CollapsibleContent>
+                                      <div className="px-3 pb-3">
+                                        {wheelStopPricing ? (
+                                          <div className="text-xs mt-2 space-y-2">
+                                            <div><span className="font-medium">codeสินค้า:</span> {getAccessoryProductCode(wheelStopPricing.row)}</div>
+                                            <div className="grid grid-cols-3 gap-2">
+                                              <div><span className="font-medium">ราคาค่าของ/ชิ้น:</span> {wheelStopPricing.materialUnit.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium">ราคาค่าแรง/ชิ้น:</span> {wheelStopPricing.laborUnit.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium">ราคารวม/ชิ้น:</span> {wheelStopPricing.totalUnit.toLocaleString('th-TH')} บาท</div>
+                                            </div>
+                                            <div className="pt-2 border-t border-green-100 mt-2">
+                                              <div><span className="font-medium">ค่าของรวม:</span> {wheelStopPricing.materialTotal.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium">ค่าแรงรวม:</span> {wheelStopPricing.laborTotal.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium text-green-800">ราคารวม:</span> {wheelStopPricing.total.toLocaleString('th-TH')} บาท</div>
+                                            </div>
+                                          </div>
                                         ) : (
-                                          <ChevronDown className="h-4 w-4 text-green-600" />
+                                          <div className="text-xs text-yellow-700">ไม่พบข้อมูลจาก sheet "ต้นทุน อุปกรณ์ ACCESSORIES" (row {wheelStopRowNum})</div>
                                         )}
                                       </div>
-                                    </div>
-                                  </CollapsibleTrigger>
-                                  <CollapsibleContent>
-                                    <div className="px-3 pb-3">
-                                      {stationEquipmentPriceMapping['wheel-stops'] && (
-                                        <div className="text-xs space-y-1 mt-2">
-                                          <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['wheel-stops'].productCode}</div>
-                                          <div><span className="font-medium">ราคาค่าของ:</span> {(stationEquipmentPriceMapping['wheel-stops'].materialPrice * featureChargersCount).toLocaleString('th-TH')} บาท</div>
-                                          <div><span className="font-medium">ราคาค่าแรง:</span> {(stationEquipmentPriceMapping['wheel-stops'].laborPrice * featureChargersCount).toLocaleString('th-TH')} บาท</div>
-                                          <div><span className="font-medium">ราคารวม:</span> {(stationEquipmentPriceMapping['wheel-stops'].totalPrice * featureChargersCount).toLocaleString('th-TH')} บาท</div>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </CollapsibleContent>
-                                </div>
-                              </Collapsible>
+                                    </CollapsibleContent>
+                                  </div>
+                                </Collapsible>
+                              </>
                             )}
 
                           </div>
@@ -5183,39 +5337,62 @@ function MoreDetailCard(props: any) {
                             </div>
 
                             {fireExtinguisherCabinet === 'yes' && (
-                              <Collapsible
-                                open={openItems['fire-extinguisher']}
-                                onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'fire-extinguisher': open }))}
-                              >
-                                <div className="bg-red-50 rounded-lg border border-red-200">
-                                  <CollapsibleTrigger className="w-full p-3 text-left hover:bg-red-100 transition-colors rounded-lg">
-                                    <div className="flex items-center justify-between">
-                                      <span className="font-semibold text-red-600">
-                                        {featureChargersCount} <span className="text-sm">ชิ้น</span>
-                                      </span>
-                                      <div className="ml-4">
-                                        {openItems['fire-extinguisher'] ? (
-                                          <ChevronUp className="h-4 w-4 text-red-600" />
+                              <>
+                                <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600 mb-2">
+                                  <span className="font-medium">เลือกประเภท:</span>
+                                  <Select value={fireExtinguisherType} onValueChange={(value) => setFireExtinguisherType(value as 'abc' | 'co2')}>
+                                    <SelectTrigger className="w-40 h-9">
+                                      <SelectValue placeholder="เลือกประเภท" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="abc">A+B+C</SelectItem>
+                                      <SelectItem value="co2">CO2</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <Collapsible
+                                  open={openItems['fire-extinguisher']}
+                                  onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'fire-extinguisher': open }))}
+                                >
+                                  <div className="bg-red-50 rounded-lg border border-red-200">
+                                    <CollapsibleTrigger className="w-full p-3 text-left hover:bg-red-100 transition-colors rounded-lg">
+                                      <div className="flex items-center justify-between">
+                                        <span className="font-semibold text-red-600">
+                                          {(fireExtinguisherPricing?.quantity ?? fireExtinguisherQuantity).toLocaleString('th-TH')} <span className="text-sm">ชิ้น</span>
+                                        </span>
+                                        <div className="ml-4">
+                                          {openItems['fire-extinguisher'] ? (
+                                            <ChevronUp className="h-4 w-4 text-red-600" />
+                                          ) : (
+                                            <ChevronDown className="h-4 w-4 text-red-600" />
+                                          )}
+                                        </div>
+                                      </div>
+                                    </CollapsibleTrigger>
+                                    <CollapsibleContent>
+                                      <div className="px-3 pb-3">
+                                        {fireExtinguisherPricing ? (
+                                          <div className="text-xs mt-2 space-y-2">
+                                            <div><span className="font-medium">codeสินค้า:</span> {getAccessoryProductCode(fireExtinguisherPricing.row)}</div>
+                                            <div className="grid grid-cols-3 gap-2">
+                                              <div><span className="font-medium">ราคาค่าของ/ชิ้น:</span> {fireExtinguisherPricing.materialUnit.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium">ราคาค่าแรง/ชิ้น:</span> {fireExtinguisherPricing.laborUnit.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium">ราคารวม/ชิ้น:</span> {fireExtinguisherPricing.totalUnit.toLocaleString('th-TH')} บาท</div>
+                                            </div>
+                                            <div className="pt-2 border-t border-red-100 mt-2">
+                                              <div><span className="font-medium">ค่าของรวม:</span> {fireExtinguisherPricing.materialTotal.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium">ค่าแรงรวม:</span> {fireExtinguisherPricing.laborTotal.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium text-red-700">ราคารวม:</span> {fireExtinguisherPricing.total.toLocaleString('th-TH')} บาท</div>
+                                            </div>
+                                          </div>
                                         ) : (
-                                          <ChevronDown className="h-4 w-4 text-red-600" />
+                                          <div className="text-xs text-yellow-700">ไม่พบข้อมูลจาก sheet "ต้นทุน อุปกรณ์ ACCESSORIES" (row {fireExtinguisherRowNum})</div>
                                         )}
                                       </div>
-                                    </div>
-                                  </CollapsibleTrigger>
-                                  <CollapsibleContent>
-                                    <div className="px-3 pb-3">
-                                      {stationEquipmentPriceMapping['fire-extinguisher'] && (
-                                        <div className="text-xs space-y-1 mt-2">
-                                          <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['fire-extinguisher'].productCode}</div>
-                                          <div><span className="font-medium">ราคาค่าของ:</span> {(stationEquipmentPriceMapping['fire-extinguisher'].materialPrice * featureChargersCount).toLocaleString('th-TH')} บาท</div>
-                                          <div><span className="font-medium">ราคาค่าแรง:</span> {(stationEquipmentPriceMapping['fire-extinguisher'].laborPrice * featureChargersCount).toLocaleString('th-TH')} บาท</div>
-                                          <div><span className="font-medium">ราคารวม:</span> {(stationEquipmentPriceMapping['fire-extinguisher'].totalPrice * featureChargersCount).toLocaleString('th-TH')} บาท</div>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </CollapsibleContent>
-                                </div>
-                              </Collapsible>
+                                    </CollapsibleContent>
+                                  </div>
+                                </Collapsible>
+                              </>
                             )}
 
                           </div>
@@ -5263,7 +5440,7 @@ function MoreDetailCard(props: any) {
                                   <CollapsibleTrigger className="w-full p-3 text-left hover:bg-purple-100 transition-colors rounded-lg">
                                     <div className="flex items-center justify-between">
                                       <span className="font-semibold text-purple-600">
-                                        {featureChargersCount} <span className="text-sm">ชิ้น</span>
+                                        {(signagePricing?.quantity ?? signageQuantity).toLocaleString('th-TH')} <span className="text-sm">ชิ้น</span>
                                       </span>
                                       <div className="ml-4">
                                         {openItems['signage'] ? (
@@ -5276,13 +5453,22 @@ function MoreDetailCard(props: any) {
                                   </CollapsibleTrigger>
                                   <CollapsibleContent>
                                     <div className="px-3 pb-3">
-                                      {stationEquipmentPriceMapping['signage'] && (
-                                        <div className="text-xs space-y-1 mt-2">
-                                          <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['signage'].productCode}</div>
-                                          <div><span className="font-medium">ราคาค่าของ:</span> {(stationEquipmentPriceMapping['signage'].materialPrice * featureChargersCount).toLocaleString('th-TH')} บาท</div>
-                                          <div><span className="font-medium">ราคาค่าแรง:</span> {(stationEquipmentPriceMapping['signage'].laborPrice * featureChargersCount).toLocaleString('th-TH')} บาท</div>
-                                          <div><span className="font-medium">ราคารวม:</span> {(stationEquipmentPriceMapping['signage'].totalPrice * featureChargersCount).toLocaleString('th-TH')} บาท</div>
+                                      {signagePricing ? (
+                                        <div className="text-xs mt-2 space-y-2">
+                                          <div><span className="font-medium">codeสินค้า:</span> {getAccessoryProductCode(signagePricing.row)}</div>
+                                          <div className="grid grid-cols-3 gap-2">
+                                            <div><span className="font-medium">ราคาค่าของ/ชิ้น:</span> {signagePricing.materialUnit.toLocaleString('th-TH')} บาท</div>
+                                            <div><span className="font-medium">ราคาค่าแรง/ชิ้น:</span> {signagePricing.laborUnit.toLocaleString('th-TH')} บาท</div>
+                                            <div><span className="font-medium">ราคารวม/ชิ้น:</span> {signagePricing.totalUnit.toLocaleString('th-TH')} บาท</div>
+                                          </div>
+                                          <div className="pt-2 border-t border-purple-100 mt-2">
+                                            <div><span className="font-medium">ค่าของรวม:</span> {signagePricing.materialTotal.toLocaleString('th-TH')} บาท</div>
+                                            <div><span className="font-medium">ค่าแรงรวม:</span> {signagePricing.laborTotal.toLocaleString('th-TH')} บาท</div>
+                                            <div><span className="font-medium text-purple-700">ราคารวม:</span> {signagePricing.total.toLocaleString('th-TH')} บาท</div>
+                                          </div>
                                         </div>
+                                      ) : (
+                                        <div className="text-xs text-yellow-700">ไม่พบข้อมูลจาก sheet "ต้นทุน อุปกรณ์ ACCESSORIES" (row 9)</div>
                                       )}
                                     </div>
                                   </CollapsibleContent>
@@ -5388,12 +5574,11 @@ function MoreDetailCard(props: any) {
                       <div className="px-4 pb-4 space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-                          {/* 2.1 WIFI + 4G + HUB */}
+                          {/* 2.1 ROUTER */}
 
                           <div className="space-y-2">
-                            {/* Item name and toggle buttons */}
                             <div className="flex items-center justify-between mb-2">
-                              <span className="text-base font-semibold text-gray-800">WIFI + 4G + HUB</span>
+                              <span className="text-base font-semibold text-gray-800">ROUTER</span>
                               <div className="flex items-center gap-2">
                                 <div
                                   className={`flex items-center space-x-2 px-3 py-1 rounded-lg border cursor-pointer ${wifi4gHub === 'yes' ? 'bg-green-100 border-green-300' : 'hover:bg-gray-50'}`}
@@ -5423,37 +5608,116 @@ function MoreDetailCard(props: any) {
                             </div>
 
                             {wifi4gHub === 'yes' && (
-                              <Collapsible
-                                open={openItems['wifi-4g-hub']}
-                                onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'wifi-4g-hub': open }))}
-                              >
-                                <div className="bg-green-50 rounded-lg border border-green-200">
-                                  <CollapsibleTrigger className="w-full p-3 text-left hover:bg-green-100 transition-colors rounded-lg">
-                                    <div className="flex items-center justify-between">
-                                      <span className="font-semibold">1 <span className="text-sm">ชิ้น</span></span>
-                                      <div className="ml-4">
-                                        {openItems['wifi-4g-hub'] ? (
-                                          <ChevronUp className="h-4 w-4 text-green-600" />
+                              <div className="space-y-4">
+                                <div className="space-y-1">
+                                  <Label className="text-sm font-medium">เลือกอุปกรณ์:</Label>
+                                  <Select value={routerType} onValueChange={(value) => setRouterType(value as 'router-sim' | 'router-sim-hub')}>
+                                    <SelectTrigger className="w-full md:w-72">
+                                      <SelectValue placeholder="เลือกชนิด ROUTER" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="router-sim">ROUTER 4 G + SIM</SelectItem>
+                                      <SelectItem value="router-sim-hub">ROUTER 4 G + SIM + HUB 6 PORT</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <p className="text-xs text-gray-500">ROUTER 4 G + SIM + HUB 6 PORT เป็นชุดพื้นฐาน</p>
+                                </div>
+
+                                <Collapsible
+                                  open={openItems['wifi-4g-hub']}
+                                  onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'wifi-4g-hub': open }))}
+                                >
+                                  <div className="bg-green-50 rounded-lg border border-green-200">
+                                    <CollapsibleTrigger className="w-full p-3 text-left hover:bg-green-100 transition-colors rounded-lg">
+                                      <div className="flex items-center justify-between">
+                                        <span className="font-semibold">
+                                          {routerBaseQuantity.toLocaleString('th-TH')} <span className="text-sm">ชิ้น</span>
+                                        </span>
+                                        <div className="ml-4">
+                                          {openItems['wifi-4g-hub'] ? (
+                                            <ChevronUp className="h-4 w-4 text-green-600" />
+                                          ) : (
+                                            <ChevronDown className="h-4 w-4 text-green-600" />
+                                          )}
+                                        </div>
+                                      </div>
+                                    </CollapsibleTrigger>
+                                    <CollapsibleContent>
+                                      <div className="px-3 pb-3">
+                                        {routerBasePricing ? (
+                                          <div className="text-xs mt-2 space-y-2">
+                                            <div><span className="font-medium">รายการ:</span> {routerBaseLabel}</div>
+                                            <div className="grid grid-cols-3 gap-2">
+                                              <div><span className="font-medium">ราคาค่าของ:</span> {routerBasePricing.materialUnit.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium">ราคาค่าแรง:</span> {routerBasePricing.laborUnit.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium">ราคารวม:</span> {routerBasePricing.totalUnit.toLocaleString('th-TH')} บาท</div>
+                                            </div>
+                                            <div className="pt-2 border-t border-green-100 mt-2">
+                                              <div><span className="font-medium">ค่าของรวม:</span> {routerBasePricing.materialTotal.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium">ค่าแรงรวม:</span> {routerBasePricing.laborTotal.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium text-green-800">ราคารวม:</span> {routerBasePricing.total.toLocaleString('th-TH')} บาท</div>
+                                            </div>
+                                          </div>
                                         ) : (
-                                          <ChevronDown className="h-4 w-4 text-green-600" />
+                                          <div className="text-xs text-yellow-700">ไม่พบข้อมูลจาก sheet "ต้นทุนระบบสื่อสาร" (row {routerBaseRowNum})</div>
                                         )}
                                       </div>
-                                    </div>
-                                  </CollapsibleTrigger>
-                                  <CollapsibleContent>
-                                    <div className="px-3 pb-3">
-                                      {stationEquipmentPriceMapping['wifi-4g-hub'] && (
-                                        <div className="text-xs space-y-1 mt-2">
-                                          <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['wifi-4g-hub'].productCode}</div>
-                                          <div><span className="font-medium">ราคาค่าของ:</span> {(stationEquipmentPriceMapping['wifi-4g-hub'].materialPrice * 1).toLocaleString('th-TH')} บาท</div>
-                                          <div><span className="font-medium">ราคาค่าแรง:</span> {(stationEquipmentPriceMapping['wifi-4g-hub'].laborPrice * 1).toLocaleString('th-TH')} บาท</div>
-                                          <div><span className="font-medium">ราคารวม:</span> {(stationEquipmentPriceMapping['wifi-4g-hub'].totalPrice * 1).toLocaleString('th-TH')} บาท</div>
+                                    </CollapsibleContent>
+                                  </div>
+                                </Collapsible>
+
+                                <Collapsible
+                                  open={openItems['router-distance']}
+                                  onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'router-distance': open }))}
+                                >
+                                  <div className="bg-green-50 rounded-lg border border-green-200">
+                                    <CollapsibleTrigger className="w-full p-4 text-left hover:bg-green-100 transition-colors rounded-lg">
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-medium text-green-800">{routerCableLabel || 'สาย LAN CAT6 + ท่อ PVC 16 มม.'}:</span>
+                                          <span className="font-medium">ระยะ:</span>
+                                          <Input
+                                            type="number"
+                                            value={routerCableDistance}
+                                            onChange={(e) => setRouterCableDistance(e.target.value)}
+                                            placeholder="กรอกระยะ (เมตร)"
+                                            className="w-32"
+                                            min="0"
+                                            onClick={(e) => e.stopPropagation()}
+                                          />
+                                          <span className="text-gray-500">เมตร</span>
                                         </div>
-                                      )}
-                                    </div>
-                                  </CollapsibleContent>
-                                </div>
-                              </Collapsible>
+                                        <div className="ml-4">
+                                          {openItems['router-distance'] ? (
+                                            <ChevronUp className="h-4 w-4 text-green-600" />
+                                          ) : (
+                                            <ChevronDown className="h-4 w-4 text-green-600" />
+                                          )}
+                                        </div>
+                                      </div>
+                                    </CollapsibleTrigger>
+                                    <CollapsibleContent>
+                                      <div className="px-4 pb-4 space-y-2 text-sm">
+                                        {routerCablePricing ? (
+                                          <>
+                                            <div><span className="font-medium">รายการ:</span> {routerCableLabel || '-'}</div>
+                                            <div><span className="font-medium">ราคาค่าของ/เมตร:</span> {routerCablePricing.materialUnit.toLocaleString('th-TH')} บาท</div>
+                                            <div><span className="font-medium">ราคาค่าแรง/เมตร:</span> {routerCablePricing.laborUnit.toLocaleString('th-TH')} บาท</div>
+                                            <div><span className="font-medium">ราคารวม/เมตร:</span> {routerCablePricing.totalUnit.toLocaleString('th-TH')} บาท</div>
+                                            <div className="pt-2 border-t border-green-100 mt-2">
+                                              <div><span className="font-medium">ค่าของรวม:</span> {routerCablePricing.materialTotal.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium">ค่าแรงรวม:</span> {routerCablePricing.laborTotal.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium text-green-800">ราคารวม:</span> {routerCablePricing.total.toLocaleString('th-TH')} บาท</div>
+                                            </div>
+                                          </>
+                                        ) : (
+                                          <div className="text-yellow-700">กรอกระยะ (เมตร) เพื่อคำนวณ หรือไม่พบข้อมูล row {routerCableRowNum}</div>
+                                        )}
+                                      </div>
+                                    </CollapsibleContent>
+                                  </div>
+                                </Collapsible>
+                              </div>
                             )}
 
 
@@ -5462,7 +5726,6 @@ function MoreDetailCard(props: any) {
                           {/* 2.2 กล้อง CCTV */}
 
                           <div className="space-y-2">
-                            {/* Item name and toggle buttons */}
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-base font-semibold text-gray-800">กล้อง CCTV</span>
                               <div className="flex items-center gap-2">
@@ -5494,37 +5757,102 @@ function MoreDetailCard(props: any) {
                             </div>
 
                             {cctv === 'yes' && (
-                              <Collapsible
-                                open={openItems['cctv']}
-                                onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'cctv': open }))}
-                              >
-                                <div className="bg-green-50 rounded-lg border border-green-200">
-                                  <CollapsibleTrigger className="w-full p-3 text-left hover:bg-green-100 transition-colors rounded-lg">
-                                    <div className="flex items-center justify-between">
-                                      <span className="font-semibold">4 <span className="text-sm">ชิ้น</span></span>
-                                      <div className="ml-4">
-                                        {openItems['cctv'] ? (
-                                          <ChevronUp className="h-4 w-4 text-green-600" />
+                              <div className="space-y-4">
+                                <Collapsible
+                                  open={openItems['cctv']}
+                                  onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'cctv': open }))}
+                                >
+                                  <div className="bg-green-50 rounded-lg border border-green-200">
+                                    <CollapsibleTrigger className="w-full p-3 text-left hover:bg-green-100 transition-colors rounded-lg">
+                                      <div className="flex items-center justify-between">
+                                        <span className="font-semibold">
+                                          {cctvQuantity.toLocaleString('th-TH')} <span className="text-sm">ชิ้น</span>
+                                        </span>
+                                        <div className="ml-4">
+                                          {openItems['cctv'] ? (
+                                            <ChevronUp className="h-4 w-4 text-green-600" />
+                                          ) : (
+                                            <ChevronDown className="h-4 w-4 text-green-600" />
+                                          )}
+                                        </div>
+                                      </div>
+                                    </CollapsibleTrigger>
+                                    <CollapsibleContent>
+                                      <div className="px-3 pb-3">
+                                        {cctvBasePricing ? (
+                                          <div className="text-xs mt-2 space-y-2">
+                                            <div><span className="font-medium">รายการ:</span> {cctvBaseLabel}</div>
+                                            <div className="grid grid-cols-3 gap-2">
+                                              <div><span className="font-medium">ราคาค่าของ/ชุด:</span> {cctvBasePricing.materialUnit.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium">ราคาค่าแรง/ชุด:</span> {cctvBasePricing.laborUnit.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium">ราคารวม/ชุด:</span> {cctvBasePricing.totalUnit.toLocaleString('th-TH')} บาท</div>
+                                            </div>
+                                            <div className="pt-2 border-t border-green-100 mt-2">
+                                              <div><span className="font-medium">ค่าของรวม:</span> {cctvBasePricing.materialTotal.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium">ค่าแรงรวม:</span> {cctvBasePricing.laborTotal.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium text-green-800">ราคารวม:</span> {cctvBasePricing.total.toLocaleString('th-TH')} บาท</div>
+                                            </div>
+                                          </div>
                                         ) : (
-                                          <ChevronDown className="h-4 w-4 text-green-600" />
+                                          <div className="text-xs text-yellow-700">ไม่พบข้อมูลจาก sheet "ต้นทุนระบบสื่อสาร" (row {cctvBaseRowNum})</div>
                                         )}
                                       </div>
-                                    </div>
-                                  </CollapsibleTrigger>
-                                  <CollapsibleContent>
-                                    <div className="px-3 pb-3">
-                                      {stationEquipmentPriceMapping['cctv'] && (
-                                        <div className="text-xs space-y-1 mt-2">
-                                          <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['cctv'].productCode}</div>
-                                          <div><span className="font-medium">ราคาค่าของ:</span> {(stationEquipmentPriceMapping['cctv'].materialPrice * 4).toLocaleString('th-TH')} บาท</div>
-                                          <div><span className="font-medium">ราคาค่าแรง:</span> {(stationEquipmentPriceMapping['cctv'].laborPrice * 4).toLocaleString('th-TH')} บาท</div>
-                                          <div><span className="font-medium">ราคารวม:</span> {(stationEquipmentPriceMapping['cctv'].totalPrice * 4).toLocaleString('th-TH')} บาท</div>
+                                    </CollapsibleContent>
+                                  </div>
+                                </Collapsible>
+
+                                <Collapsible
+                                  open={openItems['cctv-cable']}
+                                  onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'cctv-cable': open }))}
+                                >
+                                  <div className="bg-green-50 rounded-lg border border-green-200">
+                                    <CollapsibleTrigger className="w-full p-4 text-left hover:bg-green-100 transition-colors rounded-lg">
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-medium text-green-800">{cctvCableLabel || 'สาย AC กล้อง ( 1.5 x 2 ) + ท่อ PVC 16 มม.'}:</span>
+                                          <span className="font-medium">ระยะ:</span>
+                                          <Input
+                                            type="number"
+                                            value={cctvCableDistance}
+                                            onChange={(e) => setCctvCableDistance(e.target.value)}
+                                            placeholder="กรอกระยะ (เมตร)"
+                                            className="w-32"
+                                            min="0"
+                                            onClick={(e) => e.stopPropagation()}
+                                          />
+                                          <span className="text-gray-500">เมตร</span>
                                         </div>
-                                      )}
-                                    </div>
-                                  </CollapsibleContent>
-                                </div>
-                              </Collapsible>
+                                        <div className="ml-4">
+                                          {openItems['cctv-cable'] ? (
+                                            <ChevronUp className="h-4 w-4 text-green-600" />
+                                          ) : (
+                                            <ChevronDown className="h-4 w-4 text-green-600" />
+                                          )}
+                                        </div>
+                                      </div>
+                                    </CollapsibleTrigger>
+                                    <CollapsibleContent>
+                                      <div className="px-4 pb-4 space-y-2 text-sm">
+                                        {cctvCablePricing ? (
+                                          <>
+                                            <div><span className="font-medium">รายการ:</span> {cctvCableLabel || '-'}</div>
+                                            <div><span className="font-medium">ราคาค่าของ/เมตร:</span> {cctvCablePricing.materialUnit.toLocaleString('th-TH')} บาท</div>
+                                            <div><span className="font-medium">ราคาค่าแรง/เมตร:</span> {cctvCablePricing.laborUnit.toLocaleString('th-TH')} บาท</div>
+                                            <div><span className="font-medium">ราคารวม/เมตร:</span> {cctvCablePricing.totalUnit.toLocaleString('th-TH')} บาท</div>
+                                            <div className="pt-2 border-t border-green-100 mt-2">
+                                              <div><span className="font-medium">ค่าของรวม:</span> {cctvCablePricing.materialTotal.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium">ค่าแรงรวม:</span> {cctvCablePricing.laborTotal.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium text-green-800">ราคารวม:</span> {cctvCablePricing.total.toLocaleString('th-TH')} บาท</div>
+                                            </div>
+                                          </>
+                                        ) : (
+                                          <div className="text-yellow-700">กรอกระยะ (เมตร) เพื่อคำนวณ หรือไม่พบข้อมูล row {cctvCableRowNum}</div>
+                                        )}
+                                      </div>
+                                    </CollapsibleContent>
+                                  </div>
+                                </Collapsible>
+                              </div>
                             )}
 
 
@@ -5565,90 +5893,101 @@ function MoreDetailCard(props: any) {
                             </div>
 
                             {lighting === 'yes' && (
-                              <Collapsible
-                                open={openItems['lighting']}
-                                onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'lighting': open }))}
-                              >
-                                <div className="bg-yellow-50 rounded-lg border border-yellow-200">
-                                  <CollapsibleTrigger className="w-full p-3 text-left hover:bg-yellow-100 transition-colors rounded-lg">
-                                    <div className="flex items-center justify-between">
-                                      <span className="font-semibold text-yellow-600">3 <span className="text-sm">ชิ้น</span></span>
-                                      <div className="ml-4">
-                                        {openItems['lighting'] ? (
-                                          <ChevronUp className="h-4 w-4 text-yellow-600" />
+                              <div className="space-y-4">
+                                <Collapsible
+                                  open={openItems['lighting']}
+                                  onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'lighting': open }))}
+                                >
+                                  <div className="bg-yellow-50 rounded-lg border border-yellow-200">
+                                    <CollapsibleTrigger className="w-full p-3 text-left hover:bg-yellow-100 transition-colors rounded-lg">
+                                      <div className="flex items-center justify-between">
+                                        <span className="font-semibold text-yellow-600">
+                                          {lightingQuantity.toLocaleString('th-TH')} <span className="text-sm">ชิ้น</span>
+                                        </span>
+                                        <div className="ml-4">
+                                          {openItems['lighting'] ? (
+                                            <ChevronUp className="h-4 w-4 text-yellow-600" />
+                                          ) : (
+                                            <ChevronDown className="h-4 w-4 text-yellow-600" />
+                                          )}
+                                        </div>
+                                      </div>
+                                    </CollapsibleTrigger>
+                                    <CollapsibleContent>
+                                      <div className="px-3 pb-3">
+                                        {lightingBasePricing ? (
+                                          <div className="text-xs mt-2 space-y-2">
+                                            <div><span className="font-medium">รายการ:</span> {lightingBaseLabel}</div>
+                                            <div className="grid grid-cols-3 gap-2">
+                                              <div><span className="font-medium">ราคาค่าของ/ชิ้น:</span> {lightingBasePricing.materialUnit.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium">ราคาค่าแรง/ชิ้น:</span> {lightingBasePricing.laborUnit.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium">ราคารวม/ชิ้น:</span> {lightingBasePricing.totalUnit.toLocaleString('th-TH')} บาท</div>
+                                            </div>
+                                            <div className="pt-2 border-t border-yellow-100 mt-2">
+                                              <div><span className="font-medium">ค่าของรวม:</span> {lightingBasePricing.materialTotal.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium">ค่าแรงรวม:</span> {lightingBasePricing.laborTotal.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium text-yellow-700">ราคารวม:</span> {lightingBasePricing.total.toLocaleString('th-TH')} บาท</div>
+                                            </div>
+                                          </div>
                                         ) : (
-                                          <ChevronDown className="h-4 w-4 text-yellow-600" />
+                                          <div className="text-xs text-yellow-700">ไม่พบข้อมูลจาก sheet "ต้นทุนระบบสื่อสาร" (row {lightingBaseRowNum})</div>
                                         )}
                                       </div>
-                                    </div>
-                                  </CollapsibleTrigger>
-                                  <CollapsibleContent>
-                                    <div className="px-3 pb-3">
-                                      {stationEquipmentPriceMapping['lighting'] && (
-                                        <div className="text-xs space-y-1 mt-2">
-                                          <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['lighting'].productCode}</div>
-                                          <div><span className="font-medium">ราคาค่าของ:</span> {(stationEquipmentPriceMapping['lighting'].materialPrice * 3).toLocaleString('th-TH')} บาท</div>
-                                          <div><span className="font-medium">ราคาค่าแรง:</span> {(stationEquipmentPriceMapping['lighting'].laborPrice * 3).toLocaleString('th-TH')} บาท</div>
-                                          <div><span className="font-medium">ราคารวม:</span> {(stationEquipmentPriceMapping['lighting'].totalPrice * 3).toLocaleString('th-TH')} บาท</div>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </CollapsibleContent>
-                                </div>
-                              </Collapsible>
-                            )}
-
-
-                          </div>
-
-                          {/* 2.4 ACC (สาย + รางสาย + ตู้outdoor + อื่นๆ) */}
-
-                          <div className="space-y-2">
-                            {/* Item name and toggle buttons */}
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-base font-semibold text-gray-800">ACC (สาย + รางสาย + ตู้outdoor + อื่นๆ)</span>
-                              <div className="flex items-center gap-2">
-                                <div
-                                  className={`flex items-center space-x-2 px-3 py-1 rounded-lg border cursor-pointer ${accSystem === 'yes' ? 'bg-green-100 border-green-300' : 'hover:bg-gray-50'}`}
-                                  onClick={() => setAccSystem('yes')}
-                                >
-                                  <Checkbox
-                                    id="acc-system-yes"
-                                    checked={accSystem === 'yes'}
-                                    onCheckedChange={(checked) => { if (checked) setAccSystem('yes'); }}
-                                    className="border-green-400 data-[state=checked]:bg-green-500"
-                                  />
-                                  <Label htmlFor="acc-system-yes" className="font-medium cursor-pointer text-sm">มี</Label>
-                                </div>
-                                <div
-                                  className={`flex items-center space-x-2 px-3 py-1 rounded-lg border cursor-pointer ${accSystem === 'no' ? 'bg-gray-100 border-gray-300' : 'hover:bg-gray-50'}`}
-                                  onClick={() => setAccSystem('no')}
-                                >
-                                  <Checkbox
-                                    id="acc-system-no"
-                                    checked={accSystem === 'no'}
-                                    onCheckedChange={(checked) => { if (checked) setAccSystem('no'); }}
-                                    className="border-gray-400 data-[state=checked]:bg-gray-500"
-                                  />
-                                  <Label htmlFor="acc-system-no" className="font-medium cursor-pointer text-sm">ไม่มี</Label>
-                                </div>
-                              </div>
-                            </div>
-
-                            {accSystem === 'yes' && (
-                              <div className="p-3 bg-purple-50 rounded-lg border border-purple-200 space-y-2">
-                                <div className="flex items-center justify-between">
-                                  <span className="font-semibold text-purple-600">1 <span className="text-sm">ชิ้น</span></span>
-                                </div>
-
-                                {stationEquipmentPriceMapping['acc-system'] && (
-                                  <div className="text-xs space-y-1">
-                                    <div><span className="font-medium">เลขสินค้า:</span> {stationEquipmentPriceMapping['acc-system'].productCode}</div>
-                                    <div><span className="font-medium">ราคาค่าของ:</span> {(stationEquipmentPriceMapping['acc-system'].materialPrice * 1).toLocaleString('th-TH')} บาท</div>
-                                    <div><span className="font-medium">ราคาค่าแรง:</span> {(stationEquipmentPriceMapping['acc-system'].laborPrice * 1).toLocaleString('th-TH')} บาท</div>
-                                    <div><span className="font-medium">ราคารวม:</span> {(stationEquipmentPriceMapping['acc-system'].totalPrice * 1).toLocaleString('th-TH')} บาท</div>
+                                    </CollapsibleContent>
                                   </div>
-                                )}
+                                </Collapsible>
+
+                                <Collapsible
+                                  open={openItems['lighting-cable']}
+                                  onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'lighting-cable': open }))}
+                                >
+                                  <div className="bg-yellow-50 rounded-lg border border-yellow-200">
+                                    <CollapsibleTrigger className="w-full p-4 text-left hover:bg-yellow-100 transition-colors rounded-lg">
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-medium text-yellow-800">{lightingCableLabel || 'สาย AC หลอด ( 1.5 x 2 ) ท่อ PVC 16 มม.'}:</span>
+                                          <span className="font-medium">ระยะ:</span>
+                                          <Input
+                                            type="number"
+                                            value={lightingCableDistance}
+                                            onChange={(e) => setLightingCableDistance(e.target.value)}
+                                            placeholder="กรอกระยะ (เมตร)"
+                                            className="w-32"
+                                            min="0"
+                                            onClick={(e) => e.stopPropagation()}
+                                          />
+                                          <span className="text-gray-500">เมตร</span>
+                                        </div>
+                                        <div className="ml-4">
+                                          {openItems['lighting-cable'] ? (
+                                            <ChevronUp className="h-4 w-4 text-yellow-600" />
+                                          ) : (
+                                            <ChevronDown className="h-4 w-4 text-yellow-600" />
+                                          )}
+                                        </div>
+                                      </div>
+                                    </CollapsibleTrigger>
+                                    <CollapsibleContent>
+                                      <div className="px-4 pb-4 space-y-2 text-sm">
+                                        {lightingCablePricing ? (
+                                          <>
+                                            <div><span className="font-medium">รายการ:</span> {lightingCableLabel || '-'}</div>
+                                            <div><span className="font-medium">ราคาค่าของ/เมตร:</span> {lightingCablePricing.materialUnit.toLocaleString('th-TH')} บาท</div>
+                                            <div><span className="font-medium">ราคาค่าแรง/เมตร:</span> {lightingCablePricing.laborUnit.toLocaleString('th-TH')} บาท</div>
+                                            <div><span className="font-medium">ราคารวม/เมตร:</span> {lightingCablePricing.totalUnit.toLocaleString('th-TH')} บาท</div>
+                                            <div className="pt-2 border-t border-yellow-100 mt-2">
+                                              <div><span className="font-medium">ค่าของรวม:</span> {lightingCablePricing.materialTotal.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium">ค่าแรงรวม:</span> {lightingCablePricing.laborTotal.toLocaleString('th-TH')} บาท</div>
+                                              <div><span className="font-medium text-yellow-700">ราคารวม:</span> {lightingCablePricing.total.toLocaleString('th-TH')} บาท</div>
+                                            </div>
+                                          </>
+                                        ) : (
+                                          <div className="text-yellow-700">กรอกระยะ (เมตร) เพื่อคำนวณ หรือไม่พบข้อมูล row {lightingCableRowNum}</div>
+                                        )}
+                                      </div>
+                                    </CollapsibleContent>
+                                  </div>
+                                </Collapsible>
                               </div>
                             )}
 
@@ -6136,45 +6475,29 @@ function MoreDetailCard(props: any) {
                       <div className="px-4 pb-4 space-y-4">
                         <div className="space-y-3">
 
-                          <Label className="text-sm font-medium mb-2 block">
-                            เลือกแบบทาสี
-                          </Label>
-
-                          <RadioGroup value={parkingPaintType} onValueChange={handleParkingPaintTypeChange} className="space-y-2">
-                            <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="no-grind-no-polish" id="paint-no-grind-no-polish" />
-                              <Label htmlFor="paint-no-grind-no-polish" className="font-normal cursor-pointer">
-                                4.1 ทาสีพื้นช่องจอดรถ แบบไม่ขัด ไม่โป้ว
-                              </Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="grind-no-polish" id="paint-grind-no-polish" />
-                              <Label htmlFor="paint-grind-no-polish" className="font-normal cursor-pointer">
-                                4.2 ทาสีพื้นช่องจอดรถ แบบขัด แต่ไม่โป้ว
-                              </Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="grind-and-polish" id="paint-grind-and-polish" />
-                              <Label htmlFor="paint-grind-and-polish" className="font-normal cursor-pointer">
-                                4.3 ทาสีพื้นช่องจอดรถ แบบขัด และโป้วให้เรียบ
-                              </Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="" id="paint-none" />
-                              <Label htmlFor="paint-none" className="font-normal cursor-pointer">
-                                4.4 ไม่ทาสี
-                              </Label>
-                            </div>
-                          </RadioGroup>
+                          <div className="space-y-1">
+                            <Label className="text-sm font-medium">เลือกแบบทาสี:</Label>
+                            <Select value={parkingPaintType} onValueChange={handleParkingPaintTypeChange}>
+                              <SelectTrigger className="w-full md:w-96">
+                                <SelectValue placeholder="เลือกแบบทาสี" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="no-grind-no-polish">ทาสีพื้นช่องจอดรถ แบบไม่ขัด ไม่โป้ว</SelectItem>
+                                <SelectItem value="grind-no-polish">ทาสีพื้นช่องจอดรถ แบบขัด แต่ไม่โป้ว</SelectItem>
+                                <SelectItem value="grind-and-polish">ทาสีพื้นช่องจอดรถ แบบขัด และโป้วให้เรียบ</SelectItem>
+                                <SelectItem value="none">ไม่ทาสี</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
 
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
 
-                            {/* 4.5 ตีเส้นด้านข้าง */}
+                            {/* ตีเส้นด้านข้าง */}
 
                             <div className="space-y-2">
                               {/* Item name and toggle buttons */}
                               <div className="flex items-center justify-between mb-2">
-                                <span className="text-base font-semibold text-gray-800">4.5 ตีเส้นด้านข้าง</span>
+                                <span className="text-base font-semibold text-gray-800">ตีเส้นด้านข้าง</span>
                                 <div className="flex items-center gap-2">
                                   <div
                                     className={`flex items-center space-x-2 px-3 py-1 rounded-lg border cursor-pointer ${sideLineMarking === 'yes' ? 'bg-green-100 border-green-300' : 'hover:bg-gray-50'}`}
@@ -6240,12 +6563,12 @@ function MoreDetailCard(props: any) {
                               )}
                             </div>
 
-                            {/* 4.6 ทำลายกลางช่องจอด ใช้ลายเดิม */}
+                            {/* ทำลายกลางช่องจอด ใช้ลายเดิม */}
 
                             <div className="space-y-2">
                               {/* Item name and toggle buttons */}
                               <div className="flex items-center justify-between mb-2">
-                                <span className="text-base font-semibold text-gray-800">4.6 ทำลายกลางช่องจอด ใช้ลายเดิม</span>
+                                <span className="text-base font-semibold text-gray-800">ทำลายกลางช่องจอด ใช้ลายเดิม</span>
                                 <div className="flex items-center gap-2">
                                   <div
                                     className={`flex items-center space-x-2 px-3 py-1 rounded-lg border cursor-pointer ${centerPatternOriginal === 'yes' ? 'bg-green-100 border-green-300' : 'hover:bg-gray-50'}`}
@@ -6311,12 +6634,12 @@ function MoreDetailCard(props: any) {
                               )}
                             </div>
 
-                            {/* 4.7 ทำลายกลางช่องจอด ออกแบบลายใหม่ */}
+                            {/* ทำลายกลางช่องจอด ออกแบบลายใหม่ */}
 
                             <div className="space-y-2">
                               {/* Item name and toggle buttons */}
                               <div className="flex items-center justify-between mb-2">
-                                <span className="text-base font-semibold text-gray-800">4.7 ทำลายกลางช่องจอด ออกแบบลายใหม่</span>
+                                <span className="text-base font-semibold text-gray-800">ทำลายกลางช่องจอด ออกแบบลายใหม่</span>
                                 <div className="flex items-center gap-2">
                                   <div
                                     className={`flex items-center space-x-2 px-3 py-1 rounded-lg border cursor-pointer ${centerPatternNew === 'yes' ? 'bg-green-100 border-green-300' : 'hover:bg-gray-50'}`}
@@ -6385,7 +6708,7 @@ function MoreDetailCard(props: any) {
                           </div>
 
                           {/* แสดงผลลัพธ์งานทาสีช่องจอด */}
-                          {paintingSelection === 'yes' && hasSelectedParkingPaintType && (
+                          {paintingSelection === 'yes' && parkingPaintType && (
                             <div className="mt-4 p-4 bg-gradient-to-r from-pink-50 to-purple-50 rounded-lg border border-pink-200">
                               <h4 className="font-semibold text-pink-800 mb-3 flex items-center gap-2">
                                 <Paintbrush className="h-4 w-4" />
@@ -6395,10 +6718,10 @@ function MoreDetailCard(props: any) {
                                 <div className="flex items-center justify-between p-2 bg-white rounded border">
                                   <span className="font-medium">แบบทาสีที่เลือก:</span>
                                   <span className="font-semibold text-pink-600">
-                                    {parkingPaintType === 'no-grind-no-polish' && '4.1 ทาสีพื้นช่องจอดรถ แบบไม่ขัด ไม่โป้ว'}
-                                    {parkingPaintType === 'grind-no-polish' && '4.2 ทาสีพื้นช่องจอดรถ แบบขัด แต่ไม่โป้ว'}
-                                    {parkingPaintType === 'grind-and-polish' && '4.3 ทาสีพื้นช่องจอดรถ แบบขัด และโป้วให้เรียบ'}
-                                    {parkingPaintType === '' && '4.4 ไม่ทาสี'}
+                                    {parkingPaintType === 'no-grind-no-polish' && 'ทาสีพื้นช่องจอดรถ แบบไม่ขัด ไม่โป้ว'}
+                                    {parkingPaintType === 'grind-no-polish' && 'ทาสีพื้นช่องจอดรถ แบบขัด แต่ไม่โป้ว'}
+                                    {parkingPaintType === 'grind-and-polish' && 'ทาสีพื้นช่องจอดรถ แบบขัด และโป้วให้เรียบ'}
+                                    {parkingPaintType === 'none' && 'ไม่ทาสี'}
                                   </span>
                                 </div>
                                 <div className="p-3 bg-white rounded border">
