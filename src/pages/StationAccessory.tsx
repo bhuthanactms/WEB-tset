@@ -244,8 +244,9 @@ function MoreDetailCard(props: any) {
         }
 
         // Map kW to row number according to specifications
+        // 180 kW ใช้ค่าเดียวกับ 200 kW (row 20)
         const rowMapping: { [key: number]: number } = {
-          30: 11, 40: 12, 60: 14, 80: 15, 120: 17, 160: 19, 200: 20,
+          30: 11, 40: 12, 60: 14, 80: 15, 120: 17, 160: 19, 180: 20, 200: 20,
           240: 24, 320: 27, 360: 30, 480: 31, 600: 36, 640: 37, 720: 40, 800: 24
         };
 
@@ -380,8 +381,9 @@ function MoreDetailCard(props: any) {
       const kw = kwMatch ? parseInt(kwMatch[1]) : 0;
 
       // Map kW to row number according to specifications
+      // 180 kW ใช้ค่าเดียวกับ 200 kW (row 20)
       const rowMapping: { [key: number]: number } = {
-        30: 11, 40: 12, 60: 14, 80: 15, 120: 17, 160: 19, 200: 20,
+        30: 11, 40: 12, 60: 14, 80: 15, 120: 17, 160: 19, 180: 20, 200: 20,
         240: 24, 320: 27, 360: 30, 480: 31, 600: 36, 640: 37, 720: 40, 800: 24
       };
 
@@ -7764,7 +7766,45 @@ function MoreDetailCard(props: any) {
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                       <div className="px-5 pb-5">
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 mb-4">
+                        {/* แสดงรายละเอียดสินค้า */}
+                        {section.products && section.products.length > 0 && (
+                          <div className="space-y-3">
+                            <div className="text-sm font-semibold text-slate-700 mb-3">รายละเอียดสินค้า:</div>
+                            <div className="overflow-x-auto">
+                              <table className="w-full border-collapse">
+                                <thead>
+                                  <tr className="bg-slate-100 border-b-2 border-slate-200">
+                                    <th className="text-left p-3 text-xs font-semibold text-slate-700 uppercase">รหัส</th>
+                                    <th className="text-left p-3 text-xs font-semibold text-slate-700 uppercase">ประเภท</th>
+                                    <th className="text-left p-3 text-xs font-semibold text-slate-700 uppercase">รายการสินค้า</th>
+                                    <th className="text-center p-3 text-xs font-semibold text-slate-700 uppercase">จำนวนชิ้น</th>
+                                    <th className="text-left p-3 text-xs font-semibold text-slate-700 uppercase">ระยะ</th>
+                                    <th className="text-right p-3 text-xs font-semibold text-slate-700 uppercase">ค่าของรวม</th>
+                                    <th className="text-right p-3 text-xs font-semibold text-slate-700 uppercase">ค่าแรงรวม</th>
+                                    <th className="text-right p-3 text-xs font-semibold text-slate-700 uppercase">ราคารวม</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {section.products.map((product, idx) => (
+                                    <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                                      <td className="p-3 text-sm text-slate-800">{product.code || '-'}</td>
+                                      <td className="p-3 text-sm text-slate-800">{product.type || '-'}</td>
+                                      <td className="p-3 text-sm text-slate-800">{product.productName || product.code || '-'}</td>
+                                      <td className="p-3 text-sm text-slate-800 text-center">{product.quantity || '-'}</td>
+                                      <td className="p-3 text-sm text-slate-800">{product.distance || '-'}</td>
+                                      <td className="p-3 text-sm text-slate-800 text-right font-medium">{formatCurrency(product.materialTotal)} บาท</td>
+                                      <td className="p-3 text-sm text-slate-800 text-right font-medium">{formatCurrency(product.laborTotal)} บาท</td>
+                                      <td className="p-3 text-sm text-slate-900 text-right font-bold">{formatCurrency(product.totalPrice)} บาท</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* ค่าของรวม,ค่าแรงรวม,ราคารวม */}
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 mt-4">
                           <div className="rounded-lg border border-slate-100 bg-slate-50 p-4">
                             <div className="text-xs text-slate-500 uppercase tracking-wide">ค่าของรวม</div>
                             <div className="mt-2 text-xl font-semibold text-slate-800">{formatCurrency(section.totals.material)} บาท</div>
@@ -7778,43 +7818,6 @@ function MoreDetailCard(props: any) {
                             <div className="mt-2 text-2xl font-bold text-slate-900">{formatCurrency(sectionTotal)} บาท</div>
                           </div>
                         </div>
-
-                        {/* แสดงรายละเอียดสินค้า */}
-                        {section.products && section.products.length > 0 && (
-                          <div className="mt-4 space-y-3">
-                            <div className="text-sm font-semibold text-slate-700 mb-3">รายละเอียดสินค้า:</div>
-                            <div className="overflow-x-auto">
-                              <table className="w-full border-collapse">
-                                <thead>
-                                  <tr className="bg-slate-100 border-b-2 border-slate-200">
-                                    <th className="text-left p-3 text-xs font-semibold text-slate-700 uppercase">ประเภท</th>
-                                    <th className="text-left p-3 text-xs font-semibold text-slate-700 uppercase">รหัส</th>
-                                    <th className="text-left p-3 text-xs font-semibold text-slate-700 uppercase">รายการสินค้า</th>
-                                    <th className="text-left p-3 text-xs font-semibold text-slate-700 uppercase">ระยะ</th>
-                                    <th className="text-right p-3 text-xs font-semibold text-slate-700 uppercase">ค่าของรวม</th>
-                                    <th className="text-right p-3 text-xs font-semibold text-slate-700 uppercase">ค่าแรงรวม</th>
-                                    <th className="text-right p-3 text-xs font-semibold text-slate-700 uppercase">ราคารวม</th>
-                                    <th className="text-center p-3 text-xs font-semibold text-slate-700 uppercase">จำนวนชิ้น</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {section.products.map((product, idx) => (
-                                    <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                                      <td className="p-3 text-sm text-slate-800">{product.type || '-'}</td>
-                                      <td className="p-3 text-sm text-slate-800">{product.code || '-'}</td>
-                                      <td className="p-3 text-sm text-slate-800">{product.productName || product.code || '-'}</td>
-                                      <td className="p-3 text-sm text-slate-800">{product.distance || '-'}</td>
-                                      <td className="p-3 text-sm text-slate-800 text-right font-medium">{formatCurrency(product.materialTotal)} บาท</td>
-                                      <td className="p-3 text-sm text-slate-800 text-right font-medium">{formatCurrency(product.laborTotal)} บาท</td>
-                                      <td className="p-3 text-sm text-slate-900 text-right font-bold">{formatCurrency(product.totalPrice)} บาท</td>
-                                      <td className="p-3 text-sm text-slate-800 text-center">{product.quantity || '-'}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-                        )}
 
                         {!section.hasValue && (
                           <div className="mt-3 text-xs text-slate-400">

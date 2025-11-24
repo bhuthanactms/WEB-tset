@@ -75,6 +75,7 @@ export default function Home(): React.JSX.Element {
     '80 kW': { mea: 'C9', pea: 'C57' },
     '120 kW': { mea: 'C10', pea: 'C58' },
     '160 kW': { mea: 'C11', pea: 'C59' },
+    '180 kW': { mea: 'C12', pea: 'C60' }, // ใช้ค่าเดียวกับ 200 kW
     '200 kW': { mea: 'C12', pea: 'C60' },
     '240 kW': { mea: 'C13', pea: 'C61' },
     '320 kW': { mea: 'C14', pea: 'C62' },
@@ -246,7 +247,7 @@ export default function Home(): React.JSX.Element {
 
   // Charger options
   const chargerOptions = [
-    '30 kW', '40 kW', '60 kW', '80 kW', '120 kW', '160 kW', '200 kW',
+    '30 kW', '40 kW', '60 kW', '80 kW', '120 kW', '160 kW', '180 kW', '200 kW',
     '240 kW', '320 kW', '480 kW', '600 kW', '600 kW Prime+',
     '640 kW Prime+', '720 kW Prime+', '800 kW Prime+'
   ]
