@@ -715,6 +715,89 @@ function MoreDetailCard(props: any) {
     return row?.__EMPTY_1 || '';
   };
 
+  // Sheet for electrical operation costs (ค่าดำเนินการทางไฟฟ้า)
+  const electricalOperationSheet = useMemo(() => {
+    return props.excelData?.['MEA & PEA'] || [];
+  }, [props.excelData]);
+
+  // Helper function to get electrical operation cost item
+  const getElectricalOperationItem = (rowNum: number) => {
+    if (!rowNum || !electricalOperationSheet || electricalOperationSheet.length === 0) return null;
+    const row = electricalOperationSheet.find((entry: any) => entry.__rowNum__ === rowNum);
+    if (!row) return null;
+
+    const name = row.__EMPTY_3 || '';
+    const pricePerUnit = parsePrice(row.__EMPTY_10);
+    const quantity = parsePositiveNumber(row.__EMPTY_12);
+
+    return {
+      row,
+      name,
+      pricePerUnit,
+      quantity,
+      total: pricePerUnit * quantity,
+    };
+  };
+
+  // Helper function to get electrical operation cost item with transformer multiplier
+  const getElectricalOperationItemWithTransformer = (rowNum: number, transformerSize: number) => {
+    if (!rowNum || !electricalOperationSheet || electricalOperationSheet.length === 0) return null;
+    const row = electricalOperationSheet.find((entry: any) => entry.__rowNum__ === rowNum);
+    if (!row) return null;
+
+    const name = row.__EMPTY_3 || '';
+    const basePricePerUnit = parsePrice(row.__EMPTY_10);
+    const pricePerUnit = basePricePerUnit * transformerSize;
+    const quantity = parsePositiveNumber(row.__EMPTY_12);
+
+    return {
+      row,
+      name,
+      basePricePerUnit,
+      pricePerUnit,
+      quantity,
+      total: pricePerUnit * quantity,
+    };
+  };
+
+  // Helper function to calculate total kW from charger summary
+  const calculateTotalChargerKW = () => {
+    if (!props.chargerSummary || !Array.isArray(props.chargerSummary)) return 0;
+
+    let totalKW = 0;
+    props.chargerSummary.forEach((charger: any) => {
+      const chargerName = charger.name || '';
+      const kwMatch = chargerName.match(/(\d+)\s*kW/i);
+      if (kwMatch) {
+        totalKW += parseInt(kwMatch[1]);
+      }
+    });
+
+    return totalKW;
+  };
+
+  // Helper function to get electrical operation cost item with charger kW multiplier
+  const getElectricalOperationItemWithChargerKW = (rowNum: number, totalKW: number) => {
+    if (!rowNum || !electricalOperationSheet || electricalOperationSheet.length === 0) return null;
+    const row = electricalOperationSheet.find((entry: any) => entry.__rowNum__ === rowNum);
+    if (!row) return null;
+
+    const name = row.__EMPTY_3 || '';
+    const basePricePerUnit = parsePrice(row.__EMPTY_10);
+    const pricePerUnit = basePricePerUnit * totalKW;
+    const quantity = parsePositiveNumber(row.__EMPTY_12);
+
+    return {
+      row,
+      name,
+      basePricePerUnit,
+      pricePerUnit,
+      quantity,
+      total: pricePerUnit * quantity,
+      usesChargerKW: true,
+    };
+  };
+
   const getAccessoryProductCode = (row: any) => {
     if (!row) return '-';
     return row['รหัสสินค้า'] || row['code'] || row['Code'] || row['CODE'] || row.__EMPTY_2 || row.__EMPTY_1 || row.__EMPTY || '-';
@@ -1456,6 +1539,10 @@ function MoreDetailCard(props: any) {
     };
   }, [travelCostResult]);
 
+  // State สำหรับกำไร% และ CF%
+  const [profitPercent, setProfitPercent] = useState<string>('');
+  const [cfPercent, setCfPercent] = useState<string>('');
+
   const stationTotals = React.useMemo(() => {
     const totals = [
       transformerTotals,
@@ -1476,6 +1563,131 @@ function MoreDetailCard(props: any) {
       };
     }, { material: 0, labor: 0, total: 0 });
   }, [transformerTotals, highVoltageTotals, installationTotals, trToMdbTotals, mdbTotals, mdbToChargerTotals, additionalFeaturesTotals, travelTotals]);
+
+  // ราคารวมสำหรับคำนวณกำไร% (section 1-7 ไม่รวม 8.ค่าเดินทาง)
+  const baseStationTotalsForProfit = React.useMemo(() => {
+    const totals = [
+      transformerTotals,
+      highVoltageTotals,
+      installationTotals,
+      trToMdbTotals,
+      mdbTotals,
+      mdbToChargerTotals,
+      additionalFeaturesTotals,
+    ];
+
+    return totals.reduce((acc, current) => {
+      return {
+        material: acc.material + (current?.material || 0),
+        labor: acc.labor + (current?.labor || 0),
+        total: acc.total + (current?.total || 0),
+      };
+    }, { material: 0, labor: 0, total: 0 });
+  }, [transformerTotals, highVoltageTotals, installationTotals, trToMdbTotals, mdbTotals, mdbToChargerTotals, additionalFeaturesTotals]);
+
+  // คำนวณค่าดำเนินการทางไฟฟ้า
+  const electricalOperationTotals = React.useMemo(() => {
+    if (!electricalOperationSheet || electricalOperationSheet.length === 0) {
+      return { total: 0, items: [], pricePerUnitTotal: 0 };
+    }
+
+    const transformerSize = parseInt(props.transformer) || 0;
+    const totalKW = calculateTotalChargerKW();
+    const powerAuthority = props.powerAuthority || '';
+    const items: Array<{ name: string; pricePerUnit: number; basePricePerUnit?: number; quantity: number; total: number; usesTransformer?: boolean; usesChargerKW?: boolean }> = [];
+    let total = 0;
+    let pricePerUnitTotal = 0;
+
+    if (powerAuthority === 'MEA') {
+      // MEA: 7 รายการ (3.1.1 - 3.1.7)
+      const meaRowNums = [3, 4, 5, 6, 7, 8, 9];
+      const meaUseChargerKW = [false, false, true, true, false, false, false]; // 3.1.3 และ 3.1.4 ใช้ charger kW
+
+      meaRowNums.forEach((rowNum, index) => {
+        let item;
+        if (meaUseChargerKW[index]) {
+          item = getElectricalOperationItemWithChargerKW(rowNum, totalKW);
+        } else {
+          item = getElectricalOperationItem(rowNum);
+        }
+
+        if (item) {
+          items.push({ ...item, usesChargerKW: meaUseChargerKW[index] });
+          total += item.total;
+          // สำหรับรายการที่ใช้ charger kW ให้ใช้ basePricePerUnit, ไม่ใช่ pricePerUnit ที่คูณแล้ว
+          if (meaUseChargerKW[index] && 'basePricePerUnit' in item) {
+            pricePerUnitTotal += (item as any).basePricePerUnit;
+          } else {
+            pricePerUnitTotal += item.pricePerUnit;
+          }
+        }
+      });
+    } else if (powerAuthority === 'PEA') {
+      // PEA: 14 รายการ (3.2.1 - 3.2.14)
+      const peaRowNums = [13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26];
+      const peaUseTransformer = [false, false, false, true, true, false, false, false, false, false, false, false, false, false]; // 3.2.4 และ 3.2.5 ใช้ transformer
+
+      peaRowNums.forEach((rowNum, index) => {
+        let item;
+        if (peaUseTransformer[index]) {
+          item = getElectricalOperationItemWithTransformer(rowNum, transformerSize);
+        } else {
+          item = getElectricalOperationItem(rowNum);
+        }
+
+        if (item) {
+          items.push({ ...item, usesTransformer: peaUseTransformer[index] });
+          total += item.total;
+          // สำหรับรายการที่ใช้ transformer ให้ใช้ basePricePerUnit, ไม่ใช่ pricePerUnit ที่คูณแล้ว
+          if (peaUseTransformer[index] && 'basePricePerUnit' in item) {
+            pricePerUnitTotal += (item as any).basePricePerUnit;
+          } else {
+            pricePerUnitTotal += item.pricePerUnit;
+          }
+        }
+      });
+    }
+
+    return { total, items, pricePerUnitTotal };
+  }, [electricalOperationSheet, props.transformer, props.powerAuthority, props.chargerSummary]);
+
+  // คำนวณกำไร% และ CF% (คิดรวมค่าแรงด้วย)
+  const profitAmount = React.useMemo(() => {
+    const profit = parseFloat(profitPercent) || 0;
+    if (profit < 5 || profit > 25) return 0;
+    // คิดกำไร% จากราคารวมสร้างสถานี (รวมค่าแรงด้วย)
+    return (stationTotals.total * profit) / 100;
+  }, [profitPercent, stationTotals]);
+
+  // ราคารวมสร้างสถานีรวมกำไร%
+  const stationTotalWithProfit = React.useMemo(() => {
+    return stationTotals.total + profitAmount;
+  }, [stationTotals, profitAmount]);
+
+  const cfAmount = React.useMemo(() => {
+    const cf = parseFloat(cfPercent) || 0;
+    if (cf < 0 || cf > 25) return 0;
+    // คิด CF% จากราคารวมสร้างสถานีรวมกำไร%
+    return (stationTotalWithProfit * cf) / 100;
+  }, [cfPercent, stationTotalWithProfit]);
+
+  // ราคารวมสร้างสถานีรวมกำไร% และ CF%
+  const stationTotalWithProfitAndCF = React.useMemo(() => {
+    return stationTotalWithProfit + cfAmount;
+  }, [stationTotalWithProfit, cfAmount]);
+
+  // ราคารวมสุดท้าย (รวมทุกอย่าง: กำไร%, CF%, ค่าเดินทาง, และค่าดำเนินการทางไฟฟ้า)
+  const finalStationTotals = React.useMemo(() => {
+    return {
+      material: stationTotals.material + profitAmount + cfAmount,
+      labor: stationTotals.labor + travelTotals.total,
+      total: stationTotalWithProfitAndCF + travelTotals.total + electricalOperationTotals.pricePerUnitTotal,
+      profitAmount,
+      cfAmount,
+      travelTotal: travelTotals.total,
+      electricalOperationTotal: electricalOperationTotals.pricePerUnitTotal,
+    };
+  }, [stationTotals, profitAmount, cfAmount, stationTotalWithProfitAndCF, travelTotals, electricalOperationTotals]);
 
   // ฟังก์ชันดึงรายละเอียดสินค้าสำหรับแต่ละหัวข้อ
   const getSectionProductDetails = React.useCallback((sectionKey: string) => {
@@ -1956,12 +2168,6 @@ function MoreDetailCard(props: any) {
       totals: additionalFeaturesTotals,
       products: getSectionProductDetails('additional'),
     },
-    {
-      key: 'travel',
-      label: '8. ค่าเดินทาง: ของ ค่าเดินทาง (Travel Cost)',
-      totals: travelTotals,
-      products: getSectionProductDetails('travel'),
-    },
   ]), [
     transformerTotals,
     highVoltageTotals,
@@ -1970,7 +2176,6 @@ function MoreDetailCard(props: any) {
     mdbTotals,
     mdbToChargerTotals,
     additionalFeaturesTotals,
-    travelTotals,
     getSectionProductDetails,
   ]);
 
@@ -2004,6 +2209,7 @@ function MoreDetailCard(props: any) {
   // State สำหรับเก็บสถานะการเปิด/ปิดของแต่ละรายการย่อย
   const [openItems, setOpenItems] = useState<{ [key: string]: boolean }>({});
   const [travelCostBreakdown, setTravelCostBreakdown] = useState<string>('');
+
   // ฟังก์ชันคำนวณค่าเดินทาง
 
   const calculateTravelCost = () => {
@@ -7625,12 +7831,8 @@ function MoreDetailCard(props: any) {
 
           <Separator />
 
+          {/* บรรทัดแรก: ค่าของ, ค่าแรง, ราคารวม */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-5 rounded-xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white shadow-sm">
-              <div className="text-sm text-slate-200/80 mb-2">ราคารวมสร้างสถานี</div>
-              <div className="text-3xl font-bold tracking-tight">{formatCurrency(stationTotals.total)} บาท</div>
-              <div className="text-xs text-slate-200/60 mt-2">รวมค่าของและค่าแรงทุกหมวด</div>
-            </div>
             <div className="p-5 rounded-xl bg-gradient-to-br from-slate-100 via-white to-slate-50 border border-slate-200 text-slate-800 shadow-sm">
               <div className="text-sm text-slate-500 mb-2">ค่าของสร้างสถานี</div>
               <div className="text-2xl font-semibold">{formatCurrency(stationTotals.material)} บาท</div>
@@ -7640,6 +7842,231 @@ function MoreDetailCard(props: any) {
               <div className="text-sm text-slate-500 mb-2">ค่าแรงสร้างสถานี</div>
               <div className="text-2xl font-semibold">{formatCurrency(stationTotals.labor)} บาท</div>
               <div className="text-xs text-slate-400 mt-2">รวมค่าแรงงานติดตั้งทุกประเภท</div>
+            </div>
+            <div className="p-5 rounded-xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white shadow-sm">
+              <div className="text-sm text-slate-200/80 mb-2">ราคารวมสร้างสถานี</div>
+              <div className="text-3xl font-bold tracking-tight">{formatCurrency(stationTotals.total)} บาท</div>
+              <div className="text-xs text-slate-200/60 mt-2">รวมค่าของและค่าแรงทุกหมวด</div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* บรรทัดที่ 2: กำไร% + จำนวนเงิน + ราคารวมรวมกำไร */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-4 rounded-lg border border-slate-200 bg-slate-50">
+              <Label htmlFor="profit-percent" className="text-sm font-semibold text-slate-700 mb-2 block">
+                กำไร% (5-25%)
+              </Label>
+              <Input
+                id="profit-percent"
+                type="number"
+                min="1"
+                max="25"
+                step="0.01"
+                value={profitPercent}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  const num = parseFloat(value);
+                  if (value === '' || (num >= 1 && num <= 25)) {
+                    setProfitPercent(value);
+                  }
+                }}
+                placeholder="กรอกเปอร์เซ็นต์กำไร"
+                className="w-full"
+              />
+            </div>
+            <div className="p-5 rounded-xl bg-gradient-to-br from-slate-100 via-white to-slate-50 border border-slate-200 text-slate-800 shadow-sm">
+              <div className="text-sm text-slate-500 mb-2">จำนวนเงิน (กำไร%)</div>
+              <div className="text-2xl font-semibold">
+                {profitPercent && parseFloat(profitPercent) >= 5 && parseFloat(profitPercent) <= 25
+                  ? `${formatCurrency(profitAmount)} บาท`
+                  : '0 บาท'}
+              </div>
+            </div>
+            <div className="p-5 rounded-xl bg-gradient-to-br from-green-100 via-white to-green-50 border border-green-200 text-green-800 shadow-sm">
+              <div className="text-sm text-green-700 mb-2">ราคารวมสร้างสถานีรวมกำไร</div>
+              <div className="text-2xl font-semibold">{formatCurrency(stationTotalWithProfit)} บาท</div>
+              <div className="text-xs text-green-600 mt-2">รวมค่าของ ค่าแรง และกำไร%</div>
+            </div>
+          </div>
+
+          {/* ค่าเดินทาง (Collapsible) */}
+          <Collapsible
+            open={openItems['travel-cost'] ?? false}
+            onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'travel-cost': open }))}
+          >
+            <div className={`rounded-xl border transition-colors ${travelTotals.total > 0 ? 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50' : 'border-slate-100 bg-slate-50 text-slate-400'}`}>
+              <CollapsibleTrigger className="w-full px-5 py-4 text-left">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div className="text-sm font-semibold text-slate-700 md:text-base">
+                    ค่าเดินทาง
+                  </div>
+                  <div className="flex items-center gap-4 md:gap-6">
+                    <div className="text-xs text-slate-500 md:text-sm">ราคารวม</div>
+                    <div className={`text-lg font-bold ${travelTotals.total > 0 ? 'text-slate-800' : 'text-slate-400'}`}>
+                      {formatCurrency(travelTotals.total)} บาท
+                    </div>
+                    <div className="text-slate-500">
+                      {openItems['travel-cost'] ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </div>
+                  </div>
+                </div>
+              </CollapsibleTrigger>
+
+              <CollapsibleContent>
+                <div className="px-5 pb-5">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <div className="text-xs text-slate-500 mb-1">ระยะทาง (กิโลเมตร)</div>
+                      <div className="text-base font-semibold text-slate-800">
+                        {travelDistance ? `${travelDistance} กม.` : '-'}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 mb-1">งานฝึกอบรม</div>
+                      <div className="text-base font-semibold text-slate-800">
+                        {trainingWork === 'yes' ? 'มี' : 'ไม่มี'}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 mb-1">ราคาค่าเดินทาง</div>
+                      <div className="text-xl font-bold text-slate-900">
+                        {formatCurrency(travelTotals.total)} บาท
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CollapsibleContent>
+            </div>
+          </Collapsible>
+
+          <Separator />
+
+          {/* บรรทัดที่ 3: CF% + จำนวนเงิน + ราคารวมรวมกำไร% CF% */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-4 rounded-lg border border-slate-200 bg-slate-50">
+              <Label htmlFor="cf-percent" className="text-sm font-semibold text-slate-700 mb-2 block">
+                CF% (0-25%)
+              </Label>
+              <Input
+                id="cf-percent"
+                type="number"
+                min="0"
+                max="25"
+                step="0.01"
+                value={cfPercent}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  const num = parseFloat(value);
+                  if (value === '' || (num >= 0 && num <= 25)) {
+                    setCfPercent(value);
+                  }
+                }}
+                placeholder="กรอกเปอร์เซ็นต์ CF"
+                className="w-full"
+              />
+            </div>
+            <div className="p-5 rounded-xl bg-gradient-to-br from-slate-100 via-white to-slate-50 border border-slate-200 text-slate-800 shadow-sm">
+              <div className="text-sm text-slate-500 mb-2">จำนวนเงิน (CF%)</div>
+              <div className="text-2xl font-semibold">
+                {cfPercent && parseFloat(cfPercent) >= 0 && parseFloat(cfPercent) <= 25
+                  ? `${formatCurrency(cfAmount)} บาท`
+                  : '0 บาท'}
+              </div>
+            </div>
+            <div className="p-5 rounded-xl bg-gradient-to-br from-blue-100 via-white to-blue-50 border border-blue-200 text-blue-800 shadow-sm">
+              <div className="text-sm text-blue-700 mb-2">ราคารวมสร้างสถานีรวมกำไร% CF%</div>
+              <div className="text-2xl font-semibold">{formatCurrency(stationTotalWithProfitAndCF)} บาท</div>
+              <div className="text-xs text-blue-600 mt-2">รวมค่าของ ค่าแรง กำไร% และ CF%</div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* ค่าดำเนินการทางไฟฟ้า */}
+          {(props.powerAuthority === 'MEA' || props.powerAuthority === 'PEA') && (
+            <Collapsible
+              open={openItems['electrical-operation'] ?? false}
+              onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'electrical-operation': open }))}
+            >
+              <div className={`rounded-xl border transition-colors ${electricalOperationTotals.pricePerUnitTotal > 0 ? 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50' : 'border-slate-100 bg-slate-50 text-slate-400'}`}>
+                <CollapsibleTrigger className="w-full px-5 py-4 text-left">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div className="text-sm font-semibold text-slate-700 md:text-base">
+                      ค่าดำเนินการทางไฟฟ้า ({props.powerAuthority === 'MEA' ? 'การไฟฟ้านครหลวง' : 'การไฟฟ้าส่วนภูมิภาค'})
+                    </div>
+                    <div className="flex items-center gap-4 md:gap-6">
+                      <div className="text-xs text-slate-500 md:text-sm">ราคารวม</div>
+                      <div className={`text-lg font-bold ${electricalOperationTotals.pricePerUnitTotal > 0 ? 'text-slate-800' : 'text-slate-400'}`}>
+                        {formatCurrency(electricalOperationTotals.pricePerUnitTotal)} บาท
+                      </div>
+                      <div className="text-slate-500">
+                        {openItems['electrical-operation'] ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                      </div>
+                    </div>
+                  </div>
+                </CollapsibleTrigger>
+
+                <CollapsibleContent>
+                  <div className="px-5 pb-5">
+                    {electricalOperationTotals.items.length > 0 ? (
+                      <div className="space-y-3">
+                        {electricalOperationTotals.items.map((item, index) => {
+                          return (
+                            <div key={index} className="grid grid-cols-4 gap-4 p-3 bg-white rounded border border-slate-100">
+                              <div>
+                                <div className="text-xs text-slate-500 mb-1">รายการ</div>
+                                <div className="text-sm font-semibold text-slate-800">{item.name || '-'}</div>
+                              </div>
+                              <div>
+                                <div className="text-xs text-slate-500 mb-1">ราคา/หน่วย</div>
+                                <div className="text-sm font-semibold text-slate-800">
+                                  {formatCurrency(item.pricePerUnit)} บาท
+                                </div>
+                              </div>
+                              <div>
+                                <div className="text-xs text-slate-500 mb-1">จำนวน</div>
+                                <div className="text-sm font-semibold text-slate-800">{item.quantity}</div>
+                              </div>
+                              <div>
+                                <div className="text-xs text-slate-500 mb-1">รวม</div>
+                                <div className="text-sm font-semibold text-slate-800">{formatCurrency(item.total)} บาท</div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        <div className="mt-4 p-4 bg-slate-100 rounded border border-slate-200">
+                          <div className="text-sm font-semibold text-slate-800 mb-1">
+                            {props.powerAuthority === 'MEA' ? 'ค่าใช้จ่ายการขอใช้ไฟฟ้ากับการไฟฟ้านครหลวง' : 'ค่าใช้จ่ายการขอใช้ไฟฟ้ากับการไฟฟ้าส่วนภูมิภาค'}
+                          </div>
+                          <div className="text-2xl font-bold text-slate-900">
+                            {formatCurrency(electricalOperationTotals.pricePerUnitTotal)} บาท
+                          </div>
+                          <div className="text-xs text-slate-600 mt-1">
+                            (รวมราคา/หน่วยของทุกรายการ)
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-sm text-slate-400 mt-3">
+                        ไม่มีค่าใช้จ่ายในหัวข้อนี้จากเงื่อนไขที่เลือกไว้
+                      </div>
+                    )}
+                  </div>
+                </CollapsibleContent>
+              </div>
+            </Collapsible>
+          )}
+
+          <Separator />
+
+          {/* ราคารวมสุดท้าย (รวมทุกอย่าง) */}
+          <div className="p-5 rounded-xl bg-gradient-to-br from-green-900 via-green-800 to-green-900 text-white shadow-sm">
+            <div className="text-sm text-green-200/80 mb-2">ราคารวมสร้างสถานี</div>
+            <div className="text-3xl font-bold tracking-tight">{formatCurrency(finalStationTotals.total)} บาท</div>
+            <div className="text-xs text-green-200/60 mt-2">
+              รวมราคารวมสร้างสถานีรวมกำไร% CF% และ ค่าเดินทาง และ ค่าดำเนินการทางไฟฟ้า
             </div>
           </div>
         </CardContent>
