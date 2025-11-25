@@ -1725,7 +1725,7 @@ function MoreDetailCard(props: any) {
             products.push({
               type: `หม้อแปลง ${row2.__EMPTY || ''}`,
               code: row2.__EMPTY || '',
-              productName: `Transformer Size: ${transformerSize} kVA`,
+              productName: `${transformerSize} kVA`,
               distance: isDistance ? `${distance} เมตร` : undefined,
               materialTotal: material,
               laborTotal: labor,
@@ -1746,7 +1746,7 @@ function MoreDetailCard(props: any) {
             products.push({
               type: `หม้อแปลง ${row3.__EMPTY || ''}`,
               code: row3.__EMPTY || '',
-              productName: `Transformer Size: ${transformerSize} kVA`,
+              productName: `${transformerSize} kVA`,
               distance: isDistance ? `${distance} เมตร` : undefined,
               materialTotal: material,
               laborTotal: labor,
@@ -1759,7 +1759,7 @@ function MoreDetailCard(props: any) {
         products.push({
           type: `หม้อแปลง ${transformerPrice.type === '22kv-416v' ? '22 (24) kV / 416 V' : '33 kV / 316 V'}`,
           code: transformerPrice.productCode || transformerPrice.productName || '',
-          productName: `Transformer Size: ${transformerSize} kVA`,
+          productName: `${transformerSize} kVA`,
           materialTotal: toNumber(transformerPrice.laborCost),
           laborTotal: toNumber(transformerPrice.installationCost),
           totalPrice: toNumber(transformerPrice.totalInstallationCost) || (toNumber(transformerPrice.laborCost) + toNumber(transformerPrice.installationCost)),
@@ -1982,10 +1982,10 @@ function MoreDetailCard(props: any) {
             // สร้างรายการสินค้า: ขนาดสาย (CV/THW) + ท่อ
             let productNameParts: string[] = [];
             if (props.trWiringSize) {
-              productNameParts.push(`ขนาดสาย (CV/THW): ${props.trWiringSize}`);
+              productNameParts.push(props.trWiringSize);
             }
             if (props.trWireConduit || conduit) {
-              productNameParts.push(`ท่อ: ${props.trWireConduit || conduit}`);
+              productNameParts.push(props.trWireConduit || conduit);
             }
             const productName = productNameParts.length > 0 ? productNameParts.join(', ') : '-';
 
@@ -2071,7 +2071,7 @@ function MoreDetailCard(props: any) {
           products.push({
             type: props.chargerWiringType || 'MDB to Charger',
             code: result.code || '',
-            productName: cableSize ? `ขนาดสาย (CV/THW): ${cableSize}` : '-',
+            productName: cableSize || '-',
             distance: distance > 0 ? `${distance} เมตร` : undefined,
             materialTotal: parsePrice(result.materialCost),
             laborTotal: parsePrice(result.laborCost),
@@ -2081,16 +2081,276 @@ function MoreDetailCard(props: any) {
         });
       }
     } else if (sectionKey === 'additional') {
-      // Additional features are complex, we'll show a summary
-      if (additionalFeaturesTotals.total > 0) {
+      // 1. อุปกรณ์ประกอบสถานี
+      if (equipmentSelection === 'yes') {
+        if (bumperPoles === 'yes' && bumperPolePricing) {
+          products.push({
+            type: 'อุปกรณ์ประกอบสถานี',
+            code: getAccessoryProductCode(bumperPolePricing.row),
+            productName: `เสากันชน (${bumperPoleMaterial === 'steel' ? 'เหล็ก' : 'สแตนเลส'})`,
+            materialTotal: bumperPolePricing.materialTotal,
+            laborTotal: bumperPolePricing.laborTotal,
+            totalPrice: bumperPolePricing.total,
+            quantity: bumperPolePricing.quantity.toString(),
+          });
+        }
+        if (wheelStops === 'yes' && wheelStopPricing) {
+          products.push({
+            type: 'อุปกรณ์ประกอบสถานี',
+            code: getAccessoryProductCode(wheelStopPricing.row),
+            productName: `ยางกั้นล้อ (${wheelStopMaterial === 'rubber' ? 'ยาง' : 'ปูน'})`,
+            materialTotal: wheelStopPricing.materialTotal,
+            laborTotal: wheelStopPricing.laborTotal,
+            totalPrice: wheelStopPricing.total,
+            quantity: wheelStopPricing.quantity.toString(),
+          });
+        }
+        if (fireExtinguisherCabinet === 'yes' && fireExtinguisherPricing) {
+          products.push({
+            type: 'อุปกรณ์ประกอบสถานี',
+            code: getAccessoryProductCode(fireExtinguisherPricing.row),
+            productName: `ถังดับเพลิง+ตู้ (${fireExtinguisherType === 'abc' ? 'A+B+C' : 'CO2'})`,
+            materialTotal: fireExtinguisherPricing.materialTotal,
+            laborTotal: fireExtinguisherPricing.laborTotal,
+            totalPrice: fireExtinguisherPricing.total,
+            quantity: fireExtinguisherPricing.quantity.toString(),
+          });
+        }
+        if (signage === 'yes' && signagePricing) {
+          products.push({
+            type: 'อุปกรณ์ประกอบสถานี',
+            code: getAccessoryProductCode(signagePricing.row),
+            productName: 'ป้ายสูง + วิธีใช้งาน',
+            materialTotal: signagePricing.materialTotal,
+            laborTotal: signagePricing.laborTotal,
+            totalPrice: signagePricing.total,
+            quantity: signagePricing.quantity.toString(),
+          });
+        }
+      }
+
+      // 2. ระบบสื่อสาร
+      if (communicationSelection === 'yes') {
+        if (wifi4gHub === 'yes' && routerBasePricing) {
+          products.push({
+            type: 'ระบบสื่อสาร',
+            code: getAccessoryProductCode(routerBasePricing.row),
+            productName: routerBaseLabel || 'ROUTER',
+            materialTotal: routerBasePricing.materialTotal,
+            laborTotal: routerBasePricing.laborTotal,
+            totalPrice: routerBasePricing.total,
+            quantity: routerBasePricing.quantity.toString(),
+          });
+        }
+        if (wifi4gHub === 'yes' && routerCablePricing) {
+          products.push({
+            type: 'ระบบสื่อสาร',
+            code: getAccessoryProductCode(routerCablePricing.row),
+            productName: routerCableLabel || 'สาย ROUTER',
+            materialTotal: routerCablePricing.materialTotal,
+            laborTotal: routerCablePricing.laborTotal,
+            totalPrice: routerCablePricing.total,
+            quantity: routerCablePricing.quantity.toString(),
+            distance: routerCableDistance ? `${routerCableDistance} เมตร` : undefined,
+          });
+        }
+        if (cctv === 'yes' && cctvBasePricing) {
+          products.push({
+            type: 'ระบบสื่อสาร',
+            code: getAccessoryProductCode(cctvBasePricing.row),
+            productName: cctvBaseLabel || 'CCTV',
+            materialTotal: cctvBasePricing.materialTotal,
+            laborTotal: cctvBasePricing.laborTotal,
+            totalPrice: cctvBasePricing.total,
+            quantity: cctvBasePricing.quantity.toString(),
+          });
+        }
+        if (cctv === 'yes' && cctvCablePricing) {
+          products.push({
+            type: 'ระบบสื่อสาร',
+            code: getAccessoryProductCode(cctvCablePricing.row),
+            productName: cctvCableLabel || 'สาย CCTV',
+            materialTotal: cctvCablePricing.materialTotal,
+            laborTotal: cctvCablePricing.laborTotal,
+            totalPrice: cctvCablePricing.total,
+            quantity: cctvCablePricing.quantity.toString(),
+            distance: cctvCableDistance ? `${cctvCableDistance} เมตร` : undefined,
+          });
+        }
+        if (lighting === 'yes' && lightingBasePricing) {
+          products.push({
+            type: 'ระบบสื่อสาร',
+            code: getAccessoryProductCode(lightingBasePricing.row),
+            productName: lightingBaseLabel || 'หลอดไฟ',
+            materialTotal: lightingBasePricing.materialTotal,
+            laborTotal: lightingBasePricing.laborTotal,
+            totalPrice: lightingBasePricing.total,
+            quantity: lightingBasePricing.quantity.toString(),
+          });
+        }
+        if (lighting === 'yes' && lightingCablePricing) {
+          products.push({
+            type: 'ระบบสื่อสาร',
+            code: getAccessoryProductCode(lightingCablePricing.row),
+            productName: lightingCableLabel || 'สายหลอดไฟ',
+            materialTotal: lightingCablePricing.materialTotal,
+            laborTotal: lightingCablePricing.laborTotal,
+            totalPrice: lightingCablePricing.total,
+            quantity: lightingCablePricing.quantity.toString(),
+            distance: lightingCableDistance ? `${lightingCableDistance} เมตร` : undefined,
+          });
+        }
+      }
+
+      // 3. งานปูน
+      if (concreteSelection === 'yes') {
+        if (mdbConcreteBase === 'yes') {
+          const pricing = getConcretePricing(3, 1);
+          if (pricing) {
+            products.push({
+              type: 'งานปูน',
+              code: getAccessoryProductCode(pricing.row),
+              productName: getConcreteRowName(3) || 'ฐานปูน MDB',
+              materialTotal: pricing.materialTotal,
+              laborTotal: pricing.laborTotal,
+              totalPrice: pricing.total,
+              quantity: pricing.quantity.toString(),
+            });
+          }
+        }
+        if (chargerConcreteBase === 'yes') {
+          const pricing = getConcretePricing(4, featureChargersCount);
+          if (pricing) {
+            products.push({
+              type: 'งานปูน',
+              code: getAccessoryProductCode(pricing.row),
+              productName: getConcreteRowName(4) || 'ฐานปูน CHARGER',
+              materialTotal: pricing.materialTotal,
+              laborTotal: pricing.laborTotal,
+              totalPrice: pricing.total,
+              quantity: pricing.quantity.toString(),
+            });
+          }
+        }
+        if (parkingConcreteFloor === 'yes') {
+          const pricing = getConcretePricing(5, parkingSlotsCount);
+          if (pricing) {
+            products.push({
+              type: 'งานปูน',
+              code: getAccessoryProductCode(pricing.row),
+              productName: getConcreteRowName(5) || 'พื้นปูน ลานจอดรถ',
+              materialTotal: pricing.materialTotal,
+              laborTotal: pricing.laborTotal,
+              totalPrice: pricing.total,
+              quantity: pricing.quantity.toString(),
+            });
+          }
+        }
+        if (generalConcreteFloor === 'yes') {
+          const pricing = getConcretePricing(6, featureChargersCount);
+          if (pricing) {
+            products.push({
+              type: 'งานปูน',
+              code: getAccessoryProductCode(pricing.row),
+              productName: getConcreteRowName(6) || 'ปูนแท่นสถานี',
+              materialTotal: pricing.materialTotal,
+              laborTotal: pricing.laborTotal,
+              totalPrice: pricing.total,
+              quantity: pricing.quantity.toString(),
+            });
+          }
+        }
+      }
+
+      // 4. งานทาสี
+      if (paintingSelection === 'yes') {
+        if (selectedPaintItem && parkingPaintType && parkingPaintType !== 'none') {
+          products.push({
+            type: 'งานทาสี',
+            code: selectedPaintItem.productCode || '-',
+            productName: selectedPaintItem.name || 'ทาสีพื้นช่องจอดรถ',
+            materialTotal: selectedPaintItem.materialPrice * parkingSlotsCount,
+            laborTotal: selectedPaintItem.laborPrice * parkingSlotsCount,
+            totalPrice: selectedPaintItem.totalPrice * parkingSlotsCount,
+            quantity: parkingSlotsCount.toString(),
+          });
+        }
+        if (sideLineMarking === 'yes' && stationEquipmentPriceMapping) {
+          const item = stationEquipmentPriceMapping['side-line-marking'];
+          if (item) {
+            products.push({
+              type: 'งานทาสี',
+              code: item.productCode || '-',
+              productName: item.name || 'ตีเส้นด้านข้าง',
+              materialTotal: item.materialPrice * parkingSlotsCount,
+              laborTotal: item.laborPrice * parkingSlotsCount,
+              totalPrice: item.totalPrice * parkingSlotsCount,
+              quantity: parkingSlotsCount.toString(),
+            });
+          }
+        }
+        if (centerPatternOriginal === 'yes' && stationEquipmentPriceMapping) {
+          const item = stationEquipmentPriceMapping['center-pattern-original'];
+          if (item) {
+            products.push({
+              type: 'งานทาสี',
+              code: item.productCode || '-',
+              productName: item.name || 'ทำลายกลางช่องจอด ใช้ลายเดิม',
+              materialTotal: item.materialPrice * parkingSlotsCount,
+              laborTotal: item.laborPrice * parkingSlotsCount,
+              totalPrice: item.totalPrice * parkingSlotsCount,
+              quantity: parkingSlotsCount.toString(),
+            });
+          }
+        }
+        if (centerPatternNew === 'yes' && stationEquipmentPriceMapping) {
+          const item = stationEquipmentPriceMapping['center-pattern-new'];
+          if (item) {
+            products.push({
+              type: 'งานทาสี',
+              code: item.productCode || '-',
+              productName: item.name || 'ทำลายกลางช่องจอด ออกแบบลายใหม่',
+              materialTotal: item.materialPrice * parkingSlotsCount,
+              laborTotal: item.laborPrice * parkingSlotsCount,
+              totalPrice: item.totalPrice * parkingSlotsCount,
+              quantity: parkingSlotsCount.toString(),
+            });
+          }
+        }
+      }
+
+      // 5. หลังคา
+      if (roofCoverType === 'yes' && parkingRoofData) {
         products.push({
-          type: 'Additional Features & Options',
-          code: 'รวมฟีเจอร์และตัวเลือกเพิ่มเติม',
-          productName: 'รวมฟีเจอร์และตัวเลือกเพิ่มเติม',
-          materialTotal: additionalFeaturesTotals.material,
-          laborTotal: additionalFeaturesTotals.labor,
-          totalPrice: additionalFeaturesTotals.total,
+          type: 'หลังคา',
+          code: parkingRoofData.productCode || '-',
+          productName: 'หลังคาลานจอดรถ',
+          materialTotal: parkingRoofTotals.material,
+          laborTotal: parkingRoofTotals.labor,
+          totalPrice: parkingRoofTotals.total,
           quantity: '1',
+        });
+      }
+      if (mdbRoof === 'yes' && mdbRoofData) {
+        products.push({
+          type: 'หลังคา',
+          code: '-',
+          productName: 'หลังคา MDB',
+          materialTotal: mdbRoofTotals.material,
+          laborTotal: mdbRoofTotals.labor,
+          totalPrice: mdbRoofTotals.total,
+          quantity: '1',
+        });
+      }
+      if (chargerRoofType && chargerRoofType !== 'no' && chargerRoofData) {
+        products.push({
+          type: 'หลังคา',
+          code: '-',
+          productName: chargerRoofType === 'normal' ? 'หลังคา CHARGER (ปกติ)' : 'หลังคา CHARGER (คอมโพสิต)',
+          materialTotal: chargerRoofTotals.material,
+          laborTotal: chargerRoofTotals.labor,
+          totalPrice: chargerRoofTotals.total,
+          quantity: featureChargersCount.toString(),
         });
       }
     } else if (sectionKey === 'travel') {
@@ -2258,6 +2518,10 @@ function MoreDetailCard(props: any) {
     const laborRate = toNumber(row.__EMPTY_5);
     const extraCharge = toNumber(row.__EMPTY_6);
 
+    // ค่าเดินทางระหว่างที่พัก และค่าที่พัก + อาหาร
+    const travelBetweenAccommodation = toNumber(row.__EMPTY_5);
+    const accommodationAndFood = toNumber(row.__EMPTY_6);
+
     let cost = 0;
     if (isWithinThreshold) {
       cost = (materialRate + laborRate) * distance;
@@ -2267,10 +2531,14 @@ function MoreDetailCard(props: any) {
 
     let travelCostDetails = '';
 
+    // เพิ่มค่าเดินทางระหว่างที่พัก และค่าที่พัก + อาหาร ด้านบน
+    travelCostDetails = `ค่าเดินทางระหว่างที่พัก: ${travelBetweenAccommodation.toLocaleString('th-TH')} บาท`;
+    travelCostDetails += `\nค่าที่พัก + อาหาร: ${accommodationAndFood.toLocaleString('th-TH')} บาท`;
+
     if (isWithinThreshold) {
-      travelCostDetails = `ค่าเดินทางตามจำนวนเครื่องชาร์จ: (${materialRate.toLocaleString('th-TH')} + ${laborRate.toLocaleString('th-TH')}) × ${distance.toLocaleString('th-TH')} km`;
+      travelCostDetails += `\nค่าเดินทางตามจำนวนเครื่องชาร์จ: (${materialRate.toLocaleString('th-TH')} + ${laborRate.toLocaleString('th-TH')}) × ${distance.toLocaleString('th-TH')} km`;
     } else {
-      travelCostDetails = `ค่าเดินทางตามจำนวนเครื่องชาร์จ: (${materialRate.toLocaleString('th-TH')} × ${distance.toLocaleString('th-TH')} km) + ${laborRate.toLocaleString('th-TH')} + ${extraCharge.toLocaleString('th-TH')}`;
+      travelCostDetails += `\nค่าเดินทางตามจำนวนเครื่องชาร์จ: (${materialRate.toLocaleString('th-TH')} × ${distance.toLocaleString('th-TH')} km) + ${laborRate.toLocaleString('th-TH')} + ${extraCharge.toLocaleString('th-TH')}`;
     }
 
     if (trainingWork === 'yes') {
@@ -8530,28 +8798,28 @@ function StationAccessory() {
 
       // MEA
       mapping['underground']['MEA'] = {
-        400: sheet912.find(row => row.__rowNum__ === 26),
-        500: sheet912.find(row => row.__rowNum__ === 27),
-        630: sheet912.find(row => row.__rowNum__ === 32),
-        800: sheet912.find(row => row.__rowNum__ === 37),
-        1000: sheet912.find(row => row.__rowNum__ === 40),
-        1250: sheet912.find(row => row.__rowNum__ === 42),
-        1500: sheet912.find(row => row.__rowNum__ === 43)
+        400: sheet912.find(row => row.__rowNum__ === 24),
+        500: sheet912.find(row => row.__rowNum__ === 25),
+        630: sheet912.find(row => row.__rowNum__ === 30),
+        800: sheet912.find(row => row.__rowNum__ === 35),
+        1000: sheet912.find(row => row.__rowNum__ === 38),
+        1250: sheet912.find(row => row.__rowNum__ === 40),
+        1500: sheet912.find(row => row.__rowNum__ === 41)
       };
 
       // PEA
       mapping['underground']['PEA'] = {
-        100: sheet912.find(row => row.__rowNum__ === 15),
-        160: sheet912.find(row => row.__rowNum__ === 17),
-        250: sheet912.find(row => row.__rowNum__ === 24),
-        315: sheet912.find(row => row.__rowNum__ === 24),
-        400: sheet912.find(row => row.__rowNum__ === 26),
-        500: sheet912.find(row => row.__rowNum__ === 27),
-        630: sheet912.find(row => row.__rowNum__ === 32),
-        800: sheet912.find(row => row.__rowNum__ === 37),
-        1000: sheet912.find(row => row.__rowNum__ === 40),
-        1250: sheet912.find(row => row.__rowNum__ === 42),
-        1500: sheet912.find(row => row.__rowNum__ === 43)
+        100: sheet912.find(row => row.__rowNum__ === 13),
+        160: sheet912.find(row => row.__rowNum__ === 15),
+        250: sheet912.find(row => row.__rowNum__ === 22),
+        315: sheet912.find(row => row.__rowNum__ === 22),
+        400: sheet912.find(row => row.__rowNum__ === 24),
+        500: sheet912.find(row => row.__rowNum__ === 25),
+        630: sheet912.find(row => row.__rowNum__ === 30),
+        800: sheet912.find(row => row.__rowNum__ === 35),
+        1000: sheet912.find(row => row.__rowNum__ === 38),
+        1250: sheet912.find(row => row.__rowNum__ === 40),
+        1500: sheet912.find(row => row.__rowNum__ === 41)
       };
     }
 
