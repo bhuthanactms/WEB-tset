@@ -595,6 +595,10 @@ function MoreDetailCard(props: any) {
     ? stationEquipmentPriceMapping[`paint-${parkingPaintType}`]
     : undefined;
 
+  // Section 5: งานป้าย (yes=มี, no=ไม่มี)
+  const [signageWorkSelection, setSignageWorkSelection] = useState(props.signageWorkSelection || 'no');
+  const [signageStationType, setSignageStationType] = useState<'general' | 'eic'>(props.signageStationType || 'general');
+
   const parseCount = (value: string | number | undefined, fallback: number) => {
     if (typeof value === 'number' && Number.isFinite(value)) return value;
     const parsed = parseInt((value ?? '').toString(), 10);
@@ -714,6 +718,39 @@ function MoreDetailCard(props: any) {
   const getConcreteRowName = (rowNum: number) => {
     if (!rowNum || !concreteSheet || concreteSheet.length === 0) return '';
     const row = concreteSheet.find((entry: any) => entry.__rowNum__ === rowNum);
+    return row?.__EMPTY_1 || '';
+  };
+
+  // Sheet for signage work (งานป้าย)
+  const signageSheet = useMemo(() => {
+    return props.excelData?.['ต้นทุนงานป้าย + สติ๊กเกอร์'] || [];
+  }, [props.excelData]);
+
+  // ฟังก์ชันดึงข้อมูลงานป้าย
+  const getSignagePricing = (rowNum: number): AccessoryPricing | null => {
+    if (!rowNum || !signageSheet || signageSheet.length === 0) return null;
+    const row = signageSheet.find((entry: any) => entry.__rowNum__ === rowNum);
+    if (!row) return null;
+
+    const materialUnit = parsePrice(row.__EMPTY_41);
+    const laborUnit = parsePrice(row.__EMPTY_43);
+    const totalUnit = materialUnit + laborUnit;
+
+    return {
+      row,
+      quantity: 1,
+      materialUnit,
+      laborUnit,
+      totalUnit,
+      materialTotal: materialUnit,
+      laborTotal: laborUnit,
+      total: totalUnit,
+    };
+  };
+
+  const getSignageRowName = (rowNum: number) => {
+    if (!rowNum || !signageSheet || signageSheet.length === 0) return '';
+    const row = signageSheet.find((entry: any) => entry.__rowNum__ === rowNum);
     return row?.__EMPTY_1 || '';
   };
 
@@ -1094,10 +1131,54 @@ function MoreDetailCard(props: any) {
     }
     : { material: 0, labor: 0, total: 0 };
 
+  // งานป้าย totals
+  const signageWorkTotals = React.useMemo(() => {
+    const totals = { material: 0, labor: 0, total: 0 };
+    if (signageWorkSelection !== 'yes') {
+      return totals;
+    }
+
+    if (signageStationType === 'general') {
+      // สถานีทั่วไป: 1.1 (row 5), 1.2 (row 6)
+      const item1 = getSignagePricing(5);
+      const item2 = getSignagePricing(6);
+      if (item1) {
+        totals.material += item1.materialTotal;
+        totals.labor += item1.laborTotal;
+        totals.total += item1.total;
+      }
+      if (item2) {
+        totals.material += item2.materialTotal;
+        totals.labor += item2.laborTotal;
+        totals.total += item2.total;
+      }
+    } else if (signageStationType === 'eic') {
+      // สถานี EIC: 2.1.1-2.1.8 (row 9-15), 2.2.1-2.2.4 (row 18-21)
+      for (let rowNum = 9; rowNum <= 15; rowNum++) {
+        const item = getSignagePricing(rowNum);
+        if (item) {
+          totals.material += item.materialTotal;
+          totals.labor += item.laborTotal;
+          totals.total += item.total;
+        }
+      }
+      for (let rowNum = 18; rowNum <= 21; rowNum++) {
+        const item = getSignagePricing(rowNum);
+        if (item) {
+          totals.material += item.materialTotal;
+          totals.labor += item.laborTotal;
+          totals.total += item.total;
+        }
+      }
+    }
+
+    return totals;
+  }, [signageWorkSelection, signageStationType, signageSheet]);
+
   const additionalFeaturesTotals = {
-    material: equipmentTotals.material + communicationTotals.material + concreteTotals.material + paintingTotals.material + parkingRoofTotals.material + mdbRoofTotals.material + chargerRoofTotals.material,
-    labor: equipmentTotals.labor + communicationTotals.labor + concreteTotals.labor + paintingTotals.labor + parkingRoofTotals.labor + mdbRoofTotals.labor + chargerRoofTotals.labor,
-    total: equipmentTotals.total + communicationTotals.total + concreteTotals.total + paintingTotals.total + parkingRoofTotals.total + mdbRoofTotals.total + chargerRoofTotals.total
+    material: equipmentTotals.material + communicationTotals.material + concreteTotals.material + paintingTotals.material + parkingRoofTotals.material + mdbRoofTotals.material + chargerRoofTotals.material + signageWorkTotals.material,
+    labor: equipmentTotals.labor + communicationTotals.labor + concreteTotals.labor + paintingTotals.labor + parkingRoofTotals.labor + mdbRoofTotals.labor + chargerRoofTotals.labor + signageWorkTotals.labor,
+    total: equipmentTotals.total + communicationTotals.total + concreteTotals.total + paintingTotals.total + parkingRoofTotals.total + mdbRoofTotals.total + chargerRoofTotals.total + signageWorkTotals.total
   };
 
   const transformerTotals = React.useMemo(() => {
@@ -1449,6 +1530,8 @@ function MoreDetailCard(props: any) {
     const laborPrice = siteInstallationCost;
     const totalPrice = materialPrice + laborPrice;
 
+    const productCode = row.__EMPTY_14 || '';
+
     return {
       cabinetSize,
       emptyCabinetPrice,
@@ -1457,6 +1540,7 @@ function MoreDetailCard(props: any) {
       materialPrice,
       laborPrice,
       totalPrice,
+      productCode,
     };
   }, [mdbSelection, props.transformer, props.powerAuthority, lowVoltageRequest, getExcelData]);
 
@@ -1809,7 +1893,7 @@ function MoreDetailCard(props: any) {
             if (mainRow) {
               products.push({
                 type: mainRow.__EMPTY || '',
-                code: '-',
+                code: mainRow.__EMPTY_7 || '-',
                 productName: '-',
                 materialTotal: parseFloat(mainRow.__EMPTY_4 || 0) || 0,
                 laborTotal: parseFloat(mainRow.__EMPTY_5 || 0) || 0,
@@ -2319,7 +2403,68 @@ function MoreDetailCard(props: any) {
         }
       }
 
-      // 5. หลังคา
+      // 5. งานป้าย
+      if (signageWorkSelection === 'yes') {
+        if (signageStationType === 'general') {
+          // สถานีทั่วไป: 1.1 (row 5), 1.2 (row 6)
+          const item1 = getSignagePricing(5);
+          if (item1) {
+            products.push({
+              type: 'งานป้าย',
+              code: item1.row?.__EMPTY || '-',
+              productName: getSignageRowName(5) || 'รายการ 1.1',
+              materialTotal: item1.materialTotal,
+              laborTotal: item1.laborTotal,
+              totalPrice: item1.total,
+              quantity: '1',
+            });
+          }
+          const item2 = getSignagePricing(6);
+          if (item2) {
+            products.push({
+              type: 'งานป้าย',
+              code: item2.row?.__EMPTY || '-',
+              productName: getSignageRowName(6) || 'รายการ 1.2',
+              materialTotal: item2.materialTotal,
+              laborTotal: item2.laborTotal,
+              totalPrice: item2.total,
+              quantity: '1',
+            });
+          }
+        } else if (signageStationType === 'eic') {
+          // สถานี EIC: 2.1.1-2.1.8 (row 9-15), 2.2.1-2.2.4 (row 18-21)
+          for (let rowNum = 9; rowNum <= 15; rowNum++) {
+            const item = getSignagePricing(rowNum);
+            if (item) {
+              products.push({
+                type: 'งานป้าย',
+                code: item.row?.__EMPTY || '-',
+                productName: getSignageRowName(rowNum) || `รายการ 2.1.${rowNum - 8}`,
+                materialTotal: item.materialTotal,
+                laborTotal: item.laborTotal,
+                totalPrice: item.total,
+                quantity: '1',
+              });
+            }
+          }
+          for (let rowNum = 18; rowNum <= 21; rowNum++) {
+            const item = getSignagePricing(rowNum);
+            if (item) {
+              products.push({
+                type: 'งานป้าย',
+                code: item.row?.__EMPTY || '-',
+                productName: getSignageRowName(rowNum) || `รายการ 2.2.${rowNum - 17}`,
+                materialTotal: item.materialTotal,
+                laborTotal: item.laborTotal,
+                totalPrice: item.total,
+                quantity: '1',
+              });
+            }
+          }
+        }
+      }
+
+      // 6. หลังคา
       if (roofCoverType === 'yes' && parkingRoofData) {
         products.push({
           type: 'หลังคา',
@@ -3402,6 +3547,7 @@ function MoreDetailCard(props: any) {
                         </CollapsibleTrigger>
                         <CollapsibleContent>
                           <div className="px-4 pb-4 space-y-2 text-sm">
+                            <div><span className="font-medium">รหัส:</span> {mainRow.__EMPTY_7 || '-'}</div>
                             <div><span className="font-medium">จำนวน:</span> {mainRow.__EMPTY_3 || '-'}</div>
                             <div className="mt-2">
                               <div className="font-medium mb-1">รายละเอียด:</div>
@@ -4328,53 +4474,65 @@ function MoreDetailCard(props: any) {
                           <CollapsibleContent>
                             <div className="px-5 pb-5 space-y-5 bg-white/50">
                               {/* ขนาดตู้และรายละเอียดราคา - แสดงในบรรทัดเดียวกัน */}
-                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+                                {/* รหัส */}
+                                {getMdbCabinetData.productCode && (
+                                  <div className="p-4 bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                                    <div className="flex items-center gap-2">
+                                      <div className="text-xs text-gray-500 uppercase tracking-wide">รหัส</div>
+                                    </div>
+                                    <div className="text-base font-bold text-gray-800 mt-1">{getMdbCabinetData.productCode}</div>
+                                  </div>
+                                )}
+
                                 {/* ขนาดตู้ */}
                                 {getMdbCabinetData.cabinetSize && (
                                   <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200 shadow-sm">
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <Ruler className="h-4 w-4 text-blue-600" />
-                                      <div className="text-xs font-semibold text-blue-900 uppercase tracking-wide">ขนาดตู้</div>
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="flex items-center gap-2">
+                                        <Ruler className="h-4 w-4 text-blue-600" />
+                                        <div className="text-xs font-semibold text-blue-900 uppercase tracking-wide">ขนาดตู้</div>
+                                      </div>
+                                      <div className="text-base font-bold text-gray-800">{getMdbCabinetData.cabinetSize}</div>
                                     </div>
-                                    <div className="text-base font-bold text-gray-800">{getMdbCabinetData.cabinetSize}</div>
                                     <div className="text-xs text-gray-500 mt-1">(กว้าง × ยาว × ลึก)</div>
                                   </div>
                                 )}
 
-                                {/* ราคาตู้เปล่า */}
+                                {/* ราคาตู้(MDB + busbar) */}
                                 <div className="p-4 bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-                                  <div className="flex items-center justify-between mb-2">
-                                    <div className="text-xs text-gray-500 uppercase tracking-wide">ราคาตู้เปล่า</div>
-                                    <Settings className="h-4 w-4 text-gray-400" />
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="text-xs text-gray-500 uppercase tracking-wide">ราคาตู้(MDB + busbar)</div>
+                                    <div className="text-xl font-bold text-gray-800">
+                                      {getMdbCabinetData.emptyCabinetPrice.toLocaleString('th-TH')} <span className="text-xs font-normal text-gray-500">บาท</span>
+                                    </div>
                                   </div>
-                                  <div className="text-xl font-bold text-gray-800">
-                                    {getMdbCabinetData.emptyCabinetPrice.toLocaleString('th-TH')}
-                                  </div>
-                                  <div className="text-xs text-gray-500 mt-1">บาท</div>
                                 </div>
 
                                 {/* ราคาGround */}
                                 <div className="p-4 bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-                                  <div className="flex items-center justify-between mb-2">
-                                    <div className="text-xs text-gray-500 uppercase tracking-wide">ราคาGround</div>
-                                    <Shield className="h-4 w-4 text-gray-400" />
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <Shield className="h-4 w-4 text-gray-400" />
+                                      <div className="text-xs text-gray-500 uppercase tracking-wide">ราคาGround</div>
+                                    </div>
+                                    <div className="text-xl font-bold text-gray-800">
+                                      {getMdbCabinetData.groundPrice.toLocaleString('th-TH')} <span className="text-xs font-normal text-gray-500">บาท</span>
+                                    </div>
                                   </div>
-                                  <div className="text-xl font-bold text-gray-800">
-                                    {getMdbCabinetData.groundPrice.toLocaleString('th-TH')}
-                                  </div>
-                                  <div className="text-xs text-gray-500 mt-1">บาท</div>
                                 </div>
 
                                 {/* ค่าติดตั้งหน้าSite */}
                                 <div className="p-4 bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-                                  <div className="flex items-center justify-between mb-2">
-                                    <div className="text-xs text-gray-500 uppercase tracking-wide">ค่าติดตั้งหน้าSite</div>
-                                    <Wrench className="h-4 w-4 text-gray-400" />
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <Wrench className="h-4 w-4 text-gray-400" />
+                                      <div className="text-xs text-gray-500 uppercase tracking-wide">ค่าติดตั้งหน้าSite</div>
+                                    </div>
+                                    <div className="text-xl font-bold text-gray-800">
+                                      {getMdbCabinetData.siteInstallationCost.toLocaleString('th-TH')} <span className="text-xs font-normal text-gray-500">บาท</span>
+                                    </div>
                                   </div>
-                                  <div className="text-xl font-bold text-gray-800">
-                                    {getMdbCabinetData.siteInstallationCost.toLocaleString('th-TH')}
-                                  </div>
-                                  <div className="text-xs text-gray-500 mt-1">บาท</div>
                                 </div>
                               </div>
 
@@ -7364,6 +7522,398 @@ function MoreDetailCard(props: any) {
 
               <Separator />
 
+              {/* 5. งานป้าย */}
+              <Collapsible
+                open={openSections['signage-work']}
+                onOpenChange={(open) => setOpenSections(prev => ({ ...prev, 'signage-work': open }))}
+              >
+                <div className="bg-gray-50 rounded-lg border border-gray-200">
+                  <CollapsibleTrigger asChild>
+                    <div className="w-full p-4 text-left hover:bg-gray-100 transition-colors rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-semibold flex items-center gap-2">
+                          <Shield className="h-5 w-5" />
+                          5. งานป้าย
+                        </h3>
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                            <div
+                              className={`flex items-center space-x-2 px-3 py-1 rounded-lg border cursor-pointer ${signageWorkSelection === 'yes' ? 'bg-green-100 border-green-300' : 'hover:bg-gray-50'}`}
+                              onClick={() => {
+                                setSignageWorkSelection('yes');
+                                setOpenSections(prev => ({ ...prev, 'signage-work': true }));
+                              }}
+                            >
+                              <Checkbox
+                                id="signage-work-yes"
+                                checked={signageWorkSelection === 'yes'}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSignageWorkSelection('yes');
+                                    setOpenSections(prev => ({ ...prev, 'signage-work': true }));
+                                  }
+                                }}
+                                className="border-green-400 data-[state=checked]:bg-green-500"
+                              />
+                              <Label htmlFor="signage-work-yes" className="font-medium cursor-pointer text-sm">มี</Label>
+                            </div>
+                            <div
+                              className={`flex items-center space-x-2 px-3 py-1 rounded-lg border cursor-pointer ${signageWorkSelection === 'no' ? 'bg-gray-100 border-gray-300' : 'hover:bg-gray-50'}`}
+                              onClick={() => setSignageWorkSelection('no')}
+                            >
+                              <Checkbox
+                                id="signage-work-no"
+                                checked={signageWorkSelection === 'no'}
+                                onCheckedChange={(checked) => { if (checked) setSignageWorkSelection('no'); }}
+                                className="border-gray-400 data-[state=checked]:bg-gray-500"
+                              />
+                              <Label htmlFor="signage-work-no" className="font-medium cursor-pointer text-sm">ไม่มี</Label>
+                            </div>
+                          </div>
+                          <div className="ml-4">
+                            {openSections['signage-work'] ? (
+                              <ChevronUp className="h-5 w-5 text-gray-600" />
+                            ) : (
+                              <ChevronDown className="h-5 w-5 text-gray-600" />
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </CollapsibleTrigger>
+
+                  <CollapsibleContent>
+                    {signageWorkSelection === 'yes' && (
+                      <div className="px-4 pb-4 space-y-4">
+                        {/* เลือกประเภทสถานี */}
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium">เลือกประเภทสถานี:</Label>
+                          <div className="flex items-center gap-4">
+                            <div
+                              className={`flex items-center space-x-2 px-3 py-2 rounded-lg border cursor-pointer ${signageStationType === 'general' ? 'bg-blue-100 border-blue-300' : 'hover:bg-gray-50'}`}
+                              onClick={() => setSignageStationType('general')}
+                            >
+                              <Checkbox
+                                id="signage-station-general"
+                                checked={signageStationType === 'general'}
+                                onCheckedChange={(checked) => { if (checked) setSignageStationType('general'); }}
+                                className="border-blue-400 data-[state=checked]:bg-blue-500"
+                              />
+                              <Label htmlFor="signage-station-general" className="font-medium cursor-pointer text-sm">1. สถานีทั่วไป</Label>
+                            </div>
+                            <div
+                              className={`flex items-center space-x-2 px-3 py-2 rounded-lg border cursor-pointer ${signageStationType === 'eic' ? 'bg-blue-100 border-blue-300' : 'hover:bg-gray-50'}`}
+                              onClick={() => setSignageStationType('eic')}
+                            >
+                              <Checkbox
+                                id="signage-station-eic"
+                                checked={signageStationType === 'eic'}
+                                onCheckedChange={(checked) => { if (checked) setSignageStationType('eic'); }}
+                                className="border-blue-400 data-[state=checked]:bg-blue-500"
+                              />
+                              <Label htmlFor="signage-station-eic" className="font-medium cursor-pointer text-sm">2. สถานี EIC</Label>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* สถานีทั่วไป */}
+                        {signageStationType === 'general' && (
+                          <div className="space-y-3">
+                            {/* ประเภท row 4 */}
+                            <Collapsible
+                              open={openItems['signage-general-type']}
+                              onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'signage-general-type': open }))}
+                            >
+                              <div className="bg-blue-50 rounded-lg border border-blue-200">
+                                <CollapsibleTrigger className="w-full p-3 text-left hover:bg-blue-100 transition-colors rounded-lg">
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-semibold text-blue-800">
+                                      {getSignageRowName(4) || 'ประเภท'}
+                                    </span>
+                                    <div className="ml-4">
+                                      {openItems['signage-general-type'] ? (
+                                        <ChevronUp className="h-4 w-4 text-blue-600" />
+                                      ) : (
+                                        <ChevronDown className="h-4 w-4 text-blue-600" />
+                                      )}
+                                    </div>
+                                  </div>
+                                </CollapsibleTrigger>
+                                <CollapsibleContent>
+                                  <div className="px-3 pb-3 space-y-3">
+                                    {/* 1.1 row 5 */}
+                                    {(() => {
+                                      const pricing = getSignagePricing(5);
+                                      if (!pricing) return null;
+                                      return (
+                                        <Collapsible
+                                          open={openItems['signage-general-1-1']}
+                                          onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'signage-general-1-1': open }))}
+                                        >
+                                          <div className="bg-white rounded-lg border border-blue-100">
+                                            <CollapsibleTrigger className="w-full p-2 text-left hover:bg-blue-50 transition-colors rounded-lg">
+                                              <div className="flex items-center justify-between">
+                                                <span className="text-sm font-medium">1.1 {getSignageRowName(5)}</span>
+                                                <div className="ml-4">
+                                                  {openItems['signage-general-1-1'] ? (
+                                                    <ChevronUp className="h-3 w-3 text-blue-600" />
+                                                  ) : (
+                                                    <ChevronDown className="h-3 w-3 text-blue-600" />
+                                                  )}
+                                                </div>
+                                              </div>
+                                            </CollapsibleTrigger>
+                                            <CollapsibleContent>
+                                              <div className="px-2 pb-2 space-y-2 text-xs">
+                                                <div className="grid grid-cols-3 gap-2 pt-2 border-t">
+                                                  <div>
+                                                    <div className="text-gray-600 mb-1">ราคาค่าของ:</div>
+                                                    <div className="font-semibold">{pricing.materialUnit.toLocaleString('th-TH')} บาท</div>
+                                                  </div>
+                                                  <div>
+                                                    <div className="text-gray-600 mb-1">ราคาค่าแรง:</div>
+                                                    <div className="font-semibold">{pricing.laborUnit.toLocaleString('th-TH')} บาท</div>
+                                                  </div>
+                                                  <div>
+                                                    <div className="text-gray-600 mb-1">ราคารวม:</div>
+                                                    <div className="font-semibold">{pricing.totalUnit.toLocaleString('th-TH')} บาท</div>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            </CollapsibleContent>
+                                          </div>
+                                        </Collapsible>
+                                      );
+                                    })()}
+
+                                    {/* 1.2 row 6 */}
+                                    {(() => {
+                                      const pricing = getSignagePricing(6);
+                                      if (!pricing) return null;
+                                      return (
+                                        <Collapsible
+                                          open={openItems['signage-general-1-2']}
+                                          onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'signage-general-1-2': open }))}
+                                        >
+                                          <div className="bg-white rounded-lg border border-blue-100">
+                                            <CollapsibleTrigger className="w-full p-2 text-left hover:bg-blue-50 transition-colors rounded-lg">
+                                              <div className="flex items-center justify-between">
+                                                <span className="text-sm font-medium">1.2 {getSignageRowName(6)}</span>
+                                                <div className="ml-4">
+                                                  {openItems['signage-general-1-2'] ? (
+                                                    <ChevronUp className="h-3 w-3 text-blue-600" />
+                                                  ) : (
+                                                    <ChevronDown className="h-3 w-3 text-blue-600" />
+                                                  )}
+                                                </div>
+                                              </div>
+                                            </CollapsibleTrigger>
+                                            <CollapsibleContent>
+                                              <div className="px-2 pb-2 space-y-2 text-xs">
+                                                <div className="grid grid-cols-3 gap-2 pt-2 border-t">
+                                                  <div>
+                                                    <div className="text-gray-600 mb-1">ราคาค่าของ:</div>
+                                                    <div className="font-semibold">{pricing.materialUnit.toLocaleString('th-TH')} บาท</div>
+                                                  </div>
+                                                  <div>
+                                                    <div className="text-gray-600 mb-1">ราคาค่าแรง:</div>
+                                                    <div className="font-semibold">{pricing.laborUnit.toLocaleString('th-TH')} บาท</div>
+                                                  </div>
+                                                  <div>
+                                                    <div className="text-gray-600 mb-1">ราคารวม:</div>
+                                                    <div className="font-semibold">{pricing.totalUnit.toLocaleString('th-TH')} บาท</div>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            </CollapsibleContent>
+                                          </div>
+                                        </Collapsible>
+                                      );
+                                    })()}
+                                  </div>
+                                </CollapsibleContent>
+                              </div>
+                            </Collapsible>
+                          </div>
+                        )}
+
+                        {/* สถานี EIC */}
+                        {signageStationType === 'eic' && (
+                          <div className="space-y-3">
+                            {/* 2.1 ประเภท row 8 */}
+                            <Collapsible
+                              open={openItems['signage-eic-2-1']}
+                              onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'signage-eic-2-1': open }))}
+                            >
+                              <div className="bg-blue-50 rounded-lg border border-blue-200">
+                                <CollapsibleTrigger className="w-full p-3 text-left hover:bg-blue-100 transition-colors rounded-lg">
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-semibold text-blue-800">
+                                      2.1 {getSignageRowName(8) || 'ประเภท'}
+                                    </span>
+                                    <div className="ml-4">
+                                      {openItems['signage-eic-2-1'] ? (
+                                        <ChevronUp className="h-4 w-4 text-blue-600" />
+                                      ) : (
+                                        <ChevronDown className="h-4 w-4 text-blue-600" />
+                                      )}
+                                    </div>
+                                  </div>
+                                </CollapsibleTrigger>
+                                <CollapsibleContent>
+                                  <div className="px-3 pb-3 space-y-3">
+                                    {/* 2.1.1-2.1.8 row 9-15 */}
+                                    {[9, 10, 11, 12, 13, 14, 15].map((rowNum, index) => {
+                                      const pricing = getSignagePricing(rowNum);
+                                      if (!pricing) return null;
+                                      const itemKey = `signage-eic-2-1-${index + 1}`;
+                                      return (
+                                        <Collapsible
+                                          key={rowNum}
+                                          open={openItems[itemKey]}
+                                          onOpenChange={(open) => setOpenItems(prev => ({ ...prev, [itemKey]: open }))}
+                                        >
+                                          <div className="bg-white rounded-lg border border-blue-100">
+                                            <CollapsibleTrigger className="w-full p-2 text-left hover:bg-blue-50 transition-colors rounded-lg">
+                                              <div className="flex items-center justify-between">
+                                                <span className="text-sm font-medium">2.1.{index + 1} {getSignageRowName(rowNum)}</span>
+                                                <div className="ml-4">
+                                                  {openItems[itemKey] ? (
+                                                    <ChevronUp className="h-3 w-3 text-blue-600" />
+                                                  ) : (
+                                                    <ChevronDown className="h-3 w-3 text-blue-600" />
+                                                  )}
+                                                </div>
+                                              </div>
+                                            </CollapsibleTrigger>
+                                            <CollapsibleContent>
+                                              <div className="px-2 pb-2 space-y-2 text-xs">
+                                                <div className="grid grid-cols-3 gap-2 pt-2 border-t">
+                                                  <div>
+                                                    <div className="text-gray-600 mb-1">ราคาค่าของ:</div>
+                                                    <div className="font-semibold">{pricing.materialUnit.toLocaleString('th-TH')} บาท</div>
+                                                  </div>
+                                                  <div>
+                                                    <div className="text-gray-600 mb-1">ราคาค่าแรง:</div>
+                                                    <div className="font-semibold">{pricing.laborUnit.toLocaleString('th-TH')} บาท</div>
+                                                  </div>
+                                                  <div>
+                                                    <div className="text-gray-600 mb-1">ราคารวม:</div>
+                                                    <div className="font-semibold">{pricing.totalUnit.toLocaleString('th-TH')} บาท</div>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            </CollapsibleContent>
+                                          </div>
+                                        </Collapsible>
+                                      );
+                                    })}
+                                  </div>
+                                </CollapsibleContent>
+                              </div>
+                            </Collapsible>
+
+                            {/* 2.2 ประเภท row 17 */}
+                            <Collapsible
+                              open={openItems['signage-eic-2-2']}
+                              onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'signage-eic-2-2': open }))}
+                            >
+                              <div className="bg-blue-50 rounded-lg border border-blue-200">
+                                <CollapsibleTrigger className="w-full p-3 text-left hover:bg-blue-100 transition-colors rounded-lg">
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-semibold text-blue-800">
+                                      2.2 {getSignageRowName(17) || 'ประเภท'}
+                                    </span>
+                                    <div className="ml-4">
+                                      {openItems['signage-eic-2-2'] ? (
+                                        <ChevronUp className="h-4 w-4 text-blue-600" />
+                                      ) : (
+                                        <ChevronDown className="h-4 w-4 text-blue-600" />
+                                      )}
+                                    </div>
+                                  </div>
+                                </CollapsibleTrigger>
+                                <CollapsibleContent>
+                                  <div className="px-3 pb-3 space-y-3">
+                                    {/* 2.2.1-2.2.4 row 18-21 */}
+                                    {[18, 19, 20, 21].map((rowNum, index) => {
+                                      const pricing = getSignagePricing(rowNum);
+                                      if (!pricing) return null;
+                                      const itemKey = `signage-eic-2-2-${index + 1}`;
+                                      return (
+                                        <Collapsible
+                                          key={rowNum}
+                                          open={openItems[itemKey]}
+                                          onOpenChange={(open) => setOpenItems(prev => ({ ...prev, [itemKey]: open }))}
+                                        >
+                                          <div className="bg-white rounded-lg border border-blue-100">
+                                            <CollapsibleTrigger className="w-full p-2 text-left hover:bg-blue-50 transition-colors rounded-lg">
+                                              <div className="flex items-center justify-between">
+                                                <span className="text-sm font-medium">2.2.{index + 1} {getSignageRowName(rowNum)}</span>
+                                                <div className="ml-4">
+                                                  {openItems[itemKey] ? (
+                                                    <ChevronUp className="h-3 w-3 text-blue-600" />
+                                                  ) : (
+                                                    <ChevronDown className="h-3 w-3 text-blue-600" />
+                                                  )}
+                                                </div>
+                                              </div>
+                                            </CollapsibleTrigger>
+                                            <CollapsibleContent>
+                                              <div className="px-2 pb-2 space-y-2 text-xs">
+                                                <div className="grid grid-cols-3 gap-2 pt-2 border-t">
+                                                  <div>
+                                                    <div className="text-gray-600 mb-1">ราคาค่าของ:</div>
+                                                    <div className="font-semibold">{pricing.materialUnit.toLocaleString('th-TH')} บาท</div>
+                                                  </div>
+                                                  <div>
+                                                    <div className="text-gray-600 mb-1">ราคาค่าแรง:</div>
+                                                    <div className="font-semibold">{pricing.laborUnit.toLocaleString('th-TH')} บาท</div>
+                                                  </div>
+                                                  <div>
+                                                    <div className="text-gray-600 mb-1">ราคารวม:</div>
+                                                    <div className="font-semibold">{pricing.totalUnit.toLocaleString('th-TH')} บาท</div>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            </CollapsibleContent>
+                                          </div>
+                                        </Collapsible>
+                                      );
+                                    })}
+                                  </div>
+                                </CollapsibleContent>
+                              </div>
+                            </Collapsible>
+                          </div>
+                        )}
+
+                        {/* รวมค่าใช้จ่ายงานป้าย */}
+                        <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200 space-y-4">
+                          <div className="text-lg font-semibold text-blue-800">รวมค่าใช้จ่ายงานป้าย</div>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                              <div className="text-sm text-gray-600 mb-1">ค่าของรวม:</div>
+                              <div className="text-xl font-bold text-gray-800">{signageWorkTotals.material.toLocaleString('th-TH')} บาท</div>
+                            </div>
+                            <div>
+                              <div className="text-sm text-gray-600 mb-1">ค่าแรงรวม:</div>
+                              <div className="text-xl font-bold text-gray-800">{signageWorkTotals.labor.toLocaleString('th-TH')} บาท</div>
+                            </div>
+                            <div>
+                              <div className="text-sm text-blue-700 font-semibold mb-1">ราคารวม:</div>
+                              <div className="text-2xl font-bold text-blue-700">{signageWorkTotals.total.toLocaleString('th-TH')} บาท</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </CollapsibleContent>
+                </div>
+              </Collapsible>
+
+              <Separator />
+
               {/* หลังคาคุมช่องจอด */}
 
               <Collapsible
@@ -7778,7 +8328,7 @@ function MoreDetailCard(props: any) {
                   </div>
                 </div>
                 <div className="text-xs text-slate-500">
-                  รวมค่าใช้จ่ายจากทุกหัวข้อย่อย: อุปกรณ์ประกอบสถานี, ระบบสื่อสาร, งานปูน, งานทาสีช่องจอด และหลังคาทุกประเภท
+                  รวมค่าใช้จ่ายจากทุกหัวข้อย่อย: อุปกรณ์ประกอบสถานี, ระบบสื่อสาร, งานปูน, งานทาสีช่องจอด, งานป้าย และหลังคาทุกประเภท
                 </div>
               </div>
 
