@@ -472,11 +472,20 @@ function MoreDetailCard(props: any) {
 
   const [chargerRoofType, setChargerRoofType] = useState(props.chargerRoofType || 'no');
 
+  const [travelType, setTravelType] = useState<'construction' | 'installation'>('construction');
   const [travelDistance, setTravelDistance] = useState(props.travelDistance || '');
+  const [installationTravelDistance, setInstallationTravelDistance] = useState('');
 
   const [trainingWork, setTrainingWork] = useState(props.trainingWork || 'no');
 
   const [travelCostResult, setTravelCostResult] = useState(props.travelCostResult || 0);
+  const [installationTravelCost, setInstallationTravelCost] = useState({
+    travelCost: 0,
+    accommodationAndFood: 0,
+    laborCost: 0,
+    trainingCost: 0,
+    total: 0,
+  });
 
   const [transformerSelection, setTransformerSelection] = useState(props.transformerSelection || 'no');
 
@@ -1762,16 +1771,16 @@ function MoreDetailCard(props: any) {
     return stationTotalWithProfit + cfAmount;
   }, [stationTotalWithProfit, cfAmount]);
 
-  // ราคารวมสุดท้าย (รวมทุกอย่าง: กำไร%, CF%, ค่าเดินทาง, และค่าดำเนินการทางไฟฟ้า)
+  // ราคารวมสุดท้าย (รวมทุกอย่าง: กำไร%, CF%, ค่าเดินทาง) - ไม่รวมค่าดำเนินการทางไฟฟ้า (แค่แสดงไว้ให้ดู)
   const finalStationTotals = React.useMemo(() => {
     return {
       material: stationTotals.material + profitAmount + cfAmount,
       labor: stationTotals.labor + travelTotals.total,
-      total: stationTotalWithProfitAndCF + travelTotals.total + electricalOperationTotals.pricePerUnitTotal,
+      total: stationTotalWithProfitAndCF + travelTotals.total, // ไม่รวมค่าดำเนินการทางไฟฟ้า
       profitAmount,
       cfAmount,
       travelTotal: travelTotals.total,
-      electricalOperationTotal: electricalOperationTotals.pricePerUnitTotal,
+      electricalOperationTotal: electricalOperationTotals.pricePerUnitTotal, // เก็บไว้เพื่อแสดง แต่ไม่รวมใน total
     };
   }, [stationTotals, profitAmount, cfAmount, stationTotalWithProfitAndCF, travelTotals, electricalOperationTotals]);
 
@@ -2036,13 +2045,30 @@ function MoreDetailCard(props: any) {
               });
 
               // 2. เบรกเกอร์
+              // สร้างค่าสำหรับรายการ (จาก __EMPTY_3 และ __EMPTY_5)
+              const listingValue = [
+                row.__EMPTY_3 ? `${row.__EMPTY_3}AT` : '',
+                row.__EMPTY_5 ? `${row.__EMPTY_5}AF` : ''
+              ].filter(Boolean).join('/') || '-';
+
               products.push({
                 type: 'เบรกเกอร์',
-                code: brandCode || '-', // รหัสสินค้า
-                productName: installationLocationBrand || '', // แบรนด์ที่เลือก
-                materialTotal: brandPrice + busbarAcc, // ราคาแบรนด์ + Busbar+ACC
+                code: brandCode || '-', // รหัสสินค้า (จาก code:)
+                productName: `${installationLocationBrand || ''} (${listingValue})`, // แบรนด์ที่เลือก + (ค่าจาก __EMPTY_3 และ __EMPTY_5)
+                materialTotal: brandPrice, // ราคาแบรนด์ (จาก ราคา ABB:/EATON:/LS:)
                 laborTotal: siteInstallationCost, // ค่าติดตั้งหน้าSite
-                totalPrice: brandPrice + busbarAcc + siteInstallationCost,
+                totalPrice: brandPrice + siteInstallationCost,
+                quantity: '1',
+              });
+
+              // 3. Busbar+ACC
+              products.push({
+                type: 'Busbar+ACC',
+                code: '-', // ไม่มีรหัส
+                productName: 'Busbar+ACC',
+                materialTotal: busbarAcc, // ราคา Busbar+ACC
+                laborTotal: 0, // ไม่มีค่าแรง
+                totalPrice: busbarAcc,
                 quantity: '1',
               });
             }
@@ -2094,10 +2120,18 @@ function MoreDetailCard(props: any) {
         }
 
         // 5.1 MDB MAIN - เอาข้อมูลจาก MCCB Main
+        // สร้างค่าสำหรับรายการ (จาก mdbMainAt และ mdbMainAf)
+        const mdbMainAt = props.mdbMainAt || '';
+        const mdbMainAf = props.mdbMainAf || '';
+        const listingValue = [
+          mdbMainAt ? `${mdbMainAt}` : '',
+          mdbMainAf ? `${mdbMainAf}` : ''
+        ].filter(Boolean).join('/') || '-';
+
         products.push({
           type: 'MDB Configuration',
           code: mdbConfiguration.header?.productCodeHeader || '', // รหัสสินค้า
-          productName: mdbConfiguration.mccbBrand || '', // ประเภท
+          productName: listingValue !== '-' ? `${mdbConfiguration.mccbBrand || ''} (${listingValue})` : (mdbConfiguration.mccbBrand || ''), // ประเภท + (รายการ)
           materialTotal: mainPrice,
           laborTotal: 0,
           totalPrice: mainPrice,
@@ -2170,7 +2204,7 @@ function MoreDetailCard(props: any) {
         if (bumperPoles === 'yes' && bumperPolePricing) {
           products.push({
             type: 'อุปกรณ์ประกอบสถานี',
-            code: getAccessoryProductCode(bumperPolePricing.row),
+            code: bumperPolePricing.row?.__EMPTY || '-',
             productName: `เสากันชน (${bumperPoleMaterial === 'steel' ? 'เหล็ก' : 'สแตนเลส'})`,
             materialTotal: bumperPolePricing.materialTotal,
             laborTotal: bumperPolePricing.laborTotal,
@@ -2181,7 +2215,7 @@ function MoreDetailCard(props: any) {
         if (wheelStops === 'yes' && wheelStopPricing) {
           products.push({
             type: 'อุปกรณ์ประกอบสถานี',
-            code: getAccessoryProductCode(wheelStopPricing.row),
+            code: wheelStopPricing.row?.__EMPTY || '-',
             productName: `ยางกั้นล้อ (${wheelStopMaterial === 'rubber' ? 'ยาง' : 'ปูน'})`,
             materialTotal: wheelStopPricing.materialTotal,
             laborTotal: wheelStopPricing.laborTotal,
@@ -2192,7 +2226,7 @@ function MoreDetailCard(props: any) {
         if (fireExtinguisherCabinet === 'yes' && fireExtinguisherPricing) {
           products.push({
             type: 'อุปกรณ์ประกอบสถานี',
-            code: getAccessoryProductCode(fireExtinguisherPricing.row),
+            code: fireExtinguisherPricing.row?.__EMPTY || '-',
             productName: `ถังดับเพลิง+ตู้ (${fireExtinguisherType === 'abc' ? 'A+B+C' : 'CO2'})`,
             materialTotal: fireExtinguisherPricing.materialTotal,
             laborTotal: fireExtinguisherPricing.laborTotal,
@@ -2203,7 +2237,7 @@ function MoreDetailCard(props: any) {
         if (signage === 'yes' && signagePricing) {
           products.push({
             type: 'อุปกรณ์ประกอบสถานี',
-            code: getAccessoryProductCode(signagePricing.row),
+            code: signagePricing.row?.__EMPTY || '-',
             productName: 'ป้ายสูง + วิธีใช้งาน',
             materialTotal: signagePricing.materialTotal,
             laborTotal: signagePricing.laborTotal,
@@ -2218,7 +2252,7 @@ function MoreDetailCard(props: any) {
         if (wifi4gHub === 'yes' && routerBasePricing) {
           products.push({
             type: 'ระบบสื่อสาร',
-            code: getAccessoryProductCode(routerBasePricing.row),
+            code: routerBasePricing.row?.__EMPTY || '-',
             productName: routerBaseLabel || 'ROUTER',
             materialTotal: routerBasePricing.materialTotal,
             laborTotal: routerBasePricing.laborTotal,
@@ -2229,7 +2263,7 @@ function MoreDetailCard(props: any) {
         if (wifi4gHub === 'yes' && routerCablePricing) {
           products.push({
             type: 'ระบบสื่อสาร',
-            code: getAccessoryProductCode(routerCablePricing.row),
+            code: routerCablePricing.row?.__EMPTY || '-',
             productName: routerCableLabel || 'สาย ROUTER',
             materialTotal: routerCablePricing.materialTotal,
             laborTotal: routerCablePricing.laborTotal,
@@ -2241,7 +2275,7 @@ function MoreDetailCard(props: any) {
         if (cctv === 'yes' && cctvBasePricing) {
           products.push({
             type: 'ระบบสื่อสาร',
-            code: getAccessoryProductCode(cctvBasePricing.row),
+            code: cctvBasePricing.row?.__EMPTY || '-',
             productName: cctvBaseLabel || 'CCTV',
             materialTotal: cctvBasePricing.materialTotal,
             laborTotal: cctvBasePricing.laborTotal,
@@ -2252,7 +2286,7 @@ function MoreDetailCard(props: any) {
         if (cctv === 'yes' && cctvCablePricing) {
           products.push({
             type: 'ระบบสื่อสาร',
-            code: getAccessoryProductCode(cctvCablePricing.row),
+            code: cctvCablePricing.row?.__EMPTY || '-',
             productName: cctvCableLabel || 'สาย CCTV',
             materialTotal: cctvCablePricing.materialTotal,
             laborTotal: cctvCablePricing.laborTotal,
@@ -2264,7 +2298,7 @@ function MoreDetailCard(props: any) {
         if (lighting === 'yes' && lightingBasePricing) {
           products.push({
             type: 'ระบบสื่อสาร',
-            code: getAccessoryProductCode(lightingBasePricing.row),
+            code: lightingBasePricing.row?.__EMPTY || '-',
             productName: lightingBaseLabel || 'หลอดไฟ',
             materialTotal: lightingBasePricing.materialTotal,
             laborTotal: lightingBasePricing.laborTotal,
@@ -2275,7 +2309,7 @@ function MoreDetailCard(props: any) {
         if (lighting === 'yes' && lightingCablePricing) {
           products.push({
             type: 'ระบบสื่อสาร',
-            code: getAccessoryProductCode(lightingCablePricing.row),
+            code: lightingCablePricing.row?.__EMPTY || '-',
             productName: lightingCableLabel || 'สายหลอดไฟ',
             materialTotal: lightingCablePricing.materialTotal,
             laborTotal: lightingCablePricing.laborTotal,
@@ -2293,7 +2327,7 @@ function MoreDetailCard(props: any) {
           if (pricing) {
             products.push({
               type: 'งานปูน',
-              code: getAccessoryProductCode(pricing.row),
+              code: pricing.row?.__EMPTY || '-',
               productName: getConcreteRowName(3) || 'ฐานปูน MDB',
               materialTotal: pricing.materialTotal,
               laborTotal: pricing.laborTotal,
@@ -2307,7 +2341,7 @@ function MoreDetailCard(props: any) {
           if (pricing) {
             products.push({
               type: 'งานปูน',
-              code: getAccessoryProductCode(pricing.row),
+              code: pricing.row?.__EMPTY || '-',
               productName: getConcreteRowName(4) || 'ฐานปูน CHARGER',
               materialTotal: pricing.materialTotal,
               laborTotal: pricing.laborTotal,
@@ -2321,7 +2355,7 @@ function MoreDetailCard(props: any) {
           if (pricing) {
             products.push({
               type: 'งานปูน',
-              code: getAccessoryProductCode(pricing.row),
+              code: pricing.row?.__EMPTY || '-',
               productName: getConcreteRowName(5) || 'พื้นปูน ลานจอดรถ',
               materialTotal: pricing.materialTotal,
               laborTotal: pricing.laborTotal,
@@ -2335,7 +2369,7 @@ function MoreDetailCard(props: any) {
           if (pricing) {
             products.push({
               type: 'งานปูน',
-              code: getAccessoryProductCode(pricing.row),
+              code: pricing.row?.__EMPTY || '-',
               productName: getConcreteRowName(6) || 'ปูนแท่นสถานี',
               materialTotal: pricing.materialTotal,
               laborTotal: pricing.laborTotal,
@@ -2706,17 +2740,92 @@ function MoreDetailCard(props: any) {
 
 
 
-  // คำนวณเมื่อมีการเปลี่ยนแปลง
+  // ฟังก์ชันคำนวณค่าเดินทางสำหรับติดตั้งอย่างเดียว
+  const calculateInstallationTravelCost = () => {
+    const distance = parseFloat(installationTravelDistance) || 0;
 
-  React.useEffect(() => {
-
-    if (travelDistance) {
-
-      calculateTravelCost();
-
+    if (!distance || distance <= 0) {
+      setInstallationTravelCost({
+        travelCost: 0,
+        accommodationAndFood: 0,
+        laborCost: 0,
+        trainingCost: 0,
+        total: 0,
+      });
+      setTravelCostResult(0);
+      return;
     }
 
-  }, [travelDistance, trainingWork, transformerSelection, trMdbSelection, mdbSelection, chargerSelection, props.numberOfChargers]);
+    const travelSheet = getExcelData('ตารางสรุปต้นทุนค่าเดินทาง');
+    if (!travelSheet || travelSheet.length === 0) {
+      console.warn('ไม่พบข้อมูลใน Sheet "ตารางสรุปต้นทุนค่าเดินทาง"');
+      setInstallationTravelCost({
+        travelCost: 0,
+        accommodationAndFood: 0,
+        laborCost: 0,
+        trainingCost: 0,
+        total: 0,
+      });
+      setTravelCostResult(0);
+      return;
+    }
+
+    const row = travelSheet.find((entry: any) => entry.__rowNum__ === 28);
+    if (!row) {
+      console.warn('ไม่พบ row 28 ใน Sheet "ตารางสรุปต้นทุนค่าเดินทาง"');
+      setInstallationTravelCost({
+        travelCost: 0,
+        accommodationAndFood: 0,
+        laborCost: 0,
+        trainingCost: 0,
+        total: 0,
+      });
+      setTravelCostResult(0);
+      return;
+    }
+
+    const travelCostPerKm = toNumber(row.__EMPTY_4);
+    const accommodationAndFood = toNumber(row.__EMPTY_6);
+    const laborCost = toNumber(row.__EMPTY_8);
+
+    const travelCost = travelCostPerKm * distance;
+    let total = travelCost + accommodationAndFood + laborCost;
+    let trainingCost = 0;
+
+    // เพิ่มงานฝึกอบรมถ้าเลือก
+    if (trainingWork === 'yes') {
+      const trainingRow = travelSheet.find((entry: any) => entry.__rowNum__ === 30);
+      if (trainingRow) {
+        const trainingMaterial = toNumber(trainingRow.__EMPTY_4);
+        const trainingLabor = toNumber(trainingRow.__EMPTY_5);
+        const trainingExtra = toNumber(trainingRow.__EMPTY_6);
+        trainingCost = (trainingMaterial * distance) + trainingLabor + trainingExtra;
+        total += trainingCost;
+      }
+    }
+
+    setInstallationTravelCost({
+      travelCost,
+      accommodationAndFood,
+      laborCost,
+      trainingCost,
+      total,
+    });
+    setTravelCostResult(total);
+  };
+
+  // คำนวณเมื่อมีการเปลี่ยนแปลง
+  React.useEffect(() => {
+    if (travelType === 'construction') {
+      if (travelDistance) {
+        calculateTravelCost();
+      } else {
+        setTravelCostResult(0);
+      }
+    } else if (travelType === 'installation') {
+      calculateInstallationTravelCost();
+    }
+  }, [travelType, travelDistance, installationTravelDistance, trainingWork, transformerSelection, trMdbSelection, mdbSelection, chargerSelection, props.numberOfChargers]);
 
 
 
@@ -3240,12 +3349,18 @@ function MoreDetailCard(props: any) {
                               <div className="text-lg font-semibold text-blue-800">
                                 ข้อมูลหม้อแปลง {transformerPrice.size} kVA
                               </div>
-                              <div className="ml-4">
-                                {openItems['transformer-info'] ? (
-                                  <ChevronUp className="h-5 w-5 text-blue-600" />
-                                ) : (
-                                  <ChevronDown className="h-5 w-5 text-blue-600" />
-                                )}
+                              <div className="flex items-center gap-4 md:gap-6">
+                                <div className="text-xs text-slate-500 md:text-sm">ราคารวม</div>
+                                <div className={`text-lg font-bold ${transformerTotals.total > 0 ? 'text-slate-800' : 'text-slate-400'}`}>
+                                  {transformerTotals.total.toLocaleString('th-TH')} บาท
+                                </div>
+                                <div className="ml-4">
+                                  {openItems['transformer-info'] ? (
+                                    <ChevronUp className="h-5 w-5 text-blue-600" />
+                                  ) : (
+                                    <ChevronDown className="h-5 w-5 text-blue-600" />
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </CollapsibleTrigger>
@@ -3536,12 +3651,18 @@ function MoreDetailCard(props: any) {
                         <CollapsibleTrigger className="w-full p-4 text-left hover:bg-blue-100 transition-colors rounded-lg">
                           <div className="flex items-center justify-between">
                             <div className="font-medium text-blue-800">{mainRow.__EMPTY || 'รายการ'}:</div>
-                            <div className="ml-4">
-                              {openItems['high-voltage-main'] ? (
-                                <ChevronUp className="h-4 w-4 text-blue-600" />
-                              ) : (
-                                <ChevronDown className="h-4 w-4 text-blue-600" />
-                              )}
+                            <div className="flex items-center gap-4 md:gap-6">
+                              <div className="text-xs text-slate-500 md:text-sm">ราคารวม</div>
+                              <div className={`text-lg font-bold ${mainTotalPrice > 0 ? 'text-slate-800' : 'text-slate-400'}`}>
+                                {mainTotalPrice.toLocaleString('th-TH')} บาท
+                              </div>
+                              <div className="ml-4">
+                                {openItems['high-voltage-main'] ? (
+                                  <ChevronUp className="h-4 w-4 text-blue-600" />
+                                ) : (
+                                  <ChevronDown className="h-4 w-4 text-blue-600" />
+                                )}
+                              </div>
                             </div>
                           </div>
                         </CollapsibleTrigger>
@@ -3592,12 +3713,18 @@ function MoreDetailCard(props: any) {
                               />
                               <span className="text-gray-500">เมตร</span>
                             </div>
-                            <div className="ml-4">
-                              {openItems['high-voltage-distance'] ? (
-                                <ChevronUp className="h-4 w-4 text-purple-600" />
-                              ) : (
-                                <ChevronDown className="h-4 w-4 text-purple-600" />
-                              )}
+                            <div className="flex items-center gap-4 md:gap-6">
+                              <div className="text-xs text-slate-500 md:text-sm">ราคารวม</div>
+                              <div className={`text-lg font-bold ${distanceTotalPrice > 0 ? 'text-slate-800' : 'text-slate-400'}`}>
+                                {distanceTotalPrice.toLocaleString('th-TH')} บาท
+                              </div>
+                              <div className="ml-4">
+                                {openItems['high-voltage-distance'] ? (
+                                  <ChevronUp className="h-4 w-4 text-purple-600" />
+                                ) : (
+                                  <ChevronDown className="h-4 w-4 text-purple-600" />
+                                )}
+                              </div>
                             </div>
                           </div>
                         </CollapsibleTrigger>
@@ -3621,12 +3748,18 @@ function MoreDetailCard(props: any) {
                           <CollapsibleTrigger className="w-full p-4 text-left hover:bg-green-100 transition-colors rounded-lg">
                             <div className="flex items-center justify-between">
                               <div className="font-medium text-green-800">{poleRow.__EMPTY || 'จำนวนเสา'}:</div>
-                              <div className="ml-4">
-                                {openItems['high-voltage-pole'] ? (
-                                  <ChevronUp className="h-4 w-4 text-green-600" />
-                                ) : (
-                                  <ChevronDown className="h-4 w-4 text-green-600" />
-                                )}
+                              <div className="flex items-center gap-4 md:gap-6">
+                                <div className="text-xs text-slate-500 md:text-sm">ราคารวม</div>
+                                <div className={`text-lg font-bold ${poleTotalPrice > 0 ? 'text-slate-800' : 'text-slate-400'}`}>
+                                  {poleTotalPrice.toLocaleString('th-TH')} บาท
+                                </div>
+                                <div className="ml-4">
+                                  {openItems['high-voltage-pole'] ? (
+                                    <ChevronUp className="h-4 w-4 text-green-600" />
+                                  ) : (
+                                    <ChevronDown className="h-4 w-4 text-green-600" />
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </CollapsibleTrigger>
@@ -3651,12 +3784,18 @@ function MoreDetailCard(props: any) {
                         <CollapsibleTrigger className="w-full p-4 text-left hover:bg-blue-100 transition-colors rounded-lg">
                           <div className="flex items-center justify-between">
                             <div className="text-lg font-semibold text-blue-800">รวมค่าใช้จ่าย</div>
-                            <div className="ml-4">
-                              {openItems['high-voltage-total'] ? (
-                                <ChevronUp className="h-4 w-4 text-blue-600" />
-                              ) : (
-                                <ChevronDown className="h-4 w-4 text-blue-600" />
-                              )}
+                            <div className="flex items-center gap-4 md:gap-6">
+                              <div className="text-xs text-slate-500 md:text-sm">ราคารวม</div>
+                              <div className={`text-lg font-bold ${totalPrice > 0 ? 'text-slate-800' : 'text-slate-400'}`}>
+                                {totalPrice.toLocaleString('th-TH')} บาท
+                              </div>
+                              <div className="ml-4">
+                                {openItems['high-voltage-total'] ? (
+                                  <ChevronUp className="h-4 w-4 text-blue-600" />
+                                ) : (
+                                  <ChevronDown className="h-4 w-4 text-blue-600" />
+                                )}
+                              </div>
                             </div>
                           </div>
                         </CollapsibleTrigger>
@@ -3889,12 +4028,18 @@ function MoreDetailCard(props: any) {
                             </div>
                           </div>
                         </div>
-                        <div className="ml-4">
-                          {openItems['installation-basic'] ? (
-                            <ChevronUp className="h-4 w-4 text-gray-600" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4 text-gray-600" />
-                          )}
+                        <div className="flex items-center gap-4 md:gap-6">
+                          <div className="text-xs text-slate-500 md:text-sm">ราคารวม</div>
+                          <div className={`text-lg font-bold ${cabinetEmptyPrice > 0 ? 'text-slate-800' : 'text-slate-400'}`}>
+                            {cabinetEmptyPrice.toLocaleString('th-TH')} บาท
+                          </div>
+                          <div className="ml-4">
+                            {openItems['installation-basic'] ? (
+                              <ChevronUp className="h-4 w-4 text-gray-600" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4 text-gray-600" />
+                            )}
+                          </div>
                         </div>
                       </div>
                     </CollapsibleTrigger>
@@ -3963,12 +4108,24 @@ function MoreDetailCard(props: any) {
                     <CollapsibleTrigger className="w-full p-4 text-left hover:bg-gray-100 transition-colors rounded-lg">
                       <div className="flex items-center justify-between">
                         <div className="text-lg font-semibold text-gray-800">ราคาสินค้า</div>
-                        <div className="ml-4">
-                          {openItems['installation-price'] ? (
-                            <ChevronUp className="h-4 w-4 text-gray-600" />
+                        <div className="flex items-center gap-4 md:gap-6">
+                          <div className="text-xs text-slate-500 md:text-sm">ราคารวม</div>
+                          {brandPrice > 0 ? (
+                            <div className="text-lg font-bold text-slate-800">
+                              {totalPrice.toLocaleString('th-TH')} บาท
+                            </div>
                           ) : (
-                            <ChevronDown className="h-4 w-4 text-gray-600" />
+                            <div className="text-sm text-yellow-600 italic">
+                              ยังไม่มีราคาสินค้า
+                            </div>
                           )}
+                          <div className="ml-4">
+                            {openItems['installation-price'] ? (
+                              <ChevronUp className="h-4 w-4 text-gray-600" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4 text-gray-600" />
+                            )}
+                          </div>
                         </div>
                       </div>
                     </CollapsibleTrigger>
@@ -3977,8 +4134,19 @@ function MoreDetailCard(props: any) {
                         {/* ราคาแบรนด์ */}
                         <div className="p-3 bg-gray-50 rounded-lg">
                           <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">
-                            codeสินค้า: {brandCode || '-'}
+                            code : {brandCode || '-'}
                           </div>
+                          {/* รายการ : หน่วย AT / หน่วย AF */}
+                          {(row.__EMPTY_3 || row.__EMPTY_5) && (
+                            <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">
+                              <span className="text-sm text-gray-600 font-medium">รายการ:</span> {
+                                [
+                                  row.__EMPTY_3 ? `${row.__EMPTY_3}AT` : '',
+                                  row.__EMPTY_5 ? `${row.__EMPTY_5}AF` : ''
+                                ].filter(Boolean).join('/') || '-'
+                              }
+                            </div>
+                          )}
                           <div className="text-lg font-semibold text-gray-800">
                             <span className="text-sm text-gray-600 font-medium">ราคา {installationLocationBrand}:</span> {brandPrice.toLocaleString('th-TH')} บาท
                           </div>
@@ -4209,12 +4377,18 @@ function MoreDetailCard(props: any) {
                     <CollapsibleTrigger className="w-full p-4 text-left hover:bg-blue-100 transition-colors rounded-lg">
                       <div className="flex items-center justify-between">
                         <div className="font-medium">ข้อมูลราคา TR to MDB Configuration:</div>
-                        <div className="ml-4">
-                          {openItems['tr-to-mdb-price'] ? (
-                            <ChevronUp className="h-4 w-4 text-blue-600" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4 text-blue-600" />
-                          )}
+                        <div className="flex items-center gap-4 md:gap-6">
+                          <div className="text-xs text-slate-500 md:text-sm">ราคารวม</div>
+                          <div className={`text-lg font-bold ${trToMdbTotals.total > 0 ? 'text-slate-800' : 'text-slate-400'}`}>
+                            {trToMdbTotals.total.toLocaleString('th-TH')} บาท
+                          </div>
+                          <div className="ml-4">
+                            {openItems['tr-to-mdb-price'] ? (
+                              <ChevronUp className="h-4 w-4 text-blue-600" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4 text-blue-600" />
+                            )}
+                          </div>
                         </div>
                       </div>
                     </CollapsibleTrigger>
@@ -4462,12 +4636,18 @@ function MoreDetailCard(props: any) {
                                   <div className="text-xs text-emerald-700 mt-0.5">ข้อมูลตู้และราคา</div>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2">
-                                {openItems['mdb-cabinet-info'] ? (
-                                  <ChevronUp className="h-5 w-5 text-emerald-600" />
-                                ) : (
-                                  <ChevronDown className="h-5 w-5 text-emerald-600" />
-                                )}
+                              <div className="flex items-center gap-4 md:gap-6">
+                                <div className="text-xs text-slate-500 md:text-sm">ราคารวม</div>
+                                <div className={`text-lg font-bold ${getMdbCabinetData.totalPrice > 0 ? 'text-slate-800' : 'text-slate-400'}`}>
+                                  {getMdbCabinetData.totalPrice.toLocaleString('th-TH')} บาท
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {openItems['mdb-cabinet-info'] ? (
+                                    <ChevronUp className="h-5 w-5 text-emerald-600" />
+                                  ) : (
+                                    <ChevronDown className="h-5 w-5 text-emerald-600" />
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </CollapsibleTrigger>
@@ -4740,18 +4920,34 @@ function MoreDetailCard(props: any) {
                             <div className="text-lg font-semibold text-blue-800">
                               ข้อมูล MCCB Main {mdbConfiguration.transformerSize} kVA
                             </div>
-                            <div className="ml-4">
-                              {openItems['mdb-mccb-info'] ? (
-                                <ChevronUp className="h-4 w-4 text-blue-600" />
-                              ) : (
-                                <ChevronDown className="h-4 w-4 text-blue-600" />
-                              )}
+                            <div className="flex items-center gap-4 md:gap-6">
+                              <div className="text-xs text-slate-500 md:text-sm">ราคารวม</div>
+                              <div className={`text-lg font-bold ${(() => {
+                                const rawPrice = mdbConfiguration.product?.MDBMPric ?? '';
+                                const normalized = parseFloat(String(rawPrice).replace(/[\,\s]/g, ''));
+                                const mainPrice = isNaN(normalized) ? 0 : normalized;
+                                return mainPrice > 0;
+                              })() ? 'text-slate-800' : 'text-slate-400'}`}>
+                                {(() => {
+                                  const rawPrice = mdbConfiguration.product?.MDBMPric ?? '';
+                                  const normalized = parseFloat(String(rawPrice).replace(/[\,\s]/g, ''));
+                                  const mainPrice = isNaN(normalized) ? 0 : normalized;
+                                  return mainPrice.toLocaleString('th-TH');
+                                })()} บาท
+                              </div>
+                              <div className="ml-4">
+                                {openItems['mdb-mccb-info'] ? (
+                                  <ChevronUp className="h-4 w-4 text-blue-600" />
+                                ) : (
+                                  <ChevronDown className="h-4 w-4 text-blue-600" />
+                                )}
+                              </div>
                             </div>
                           </div>
                         </CollapsibleTrigger>
                         <CollapsibleContent>
                           <div className="px-4 pb-4 space-y-4">
-                            {/* ประเภทและรหัสสินค้า */}
+                            {/* ประเภท รหัสสินค้า และรายการ */}
                             <div>
                               <div className="text-xs text-gray-500">
                                 ประเภท: {mdbConfiguration.mccbBrand}
@@ -4762,6 +4958,20 @@ function MoreDetailCard(props: any) {
                                   <span className="text-gray-600 ml-1">{mdbConfiguration.header.productCodeHeader}</span>
                                 </div>
                               )}
+                              {(() => {
+                                const mdbMainAt = props.mdbMainAt || '';
+                                const mdbMainAf = props.mdbMainAf || '';
+                                const listingValue = [
+                                  mdbMainAt ? `${mdbMainAt}AT` : '',
+                                  mdbMainAf ? `${mdbMainAf}AF` : ''
+                                ].filter(Boolean).join('/') || '-';
+                                return listingValue !== '-' && (
+                                  <div className="mt-2 text-sm">
+                                    <span className="font-medium text-gray-700">รายการ:</span>
+                                    <span className="text-gray-600 ml-1">{listingValue}</span>
+                                  </div>
+                                );
+                              })()}
                             </div>
 
                             {/* รวมค่าใช้จ่าย */}
@@ -4880,12 +5090,52 @@ function MoreDetailCard(props: any) {
                               <h4 className="font-semibold text-yellow-800">
                                 ข้อมูลราคา MCCB Sub ({mccbSubBrand})
                               </h4>
-                              <div className="ml-4">
-                                {openItems['mdb-mccb-sub-price'] ? (
-                                  <ChevronUp className="h-4 w-4 text-yellow-600" />
-                                ) : (
-                                  <ChevronDown className="h-4 w-4 text-yellow-600" />
-                                )}
+                              <div className="flex items-center gap-4 md:gap-6">
+                                <div className="text-xs text-slate-500 md:text-sm">ราคารวม</div>
+                                <div className={`text-lg font-bold ${(() => {
+                                  let totalSubPrice = 0;
+                                  Array.isArray(props.mdbSubs) && props.mdbSubs.forEach((val: string) => {
+                                    const mccbSubData = getMccbSubData(val, mccbSubBrand);
+                                    if (mccbSubData && Array.isArray(mccbSubData)) {
+                                      mccbSubData.forEach((item: any) => {
+                                        if (item.price && item.price !== '-') {
+                                          const priceStr = String(item.price).replace(/[,\s]/g, '');
+                                          const priceNum = parseFloat(priceStr);
+                                          if (!isNaN(priceNum)) {
+                                            totalSubPrice += priceNum;
+                                          }
+                                        }
+                                      });
+                                    }
+                                  });
+                                  return totalSubPrice;
+                                })() > 0 ? 'text-slate-800' : 'text-slate-400'}`}>
+                                  {(() => {
+                                    let totalSubPrice = 0;
+                                    Array.isArray(props.mdbSubs) && props.mdbSubs.forEach((val: string) => {
+                                      const mccbSubData = getMccbSubData(val, mccbSubBrand);
+                                      if (mccbSubData && Array.isArray(mccbSubData)) {
+                                        mccbSubData.forEach((item: any) => {
+                                          if (item.price && item.price !== '-') {
+                                            const priceStr = String(item.price).replace(/[,\s]/g, '');
+                                            const priceNum = parseFloat(priceStr);
+                                            if (!isNaN(priceNum)) {
+                                              totalSubPrice += priceNum;
+                                            }
+                                          }
+                                        });
+                                      }
+                                    });
+                                    return totalSubPrice.toLocaleString('th-TH');
+                                  })()} บาท
+                                </div>
+                                <div className="ml-4">
+                                  {openItems['mdb-mccb-sub-price'] ? (
+                                    <ChevronUp className="h-4 w-4 text-yellow-600" />
+                                  ) : (
+                                    <ChevronDown className="h-4 w-4 text-yellow-600" />
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </CollapsibleTrigger>
@@ -5533,12 +5783,18 @@ function MoreDetailCard(props: any) {
                         <CollapsibleTrigger className="w-full p-4 text-left hover:bg-green-100 transition-colors rounded-lg">
                           <div className="flex items-center justify-between">
                             <div className="text-lg font-semibold text-green-800">รวมค่าใช้จ่ายทั้งหมด</div>
-                            <div className="ml-4">
-                              {openItems['mdb-to-charger-total'] ? (
-                                <ChevronUp className="h-4 w-4 text-green-600" />
-                              ) : (
-                                <ChevronDown className="h-4 w-4 text-green-600" />
-                              )}
+                            <div className="flex items-center gap-4 md:gap-6">
+                              <div className="text-xs text-slate-500 md:text-sm">ราคารวม</div>
+                              <div className={`text-lg font-bold ${mdbToChargerTotals.total > 0 ? 'text-slate-800' : 'text-slate-400'}`}>
+                                {mdbToChargerTotals.total.toLocaleString('th-TH')} บาท
+                              </div>
+                              <div className="ml-4">
+                                {openItems['mdb-to-charger-total'] ? (
+                                  <ChevronUp className="h-4 w-4 text-green-600" />
+                                ) : (
+                                  <ChevronDown className="h-4 w-4 text-green-600" />
+                                )}
+                              </div>
                             </div>
                           </div>
                         </CollapsibleTrigger>
@@ -5856,7 +6112,8 @@ function MoreDetailCard(props: any) {
                                       <div className="px-3 pb-3">
                                         {bumperPolePricing ? (
                                           <div className="text-xs mt-2 space-y-2">
-                                            <div><span className="font-medium">codeสินค้า:</span> {getAccessoryProductCode(bumperPolePricing.row)}</div>
+                                            <div><span className="font-medium">Code:</span> {bumperPolePricing.row?.__EMPTY || '-'}</div>
+                                            <div><span className="font-medium">รายการ:</span> {getAccessoryProductCode(bumperPolePricing.row)}</div>
                                             <div className="grid grid-cols-3 gap-2">
                                               <div><span className="font-medium">ราคาค่าของ/ชิ้น:</span> {bumperPolePricing.materialUnit.toLocaleString('th-TH')} บาท</div>
                                               <div><span className="font-medium">ราคาค่าแรง/ชิ้น:</span> {bumperPolePricing.laborUnit.toLocaleString('th-TH')} บาท</div>
@@ -5951,7 +6208,8 @@ function MoreDetailCard(props: any) {
                                       <div className="px-3 pb-3">
                                         {wheelStopPricing ? (
                                           <div className="text-xs mt-2 space-y-2">
-                                            <div><span className="font-medium">codeสินค้า:</span> {getAccessoryProductCode(wheelStopPricing.row)}</div>
+                                            <div><span className="font-medium">Code:</span> {wheelStopPricing.row?.__EMPTY || '-'}</div>
+                                            <div><span className="font-medium">รายการ:</span> {getAccessoryProductCode(wheelStopPricing.row)}</div>
                                             <div className="grid grid-cols-3 gap-2">
                                               <div><span className="font-medium">ราคาค่าของ/ชิ้น:</span> {wheelStopPricing.materialUnit.toLocaleString('th-TH')} บาท</div>
                                               <div><span className="font-medium">ราคาค่าแรง/ชิ้น:</span> {wheelStopPricing.laborUnit.toLocaleString('th-TH')} บาท</div>
@@ -6046,7 +6304,8 @@ function MoreDetailCard(props: any) {
                                       <div className="px-3 pb-3">
                                         {fireExtinguisherPricing ? (
                                           <div className="text-xs mt-2 space-y-2">
-                                            <div><span className="font-medium">codeสินค้า:</span> {getAccessoryProductCode(fireExtinguisherPricing.row)}</div>
+                                            <div><span className="font-medium">Code:</span> {fireExtinguisherPricing.row?.__EMPTY || '-'}</div>
+                                            <div><span className="font-medium">รายการ:</span> {getAccessoryProductCode(fireExtinguisherPricing.row)}</div>
                                             <div className="grid grid-cols-3 gap-2">
                                               <div><span className="font-medium">ราคาค่าของ/ชิ้น:</span> {fireExtinguisherPricing.materialUnit.toLocaleString('th-TH')} บาท</div>
                                               <div><span className="font-medium">ราคาค่าแรง/ชิ้น:</span> {fireExtinguisherPricing.laborUnit.toLocaleString('th-TH')} บาท</div>
@@ -6128,7 +6387,8 @@ function MoreDetailCard(props: any) {
                                     <div className="px-3 pb-3">
                                       {signagePricing ? (
                                         <div className="text-xs mt-2 space-y-2">
-                                          <div><span className="font-medium">codeสินค้า:</span> {getAccessoryProductCode(signagePricing.row)}</div>
+                                          <div><span className="font-medium">Code:</span> {signagePricing.row?.__EMPTY || '-'}</div>
+                                          <div><span className="font-medium">รายการ:</span> {getAccessoryProductCode(signagePricing.row)}</div>
                                           <div className="grid grid-cols-3 gap-2">
                                             <div><span className="font-medium">ราคาค่าของ/ชิ้น:</span> {signagePricing.materialUnit.toLocaleString('th-TH')} บาท</div>
                                             <div><span className="font-medium">ราคาค่าแรง/ชิ้น:</span> {signagePricing.laborUnit.toLocaleString('th-TH')} บาท</div>
@@ -6319,6 +6579,7 @@ function MoreDetailCard(props: any) {
                                       <div className="px-3 pb-3">
                                         {routerBasePricing ? (
                                           <div className="text-xs mt-2 space-y-2">
+                                            <div><span className="font-medium">รหัส:</span> {routerBasePricing.row?.__EMPTY || '-'}</div>
                                             <div><span className="font-medium">รายการ:</span> {routerBaseLabel}</div>
                                             <div className="grid grid-cols-3 gap-2">
                                               <div><span className="font-medium">ราคาค่าของ:</span> {routerBasePricing.materialUnit.toLocaleString('th-TH')} บาท</div>
@@ -6373,6 +6634,7 @@ function MoreDetailCard(props: any) {
                                       <div className="px-4 pb-4 space-y-2 text-sm">
                                         {routerCablePricing ? (
                                           <>
+                                            <div><span className="font-medium">รหัส:</span> {routerCablePricing.row?.__EMPTY || '-'}</div>
                                             <div><span className="font-medium">รายการ:</span> {routerCableLabel || '-'}</div>
                                             <div><span className="font-medium">ราคาค่าของ/เมตร:</span> {routerCablePricing.materialUnit.toLocaleString('th-TH')} บาท</div>
                                             <div><span className="font-medium">ราคาค่าแรง/เมตร:</span> {routerCablePricing.laborUnit.toLocaleString('th-TH')} บาท</div>
@@ -6454,6 +6716,7 @@ function MoreDetailCard(props: any) {
                                       <div className="px-3 pb-3">
                                         {cctvBasePricing ? (
                                           <div className="text-xs mt-2 space-y-2">
+                                            <div><span className="font-medium">รหัส:</span> {cctvBasePricing.row?.__EMPTY || '-'}</div>
                                             <div><span className="font-medium">รายการ:</span> {cctvBaseLabel}</div>
                                             <div className="grid grid-cols-3 gap-2">
                                               <div><span className="font-medium">ราคาค่าของ/ชุด:</span> {cctvBasePricing.materialUnit.toLocaleString('th-TH')} บาท</div>
@@ -6508,6 +6771,7 @@ function MoreDetailCard(props: any) {
                                       <div className="px-4 pb-4 space-y-2 text-sm">
                                         {cctvCablePricing ? (
                                           <>
+                                            <div><span className="font-medium">รหัส:</span> {cctvCablePricing.row?.__EMPTY || '-'}</div>
                                             <div><span className="font-medium">รายการ:</span> {cctvCableLabel || '-'}</div>
                                             <div><span className="font-medium">ราคาค่าของ/เมตร:</span> {cctvCablePricing.materialUnit.toLocaleString('th-TH')} บาท</div>
                                             <div><span className="font-medium">ราคาค่าแรง/เมตร:</span> {cctvCablePricing.laborUnit.toLocaleString('th-TH')} บาท</div>
@@ -6590,6 +6854,7 @@ function MoreDetailCard(props: any) {
                                       <div className="px-3 pb-3">
                                         {lightingBasePricing ? (
                                           <div className="text-xs mt-2 space-y-2">
+                                            <div><span className="font-medium">รหัส:</span> {lightingBasePricing.row?.__EMPTY || '-'}</div>
                                             <div><span className="font-medium">รายการ:</span> {lightingBaseLabel}</div>
                                             <div className="grid grid-cols-3 gap-2">
                                               <div><span className="font-medium">ราคาค่าของ/ชิ้น:</span> {lightingBasePricing.materialUnit.toLocaleString('th-TH')} บาท</div>
@@ -6644,6 +6909,7 @@ function MoreDetailCard(props: any) {
                                       <div className="px-4 pb-4 space-y-2 text-sm">
                                         {lightingCablePricing ? (
                                           <>
+                                            <div><span className="font-medium">รหัส:</span> {lightingCablePricing.row?.__EMPTY || '-'}</div>
                                             <div><span className="font-medium">รายการ:</span> {lightingCableLabel || '-'}</div>
                                             <div><span className="font-medium">ราคาค่าของ/เมตร:</span> {lightingCablePricing.materialUnit.toLocaleString('th-TH')} บาท</div>
                                             <div><span className="font-medium">ราคาค่าแรง/เมตร:</span> {lightingCablePricing.laborUnit.toLocaleString('th-TH')} บาท</div>
@@ -6823,6 +7089,7 @@ function MoreDetailCard(props: any) {
                                         if (!pricing) return <div className="text-xs text-red-500 mt-2">ไม่พบข้อมูล</div>;
                                         return (
                                           <div className="text-xs space-y-2 mt-2">
+                                            <div><span className="font-medium">รหัส:</span> {pricing.row?.__EMPTY || '-'}</div>
                                             <div><span className="font-medium">รายการ:</span> {getConcreteRowName(3) || '-'}</div>
                                             <div className="grid grid-cols-3 gap-2 pt-2 border-t">
                                               <div>
@@ -6916,6 +7183,7 @@ function MoreDetailCard(props: any) {
                                         if (!pricing) return <div className="text-xs text-red-500 mt-2">ไม่พบข้อมูล</div>;
                                         return (
                                           <div className="text-xs space-y-2 mt-2">
+                                            <div><span className="font-medium">รหัส:</span> {pricing.row?.__EMPTY || '-'}</div>
                                             <div><span className="font-medium">รายการ:</span> {getConcreteRowName(4) || '-'}</div>
                                             <div className="grid grid-cols-3 gap-2 pt-2 border-t">
                                               <div>
@@ -7009,6 +7277,7 @@ function MoreDetailCard(props: any) {
                                         if (!pricing) return <div className="text-xs text-red-500 mt-2">ไม่พบข้อมูล</div>;
                                         return (
                                           <div className="text-xs space-y-2 mt-2">
+                                            <div><span className="font-medium">รหัส:</span> {pricing.row?.__EMPTY || '-'}</div>
                                             <div><span className="font-medium">รายการ:</span> {getConcreteRowName(5) || '-'}</div>
                                             <div className="grid grid-cols-3 gap-2 pt-2 border-t">
                                               <div>
@@ -7102,6 +7371,7 @@ function MoreDetailCard(props: any) {
                                         if (!pricing) return <div className="text-xs text-red-500 mt-2">ไม่พบข้อมูล</div>;
                                         return (
                                           <div className="text-xs space-y-2 mt-2">
+                                            <div><span className="font-medium">รหัส:</span> {pricing.row?.__EMPTY || '-'}</div>
                                             <div><span className="font-medium">รายการ:</span> {getConcreteRowName(6) || '-'}</div>
                                             <div className="grid grid-cols-3 gap-2 pt-2 border-t">
                                               <div>
@@ -7599,7 +7869,7 @@ function MoreDetailCard(props: any) {
                                 onCheckedChange={(checked) => { if (checked) setSignageStationType('general'); }}
                                 className="border-blue-400 data-[state=checked]:bg-blue-500"
                               />
-                              <Label htmlFor="signage-station-general" className="font-medium cursor-pointer text-sm">1. สถานีทั่วไป</Label>
+                              <Label htmlFor="signage-station-general" className="font-medium cursor-pointer text-sm">สถานีทั่วไป</Label>
                             </div>
                             <div
                               className={`flex items-center space-x-2 px-3 py-2 rounded-lg border cursor-pointer ${signageStationType === 'eic' ? 'bg-blue-100 border-blue-300' : 'hover:bg-gray-50'}`}
@@ -7611,7 +7881,7 @@ function MoreDetailCard(props: any) {
                                 onCheckedChange={(checked) => { if (checked) setSignageStationType('eic'); }}
                                 className="border-blue-400 data-[state=checked]:bg-blue-500"
                               />
-                              <Label htmlFor="signage-station-eic" className="font-medium cursor-pointer text-sm">2. สถานี EIC</Label>
+                              <Label htmlFor="signage-station-eic" className="font-medium cursor-pointer text-sm">สถานี EIC</Label>
                             </div>
                           </div>
                         </div>
@@ -7653,7 +7923,7 @@ function MoreDetailCard(props: any) {
                                           <div className="bg-white rounded-lg border border-blue-100">
                                             <CollapsibleTrigger className="w-full p-2 text-left hover:bg-blue-50 transition-colors rounded-lg">
                                               <div className="flex items-center justify-between">
-                                                <span className="text-sm font-medium">1.1 {getSignageRowName(5)}</span>
+                                                <span className="text-sm font-medium">{getSignageRowName(5)}</span>
                                                 <div className="ml-4">
                                                   {openItems['signage-general-1-1'] ? (
                                                     <ChevronUp className="h-3 w-3 text-blue-600" />
@@ -7665,6 +7935,8 @@ function MoreDetailCard(props: any) {
                                             </CollapsibleTrigger>
                                             <CollapsibleContent>
                                               <div className="px-2 pb-2 space-y-2 text-xs">
+                                                <div><span className="font-medium">รายการ:</span> {getSignageRowName(5) || '-'}</div>
+                                                <div><span className="font-medium">รหัส:</span> {pricing.row?.__EMPTY || '-'}</div>
                                                 <div className="grid grid-cols-3 gap-2 pt-2 border-t">
                                                   <div>
                                                     <div className="text-gray-600 mb-1">ราคาค่าของ:</div>
@@ -7698,7 +7970,7 @@ function MoreDetailCard(props: any) {
                                           <div className="bg-white rounded-lg border border-blue-100">
                                             <CollapsibleTrigger className="w-full p-2 text-left hover:bg-blue-50 transition-colors rounded-lg">
                                               <div className="flex items-center justify-between">
-                                                <span className="text-sm font-medium">1.2 {getSignageRowName(6)}</span>
+                                                <span className="text-sm font-medium">{getSignageRowName(6)}</span>
                                                 <div className="ml-4">
                                                   {openItems['signage-general-1-2'] ? (
                                                     <ChevronUp className="h-3 w-3 text-blue-600" />
@@ -7749,7 +8021,7 @@ function MoreDetailCard(props: any) {
                                 <CollapsibleTrigger className="w-full p-3 text-left hover:bg-blue-100 transition-colors rounded-lg">
                                   <div className="flex items-center justify-between">
                                     <span className="font-semibold text-blue-800">
-                                      2.1 {getSignageRowName(8) || 'ประเภท'}
+                                      {getSignageRowName(8) || 'ประเภท'}
                                     </span>
                                     <div className="ml-4">
                                       {openItems['signage-eic-2-1'] ? (
@@ -7776,7 +8048,7 @@ function MoreDetailCard(props: any) {
                                           <div className="bg-white rounded-lg border border-blue-100">
                                             <CollapsibleTrigger className="w-full p-2 text-left hover:bg-blue-50 transition-colors rounded-lg">
                                               <div className="flex items-center justify-between">
-                                                <span className="text-sm font-medium">2.1.{index + 1} {getSignageRowName(rowNum)}</span>
+                                                <span className="text-sm font-medium">{getSignageRowName(rowNum)}</span>
                                                 <div className="ml-4">
                                                   {openItems[itemKey] ? (
                                                     <ChevronUp className="h-3 w-3 text-blue-600" />
@@ -7788,6 +8060,8 @@ function MoreDetailCard(props: any) {
                                             </CollapsibleTrigger>
                                             <CollapsibleContent>
                                               <div className="px-2 pb-2 space-y-2 text-xs">
+                                                <div><span className="font-medium">รายการ:</span> {getSignageRowName(rowNum) || '-'}</div>
+                                                <div><span className="font-medium">รหัส:</span> {pricing.row?.__EMPTY || '-'}</div>
                                                 <div className="grid grid-cols-3 gap-2 pt-2 border-t">
                                                   <div>
                                                     <div className="text-gray-600 mb-1">ราคาค่าของ:</div>
@@ -7822,7 +8096,7 @@ function MoreDetailCard(props: any) {
                                 <CollapsibleTrigger className="w-full p-3 text-left hover:bg-blue-100 transition-colors rounded-lg">
                                   <div className="flex items-center justify-between">
                                     <span className="font-semibold text-blue-800">
-                                      2.2 {getSignageRowName(17) || 'ประเภท'}
+                                      {getSignageRowName(17) || 'ประเภท'}
                                     </span>
                                     <div className="ml-4">
                                       {openItems['signage-eic-2-2'] ? (
@@ -7849,7 +8123,7 @@ function MoreDetailCard(props: any) {
                                           <div className="bg-white rounded-lg border border-blue-100">
                                             <CollapsibleTrigger className="w-full p-2 text-left hover:bg-blue-50 transition-colors rounded-lg">
                                               <div className="flex items-center justify-between">
-                                                <span className="text-sm font-medium">2.2.{index + 1} {getSignageRowName(rowNum)}</span>
+                                                <span className="text-sm font-medium">{getSignageRowName(rowNum)}</span>
                                                 <div className="ml-4">
                                                   {openItems[itemKey] ? (
                                                     <ChevronUp className="h-3 w-3 text-blue-600" />
@@ -7861,6 +8135,8 @@ function MoreDetailCard(props: any) {
                                             </CollapsibleTrigger>
                                             <CollapsibleContent>
                                               <div className="px-2 pb-2 space-y-2 text-xs">
+                                                <div><span className="font-medium">รายการ:</span> {getSignageRowName(rowNum) || '-'}</div>
+                                                <div><span className="font-medium">รหัส:</span> {pricing.row?.__EMPTY || '-'}</div>
                                                 <div className="grid grid-cols-3 gap-2 pt-2 border-t">
                                                   <div>
                                                     <div className="text-gray-600 mb-1">ราคาค่าของ:</div>
@@ -8372,113 +8648,144 @@ function MoreDetailCard(props: any) {
 
           <div className="space-y-4">
 
-            {/* ระยะทาง */}
-
-            <div className="space-y-2">
-
-              <Label htmlFor="travelDistance" className="text-sm font-medium ">
-
-                ระยะทาง (กิโลเมตร)
-
-              </Label>
-
-              <Input
-
-                id="travelDistance"
-
-                type="number"
-
-                className="w-32 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-
-                placeholder="กรอกระยะทาง"
-
-                value={travelDistance}
-
-                onChange={(e) => setTravelDistance(e.target.value)}
-
-              />
-
-            </div>
-
-
-
-            {/* งานฝึกอบรม */}
-
+            {/* เลือกประเภทค่าเดินทาง */}
             <div className="space-y-3">
-
-              <Label className="text-sm font-medium ">
-
-                งานฝึกอบรม <span className="text-xs ">(Training Work)</span>
-
-              </Label>
-
+              <Label className="text-sm font-medium">เลือกประเภทค่าเดินทาง:</Label>
               <div className="grid grid-cols-2 gap-3">
-
                 <div
-
-                  className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-green-50 cursor-pointer ${trainingWork === 'yes' ? 'bg-green-100 border-green-300' : ''}`}
-
-                  onClick={() => setTrainingWork('yes')}
-
+                  className={`flex items-center space-x-2 p-3 rounded-lg border cursor-pointer ${travelType === 'construction' ? 'bg-blue-100 border-blue-300' : 'hover:bg-gray-50'}`}
+                  onClick={() => setTravelType('construction')}
                 >
-
                   <Checkbox
-
-                    id="training-yes"
-
-                    checked={trainingWork === 'yes'}
-
-                    onCheckedChange={(checked) => {
-
-                      if (checked) setTrainingWork('yes');
-
-                    }}
-
-                    className="text-green-500 border-green-400 data-[state=checked]:bg-green-500"
-
+                    id="travel-type-construction"
+                    checked={travelType === 'construction'}
+                    onCheckedChange={(checked) => { if (checked) setTravelType('construction'); }}
+                    className="border-blue-400 data-[state=checked]:bg-blue-500"
                   />
-
-                  <Label htmlFor="training-yes" className="font-medium cursor-pointer text-green-700">มีงานฝึกอบรม (1วัน)</Label>
-
+                  <Label htmlFor="travel-type-construction" className="font-medium cursor-pointer text-sm">1. งานสร้างสถานี</Label>
                 </div>
-
                 <div
-
-                  className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer ${trainingWork === 'no' ? 'bg-gray-100 border-gray-300' : ''}`}
-
-                  onClick={() => setTrainingWork('no')}
-
+                  className={`flex items-center space-x-2 p-3 rounded-lg border cursor-pointer ${travelType === 'installation' ? 'bg-blue-100 border-blue-300' : 'hover:bg-gray-50'}`}
+                  onClick={() => setTravelType('installation')}
                 >
-
                   <Checkbox
-
-                    id="training-no"
-
-                    checked={trainingWork === 'no'}
-
-                    onCheckedChange={(checked) => {
-
-                      if (checked) setTrainingWork('no');
-
-                    }}
-
-                    className=" border-gray-400 data-[state=checked]:bg-gray-500"
-
+                    id="travel-type-installation"
+                    checked={travelType === 'installation'}
+                    onCheckedChange={(checked) => { if (checked) setTravelType('installation'); }}
+                    className="border-blue-400 data-[state=checked]:bg-blue-500"
                   />
-
-                  <Label htmlFor="training-no" className="font-medium cursor-pointer ">ไม่มีงานฝึกอบรม</Label>
-
+                  <Label htmlFor="travel-type-installation" className="font-medium cursor-pointer text-sm">2. ติดตั้งอย่างเดียว</Label>
                 </div>
-
               </div>
-
             </div>
 
+            {/* ระยะทาง - งานสร้างสถานี */}
+            {travelType === 'construction' && (
+              <div className="space-y-2">
+                <Label htmlFor="travelDistance" className="text-sm font-medium ">
+                  ระยะทาง (กิโลเมตร)
+                </Label>
+                <Input
+                  id="travelDistance"
+                  type="number"
+                  className="w-32 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  placeholder="กรอกระยะทาง"
+                  value={travelDistance}
+                  onChange={(e) => setTravelDistance(e.target.value)}
+                />
+              </div>
+            )}
+
+            {/* ระยะทาง - ติดตั้งอย่างเดียว */}
+            {travelType === 'installation' && (
+              <div className="space-y-2">
+                <Label htmlFor="installationTravelDistance" className="text-sm font-medium ">
+                  ระยะทาง (กิโลเมตร)
+                </Label>
+                <Input
+                  id="installationTravelDistance"
+                  type="number"
+                  className="w-32 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  placeholder="กรอกระยะทาง"
+                  value={installationTravelDistance}
+                  onChange={(e) => setInstallationTravelDistance(e.target.value)}
+                />
+              </div>
+            )}
 
 
-            {/* แสดงผลการคำนวณ */}
 
-            {travelDistance && (
+            {/* งานฝึกอบรม - แสดงเมื่อเลือกงานสร้างสถานีหรือติดตั้งอย่างเดียว */}
+            {(travelType === 'construction' || travelType === 'installation') && (
+              <div className="space-y-3">
+                <Label className="text-sm font-medium ">
+                  งานฝึกอบรม <span className="text-xs ">(Training Work)</span>
+                </Label>
+
+                <div className="grid grid-cols-2 gap-3">
+
+                  <div
+
+                    className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-green-50 cursor-pointer ${trainingWork === 'yes' ? 'bg-green-100 border-green-300' : ''}`}
+
+                    onClick={() => setTrainingWork('yes')}
+
+                  >
+
+                    <Checkbox
+
+                      id="training-yes"
+
+                      checked={trainingWork === 'yes'}
+
+                      onCheckedChange={(checked) => {
+
+                        if (checked) setTrainingWork('yes');
+
+                      }}
+
+                      className="text-green-500 border-green-400 data-[state=checked]:bg-green-500"
+
+                    />
+
+                    <Label htmlFor="training-yes" className="font-medium cursor-pointer text-green-700">มีงานฝึกอบรม (1วัน)</Label>
+
+                  </div>
+
+                  <div
+
+                    className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer ${trainingWork === 'no' ? 'bg-gray-100 border-gray-300' : ''}`}
+
+                    onClick={() => setTrainingWork('no')}
+
+                  >
+
+                    <Checkbox
+
+                      id="training-no"
+
+                      checked={trainingWork === 'no'}
+
+                      onCheckedChange={(checked) => {
+
+                        if (checked) setTrainingWork('no');
+
+                      }}
+
+                      className=" border-gray-400 data-[state=checked]:bg-gray-500"
+
+                    />
+
+                    <Label htmlFor="training-no" className="font-medium cursor-pointer ">ไม่มีงานฝึกอบรม</Label>
+
+                  </div>
+
+                </div>
+              </div>
+            )}
+
+            {/* แสดงผลการคำนวณ - งานสร้างสถานี */}
+            {travelType === 'construction' && travelDistance && (
 
               <Collapsible
                 open={openItems['travel-cost']}
@@ -8523,6 +8830,104 @@ function MoreDetailCard(props: any) {
                         ))}
                         <div className="font-medium text-blue-800">
                           • ยอดรวมทั้งหมด: {travelCostResult.toLocaleString('th-TH')} บาท
+                        </div>
+                      </div>
+                    </div>
+                  </CollapsibleContent>
+                </div>
+              </Collapsible>
+            )}
+
+            {/* แสดงผลการคำนวณ - ติดตั้งอย่างเดียว */}
+            {travelType === 'installation' && installationTravelDistance && (
+              <Collapsible
+                open={openItems['travel-cost']}
+                onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'travel-cost': open }))}
+              >
+                <div className="bg-blue-50 rounded-lg border border-blue-200">
+                  <CollapsibleTrigger className="w-full p-4 text-left hover:bg-blue-100 transition-colors rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="font-medium">ค่าเดินทาง:</span>
+                        <span className="font-bold text-blue-600 text-lg ml-2">
+                          {travelCostResult.toLocaleString('th-TH')} บาท
+                        </span>
+                      </div>
+                      <div className="ml-4">
+                        {openItems['travel-cost'] ? (
+                          <ChevronUp className="h-4 w-4 text-blue-600" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4 text-blue-600" />
+                        )}
+                      </div>
+                    </div>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="px-4 pb-4 space-y-3">
+                      <div className="text-xs mt-1">
+                        ระยะทาง: {installationTravelDistance} กม.
+                        {trainingWork === 'yes' && (
+                          <span className="text-green-600 font-medium"> | + งานฝึกอบรม (1วัน)</span>
+                        )}
+                      </div>
+
+                      {/* แสดงรายละเอียดการคำนวณ */}
+                      <div className="p-3 bg-white rounded border text-sm space-y-3">
+                        <div className="font-medium text-gray-700">รายละเอียดการคำนวณ:</div>
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-600">ค่าเดินทาง:</span>
+                            <span className="font-semibold text-blue-600">
+                              {installationTravelCost.travelCost.toLocaleString('th-TH')} บาท
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-500 pl-4">
+                            (__EMPTY_4 × {installationTravelDistance} กม.)
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-600">ค่าที่พัก + อาหาร:</span>
+                            <span className="font-semibold text-blue-600">
+                              {installationTravelCost.accommodationAndFood.toLocaleString('th-TH')} บาท
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-500 pl-4">
+                            (__EMPTY_6)
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-600">ค่าแรง:</span>
+                            <span className="font-semibold text-blue-600">
+                              {installationTravelCost.laborCost.toLocaleString('th-TH')} บาท
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-500 pl-4">
+                            (__EMPTY_8)
+                          </div>
+                          {trainingWork === 'yes' && installationTravelCost.trainingCost > 0 && (
+                            <>
+                              <div className="flex justify-between items-center pt-2">
+                                <span className="text-gray-600">งานฝึกอบรม (1 วัน):</span>
+                                <span className="font-semibold text-green-600">
+                                  {installationTravelCost.trainingCost.toLocaleString('th-TH')} บาท
+                                </span>
+                              </div>
+                              <div className="text-xs text-gray-500 pl-4">
+                                (row 30: __EMPTY_4 × {installationTravelDistance} กม. + __EMPTY_5 + __EMPTY_6)
+                              </div>
+                            </>
+                          )}
+                        </div>
+                        <div className="pt-2 border-t border-gray-200">
+                          <div className="flex justify-between items-center">
+                            <span className="font-medium text-blue-800">ยอดรวมทั้งหมด:</span>
+                            <span className="text-lg font-bold text-blue-800">
+                              {travelCostResult.toLocaleString('th-TH')} บาท
+                            </span>
+                          </div>
+                          {trainingWork === 'yes' && (
+                            <div className="text-xs text-green-600 mt-1">
+                              รวมงานฝึกอบรม (1วัน)
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -8610,7 +9015,11 @@ function MoreDetailCard(props: any) {
                                       <td className="p-3 text-sm text-slate-800">{product.productName || product.code || '-'}</td>
                                       <td className="p-3 text-sm text-slate-800 text-center">{product.quantity || '-'}</td>
                                       <td className="p-3 text-sm text-slate-800">{product.distance || '-'}</td>
-                                      <td className="p-3 text-sm text-slate-800 text-right font-medium">{formatCurrency(product.materialTotal)} บาท</td>
+                                      <td className="p-3 text-sm text-slate-800 text-right font-medium">
+                                        {(product.type === 'เบรกเกอร์' || (section.key === 'mdb' && product.type === 'MDB Configuration')) && product.materialTotal === 0
+                                          ? 'ไม่มีราคา'
+                                          : `${formatCurrency(product.materialTotal)} บาท`}
+                                      </td>
                                       <td className="p-3 text-sm text-slate-800 text-right font-medium">{formatCurrency(product.laborTotal)} บาท</td>
                                       <td className="p-3 text-sm text-slate-900 text-right font-bold">{formatCurrency(product.totalPrice)} บาท</td>
                                     </tr>
@@ -8887,7 +9296,7 @@ function MoreDetailCard(props: any) {
             <div className="text-sm text-green-200/80 mb-2">ราคารวมสร้างสถานี</div>
             <div className="text-3xl font-bold tracking-tight">{formatCurrency(finalStationTotals.total)} บาท</div>
             <div className="text-xs text-green-200/60 mt-2">
-              รวมราคารวมสร้างสถานีรวมกำไร% CF% และ ค่าเดินทาง และ ค่าดำเนินการทางไฟฟ้า
+              รวมราคารวมสร้างสถานีรวมกำไร% CF% และ ค่าเดินทาง
             </div>
           </div>
         </CardContent>
