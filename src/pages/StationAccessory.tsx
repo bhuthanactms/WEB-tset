@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 
-import { Zap, Car, Paintbrush, Shield, Home, Wrench, MapPin, ChevronDown, ChevronUp, Box, Package, Settings, Ruler } from 'lucide-react'
+import { Zap, Car, Paintbrush, Shield, Home, Wrench, MapPin, ChevronDown, ChevronUp, Box, Package, Settings, Ruler, Printer } from 'lucide-react'
 
 import { useLocation } from 'react-router-dom'
 
@@ -172,6 +172,11 @@ function MoreDetailCard(props: any) {
   const [trDistance, setTrDistance] = useState(props.trDistance || '');
 
   const [trWiringGroup2, setTrWiringGroup2] = useState(props.trWiringGroup2 || '');
+
+  // State for job information form
+  const [jobName, setJobName] = useState('');
+  const [location, setLocation] = useState('');
+  const [salesPerson, setSalesPerson] = useState('');
 
 
 
@@ -1746,11 +1751,37 @@ function MoreDetailCard(props: any) {
     return { total, items, pricePerUnitTotal };
   }, [electricalOperationSheet, props.transformer, props.powerAuthority, props.chargerSummary]);
 
-  // คำนวณกำไร% และ CF% (คิดรวมค่าแรงด้วย)
+  // คำนวณ Accessories จาก Additional Features & Options
+  const accessoriesAmount = React.useMemo(() => {
+    const additionalFeaturesTotal = additionalFeaturesTotals.total;
+    const stationTotal = stationTotals.total;
+
+    let percentage = 0;
+    if (stationTotal < 1500000) {
+      // ต่ำกว่า 1.5 ล้านบาท: คูณ 7%
+      percentage = 7;
+    } else if (stationTotal >= 1500000 && stationTotal <= 3000000) {
+      // 1.5-3 ล้านบาท: คูณ 5%
+      percentage = 5;
+    } else if (stationTotal > 5000000) {
+      // มากกว่า 5 ล้านบาท: คูณ 2%
+      percentage = 2;
+    } else {
+      // 3-5 ล้านบาท: ใช้ 5% (ช่วงที่ไม่ได้ระบุชัดเจน)
+      percentage = 5;
+    }
+
+    return (additionalFeaturesTotal * percentage) / 100;
+  }, [additionalFeaturesTotals, stationTotals]);
+
+  // ต้นทุนงานเอกสาร (บังคับมี)
+  const documentCost = 3000;
+
+  // คำนวณกำไร% และ CF% (คิดรวมค่าแรงด้วย) - ไม่รวม Accessories และต้นทุนงานเอกสาร
   const profitAmount = React.useMemo(() => {
     const profit = parseFloat(profitPercent) || 0;
     if (profit < 5 || profit > 25) return 0;
-    // คิดกำไร% จากราคารวมสร้างสถานี (รวมค่าแรงด้วย)
+    // คิดกำไร% จากราคารวมสร้างสถานี (ไม่รวม Accessories และต้นทุนงานเอกสาร)
     return (stationTotals.total * profit) / 100;
   }, [profitPercent, stationTotals]);
 
@@ -1771,18 +1802,21 @@ function MoreDetailCard(props: any) {
     return stationTotalWithProfit + cfAmount;
   }, [stationTotalWithProfit, cfAmount]);
 
-  // ราคารวมสุดท้าย (รวมทุกอย่าง: กำไร%, CF%, ค่าเดินทาง) - ไม่รวมค่าดำเนินการทางไฟฟ้า (แค่แสดงไว้ให้ดู)
+  // ราคารวมสุดท้าย (รวมทุกอย่าง: กำไร%, CF%, ค่าเดินทาง, Accessories, ต้นทุนงานเอกสาร) - ไม่รวมค่าดำเนินการทางไฟฟ้า (แค่แสดงไว้ให้ดู)
+  // Accessories และต้นทุนงานเอกสารบวกสด ไม่รวมในการคำนวณกำไร% และ CF%
   const finalStationTotals = React.useMemo(() => {
     return {
       material: stationTotals.material + profitAmount + cfAmount,
       labor: stationTotals.labor + travelTotals.total,
-      total: stationTotalWithProfitAndCF + travelTotals.total, // ไม่รวมค่าดำเนินการทางไฟฟ้า
+      total: stationTotalWithProfitAndCF + travelTotals.total + accessoriesAmount + documentCost, // บวก Accessories และต้นทุนงานเอกสารสด ไม่รวมค่าดำเนินการทางไฟฟ้า
       profitAmount,
       cfAmount,
       travelTotal: travelTotals.total,
+      accessoriesAmount,
+      documentCost,
       electricalOperationTotal: electricalOperationTotals.pricePerUnitTotal, // เก็บไว้เพื่อแสดง แต่ไม่รวมใน total
     };
-  }, [stationTotals, profitAmount, cfAmount, stationTotalWithProfitAndCF, travelTotals, electricalOperationTotals]);
+  }, [stationTotals, profitAmount, cfAmount, stationTotalWithProfitAndCF, travelTotals, accessoriesAmount, documentCost, electricalOperationTotals]);
 
   // ฟังก์ชันดึงรายละเอียดสินค้าสำหรับแต่ละหัวข้อ
   const getSectionProductDetails = React.useCallback((sectionKey: string) => {
@@ -9061,6 +9095,35 @@ function MoreDetailCard(props: any) {
 
           <Separator />
 
+          {/* Accessories และต้นทุนงานเอกสาร */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div className="p-5 rounded-xl bg-gradient-to-br from-purple-100 via-white to-purple-50 border border-purple-200 text-purple-800 shadow-sm">
+              <div className="text-sm text-purple-600 mb-2 font-semibold">Accessories</div>
+              <div className="text-2xl font-semibold">{formatCurrency(accessoriesAmount)} บาท</div>
+              <div className="text-xs text-purple-500 mt-2">
+                {(() => {
+                  const stationTotal = stationTotals.total;
+                  let percentage = 0;
+                  if (stationTotal < 1500000) {
+                    percentage = 7;
+                  } else if (stationTotal >= 1500000 && stationTotal <= 3000000) {
+                    percentage = 5;
+                  } else if (stationTotal > 5000000) {
+                    percentage = 2;
+                  } else {
+                    percentage = 5;
+                  }
+                  return `${percentage}% ของ Additional Features & Options (${formatCurrency(additionalFeaturesTotals.total)} บาท)`;
+                })()}
+              </div>
+            </div>
+            <div className="p-5 rounded-xl bg-gradient-to-br from-orange-100 via-white to-orange-50 border border-orange-200 text-orange-800 shadow-sm">
+              <div className="text-sm text-orange-600 mb-2 font-semibold">ต้นทุนงานเอกสาร</div>
+              <div className="text-2xl font-semibold">{formatCurrency(documentCost)} บาท</div>
+              <div className="text-xs text-orange-500 mt-2">บังคับมี</div>
+            </div>
+          </div>
+
           {/* บรรทัดแรก: ค่าของ, ค่าแรง, ราคารวม */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="p-5 rounded-xl bg-gradient-to-br from-slate-100 via-white to-slate-50 border border-slate-200 text-slate-800 shadow-sm">
@@ -9296,7 +9359,68 @@ function MoreDetailCard(props: any) {
             <div className="text-sm text-green-200/80 mb-2">ราคารวมสร้างสถานี</div>
             <div className="text-3xl font-bold tracking-tight">{formatCurrency(finalStationTotals.total)} บาท</div>
             <div className="text-xs text-green-200/60 mt-2">
-              รวมราคารวมสร้างสถานีรวมกำไร% CF% และ ค่าเดินทาง
+              รวมราคารวมสร้างสถานีรวมกำไร% CF% และ ค่าเดินทาง (ไม่รวมค่าดำเนินการทางไฟฟ้า)
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* ฟอร์มข้อมูลงาน */}
+          <div className="p-5 rounded-xl bg-gradient-to-br from-slate-50 via-white to-slate-50 border border-slate-200 shadow-sm">
+            <div className="text-lg font-semibold text-slate-800 mb-4">ข้อมูลงาน</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="job-name" className="text-sm font-semibold text-slate-700 mb-2 block">
+                  ชื่องาน
+                </Label>
+                <Input
+                  id="job-name"
+                  type="text"
+                  value={jobName}
+                  onChange={(e) => setJobName(e.target.value)}
+                  placeholder="กรอกชื่องาน"
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <Label htmlFor="location" className="text-sm font-semibold text-slate-700 mb-2 block">
+                  สถานที่
+                </Label>
+                <Input
+                  id="location"
+                  type="text"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  placeholder="กรอกสถานที่"
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <Label htmlFor="sales-person" className="text-sm font-semibold text-slate-700 mb-2 block">
+                  พนง.ขาย
+                </Label>
+                <Input
+                  id="sales-person"
+                  type="text"
+                  value={salesPerson}
+                  onChange={(e) => setSalesPerson(e.target.value)}
+                  placeholder="กรอกชื่อพนักงานขาย"
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-semibold text-slate-700 mb-2 block">
+                  วันที่
+                </Label>
+                <div className="px-3 py-2 bg-slate-100 border border-slate-300 rounded-md text-slate-800">
+                  {new Date().toLocaleDateString('th-TH', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    weekday: 'long'
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         </CardContent>
@@ -10301,6 +10425,19 @@ function StationAccessory() {
           getMDBConfiguration={getMDBConfiguration}
         />
       </div>
+
+      {/* ปุ่ม Print มุมล่างขวา */}
+      <Button
+        onClick={() => {
+          // TODO: Implement print functionality
+          window.print();
+        }}
+        className="fixed bottom-6 right-6 z-50 shadow-lg hover:shadow-xl transition-all duration-200 bg-blue-600 hover:bg-blue-700 text-white rounded-full p-4 h-auto w-auto"
+        size="lg"
+      >
+        <Printer className="h-5 w-5 mr-2" />
+        <span className="hidden sm:inline">Print</span>
+      </Button>
     </div>
   )
 }
