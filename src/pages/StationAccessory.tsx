@@ -20,6 +20,11 @@ import { Separator } from '@/components/ui/separator'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import axios from 'axios'
 import * as XLSX from 'xlsx'
+import jsPDF from 'jspdf';
+// Import autotable as side-effect BEFORE importing your generator
+import 'jspdf-autotable';
+import {json_data} from '../utils/pdf-generate-example.js'
+import {createCostPDF} from '../utils/pdf-generator-custom.js'
 
 
 
@@ -10430,7 +10435,8 @@ function StationAccessory() {
       <Button
         onClick={() => {
           // TODO: Implement print functionality
-          window.print();
+          // window.print();
+          createCostPDF(json_data);
         }}
         className="fixed bottom-6 right-6 z-50 shadow-lg hover:shadow-xl transition-all duration-200 bg-blue-600 hover:bg-blue-700 text-white rounded-full p-4 h-auto w-auto"
         size="lg"
