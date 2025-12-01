@@ -23,8 +23,8 @@ import * as XLSX from 'xlsx'
 import jsPDF from 'jspdf';
 // Import autotable as side-effect BEFORE importing your generator
 import 'jspdf-autotable';
-import {json_data} from '../utils/pdf-generate-example.js'
-import {createCostPDF} from '../utils/pdf-generator-custom.js'
+import { getJsonData } from '../utils/pdf-generate-example.js'
+import { createCostPDF } from '../utils/pdf-generator-custom.js'
 
 
 
@@ -2075,7 +2075,7 @@ function MoreDetailCard(props: any) {
               // 1. ตู้ Disconnecter
               products.push({
                 type: 'ตู้ Disconnecter',
-                code: row.__EMPTY_9 || '', // ตู้เปล่า
+                code: row.__EMPTY_18 || '', // CODEตู้เปล่า
                 productName: cabinetSize || '-', // ขนาดตู้ (กว้าง ยาว ลึก)
                 materialTotal: cabinetEmptyPrice, // ราคาตู้เปล่า
                 laborTotal: 0, // ไม่มีค่าแรง
@@ -2187,7 +2187,7 @@ function MoreDetailCard(props: any) {
                   products.push({
                     type: 'MCCB Sub',
                     code: item.model || '',
-                    productName: `MCCB SUB ${item.value || val}`, // MCCB SUB C (ค่า A)
+                    productName: `${mccbSubBrand} MCCB SUB ${item.value || val}`, // เพิ่มยี่ห้อด้านหน้า เช่น "ABB MCCB SUB 100 A"
                     materialTotal: parsePrice(item.price),
                     laborTotal: 0,
                     totalPrice: parsePrice(item.price),
@@ -2202,14 +2202,25 @@ function MoreDetailCard(props: any) {
         // 5.3 ตู้ MDB
         if (getMdbCabinetData) {
           const cabinetSizeText = getMdbCabinetData.cabinetSize || '-';
-          const priceText = `(ราคาตู้เปล่า + ราคาGROUND: ${(getMdbCabinetData.emptyCabinetPrice + getMdbCabinetData.groundPrice).toLocaleString('th-TH')} บาท)`;
+          // แถวแรก: ตู้ MDB (MDB + busbar)
           products.push({
             type: 'ตู้ MDB',
             code: 'ตู้ MDB',
-            productName: `${cabinetSizeText} ${priceText}`, // ขนาดตู้ (ต่อท้าย (ราคาตู้เปล่า + ราคาGROUND))
-            materialTotal: getMdbCabinetData.materialPrice,
-            laborTotal: getMdbCabinetData.laborPrice,
-            totalPrice: getMdbCabinetData.totalPrice,
+            productName: `${cabinetSizeText} (MDB + busbar)`, // ขนาดตู้ (MDB + busbar)
+            materialTotal: getMdbCabinetData.emptyCabinetPrice, // ราคาตู้(MDB + busbar)
+            laborTotal: 0,
+            totalPrice: getMdbCabinetData.emptyCabinetPrice,
+            quantity: '1',
+          });
+
+          // แถวที่สอง: ค่าGround
+          products.push({
+            type: 'ตู้ MDB',
+            code: 'ตู้ MDB',
+            productName: 'ค่าGround(MDB)',
+            materialTotal: getMdbCabinetData.groundPrice, // ราคาGround
+            laborTotal: 0,
+            totalPrice: getMdbCabinetData.groundPrice,
             quantity: '1',
           });
         }
@@ -2674,6 +2685,174 @@ function MoreDetailCard(props: any) {
     const nonZeroSections = enriched.filter(section => section.hasValue);
     return nonZeroSections.length > 0 ? nonZeroSections : enriched;
   }, [stationCostSections]);
+
+  // ฟังก์ชันสร้างข้อมูลสำหรับ PDF - ดึงข้อมูลจากตารางที่แสดงจริงๆ
+  const generatePDFData = React.useCallback(() => {
+    // Format date
+    const currentDate = new Date();
+    const formattedDate = currentDate.toLocaleDateString('th-TH', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+
+    // Header - ดึงจากข้อมูลงาน
+    const header = {
+      prefix: "1.1",
+      data1: jobName || "โครงการติดตั้งระบบไฟฟ้า",
+      data2: location || "กรุงเทพฯ",
+      data3: salesPerson || "คุณสมชาย ใจดี",
+      data4: formattedDate
+    };
+
+    // Helper function แปลง product เป็น row format
+    const productToRow = (product: any) => {
+      // แปลง distance จาก string เป็น number (ถ้ามี)
+      let rangeValue: string | number = '-';
+      if (product.distance && product.distance !== '-') {
+        const distanceMatch = product.distance.toString().match(/[\d.]+/);
+        if (distanceMatch) {
+          rangeValue = parseFloat(distanceMatch[0]) || '-';
+        }
+      }
+
+      return {
+        code: product.code || '-',
+        type: product.type || 'วัสดุ',
+        name: product.productName || product.code || '-',
+        amount: parseFloat(product.quantity || '1') || 1,
+        range: rangeValue,
+        parts_total: product.materialTotal || 0,
+        wage_total: product.laborTotal || 0,
+        total: product.totalPrice || 0
+      };
+    };
+
+    // 1. ระบบแรงสูง: รวม transformer (section 1) และ high-voltage (section 2)
+    const highVoltageRows: any[] = [];
+
+    // Section 1: Transformer
+    const transformerSection = stationCostSections.find(s => s.key === 'transformer');
+    if (transformerSection && transformerSection.products) {
+      transformerSection.products.forEach(product => {
+        highVoltageRows.push(productToRow(product));
+      });
+    }
+
+    // Section 2: High voltage
+    const highVoltageSection = stationCostSections.find(s => s.key === 'high-voltage');
+    if (highVoltageSection && highVoltageSection.products) {
+      highVoltageSection.products.forEach(product => {
+        highVoltageRows.push(productToRow(product));
+      });
+    }
+
+    // 2. ระบบแรงต่ำ: sections 3-6 (installation, tr-to-mdb, mdb, mdb-to-charger)
+    const lowVoltageRows: any[] = [];
+    const lowVoltageSectionKeys = ['installation', 'tr-to-mdb', 'mdb', 'mdb-to-charger'];
+    lowVoltageSectionKeys.forEach(sectionKey => {
+      const section = stationCostSections.find(s => s.key === sectionKey);
+      if (section && section.products) {
+        section.products.forEach(product => {
+          lowVoltageRows.push(productToRow(product));
+        });
+      }
+    });
+
+    // 3. อุปกรณ์ และ เงื่อนไขเพิ่มเติม: section 7 (additional)
+    const additionalRows: any[] = [];
+    const additionalSection = stationCostSections.find(s => s.key === 'additional');
+    if (additionalSection && additionalSection.products) {
+      additionalSection.products.forEach(product => {
+        additionalRows.push(productToRow(product));
+      });
+    }
+
+    // 4. สรุปต้นทุน
+    const costSummary = {
+      part_price: stationTotals.material,
+      wage_price: stationTotals.labor
+    };
+
+    // 5. ค่าเดินทาง
+    const travelRows: any[] = [];
+    if (travelTotals.total > 0 && travelDistance) {
+      travelRows.push({
+        distance: `${travelDistance} กม.`,
+        travel_cost: 0, // ต้องดึงจาก travelTotals breakdown ถ้ามี
+        travel_between_accommodation: 0,
+        accommodation_food: 0,
+        wage: travelTotals.total,
+        total: travelTotals.total
+      });
+    }
+
+    // Summary
+    const summary = {
+      workers: 0, // ไม่มีข้อมูล
+      work_days: 0, // ไม่มีข้อมูล
+      total_labor: 0, // ไม่มีข้อมูล
+      trucks: 0, // ไม่มีข้อมูล
+      truck_days: 0, // ไม่มีข้อมูล
+      total_truck_trips: 0, // ไม่มีข้อมูล
+      cars: 0, // ไม่มีข้อมูล
+      car_days: 0, // ไม่มีข้อมูล
+      total_car_trips: 0, // ไม่มีข้อมูล
+      hiab: 0, // ไม่มีข้อมูล
+      hiab_days: 0, // ไม่มีข้อมูล
+      total_hiab_trips: 0, // ไม่มีข้อมูล
+      total_cost: stationTotals.total.toLocaleString('th-TH'),
+      travel_cost: travelTotals.total.toLocaleString('th-TH'),
+      profit: parseFloat(profitPercent) || 0,
+      profit_amount: profitAmount.toLocaleString('th-TH'),
+      cost_and_profit: stationTotalWithProfit.toLocaleString('th-TH'),
+      commission: parseFloat(cfPercent) || 0,
+      commission_amount: cfAmount.toLocaleString('th-TH')
+    };
+
+    return {
+      header,
+      tables: [
+        {
+          tablename: "1.ระบบแรงสูง",
+          type: "default",
+          rows: highVoltageRows
+        },
+        {
+          tablename: "2.ระบบแรงต่ำ",
+          type: "default",
+          rows: lowVoltageRows
+        },
+        {
+          tablename: "3.อุปกรณ์ และ เงื่อนไขเพิ่มเติม",
+          type: "default",
+          rows: additionalRows
+        },
+        {
+          tablename: "4.สรุปต้นทุน",
+          type: "cost",
+          rows: costSummary
+        },
+        {
+          tablename: "5.ค่าเดินทาง",
+          type: "distance",
+          rows: travelRows
+        }
+      ],
+      summary
+    };
+  }, [
+    jobName, location, salesPerson,
+    stationTotals, profitPercent, profitAmount, cfPercent, cfAmount,
+    stationTotalWithProfit, travelTotals, travelDistance,
+    stationCostSections
+  ]);
+
+  // Export function สำหรับใช้ใน PDF generator
+  React.useEffect(() => {
+    // เก็บฟังก์ชันไว้ใน window object เพื่อให้ PDF generator เรียกใช้ได้
+    (window as any).getStationPDFData = generatePDFData;
+  }, [generatePDFData]);
 
   // State สำหรับเก็บสถานะการเปิด/ปิดของแต่ละส่วนใน Additional Features & Options
   const [openSections, setOpenSections] = useState<{ [key: string]: boolean }>({
@@ -4025,7 +4204,7 @@ function MoreDetailCard(props: any) {
             }
 
             // ดึงข้อมูลตามที่ระบุ
-            const cabinetEmpty = row.__EMPTY_9 || '-';
+            const cabinetEmpty = row.__EMPTY_18 || '-';
             // สำหรับขนาดตู้ ให้รวม "x" ด้วย (ไม่ filter ออก)
             const cabinetSize = [
               row.__EMPTY_13,
@@ -4058,7 +4237,7 @@ function MoreDetailCard(props: any) {
                         <div className="grid grid-cols-2 gap-4 w-full">
                           <div>
                             <div className="font-semibold text-gray-900">
-                              <span className="text-sm text-gray-600 font-medium">ตู้เปล่า:</span> {cabinetEmpty}
+                              <span className="text-sm text-gray-600 font-medium">CODEตู้เปล่า:</span> {cabinetEmpty}
                             </div>
                           </div>
                           <div>
@@ -10434,9 +10613,10 @@ function StationAccessory() {
       {/* ปุ่ม Print มุมล่างขวา */}
       <Button
         onClick={() => {
-          // TODO: Implement print functionality
-          // window.print();
-          createCostPDF(json_data);
+          // ดึงข้อมูลล่าสุดจาก StationAccessory component
+          const pdfData = getJsonData();
+          console.log('PDF Data:', pdfData); // Debug log
+          createCostPDF(pdfData);
         }}
         className="fixed bottom-6 right-6 z-50 shadow-lg hover:shadow-xl transition-all duration-200 bg-blue-600 hover:bg-blue-700 text-white rounded-full p-4 h-auto w-auto"
         size="lg"
