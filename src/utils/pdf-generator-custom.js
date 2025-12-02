@@ -55,20 +55,108 @@ export function createCostPDF(jsonData) {
   // Set font for Thai support
   doc.setFont('Sarabun');
 
+  // ปรับ encoding เพื่อรองรับภาษาไทยและสระให้ถูกต้อง
+  // jsPDF ควรจะรองรับ UTF-8 โดยอัตโนมัติ แต่เราต้องแน่ใจว่า font รองรับ
+
+  // Helper function to draw dashed underline
+  const drawDashedUnderline = (x, y, text, fontSize) => {
+    const textWidth = doc.getTextWidth(text);
+    const dashLength = 1;
+    const gapLength = 1;
+    let dashX = x;
+    doc.setLineWidth(0.1);
+    doc.setDrawColor(0, 0, 0);
+    while (dashX < x + textWidth) {
+      doc.line(dashX, y + 1, Math.min(dashX + dashLength, x + textWidth), y + 1);
+      dashX += dashLength + gapLength;
+    }
+  };
+
   // Add custom header text
-  doc.setFontSize(7);
+  doc.setFontSize(11); // เพิ่ม 4 size จาก 7
+  doc.setFont('Sarabun', 'bold'); // ทำตัวหนา
   doc.setTextColor(40);
 
   // Build header text with data interpolation
-  const headerText = buildHeaderText(header);
+  const headerResult = buildHeaderText(header);
+  const headerText = headerResult.text || headerResult;
+  const headerValues = headerResult.values || [];
 
   // Add header (wrap to multiple lines for portrait) - A4 portrait width ~210mm, with margins ~180mm
   const headerLines = doc.splitTextToSize(headerText, 180);
-  doc.text(headerLines, 14, 15);
+
+  // วาด header พร้อมเส้นประใต้ค่าที่มี
+  let headerY = 15;
+  headerLines.forEach((line, lineIndex) => {
+    let lineX = 14;
+    let remainingLine = line;
+
+    // แบ่งบรรทัดออกเป็นส่วนๆ เพื่อวาดเส้นประใต้ค่าที่มี
+    if (headerValues && headerValues.length > 0) {
+      // หาตำแหน่งของแต่ละค่าในบรรทัด
+      const valuePositions = [];
+      headerValues.forEach((value) => {
+        if (value.hasValue && remainingLine.includes(value.text)) {
+          const valueIndex = remainingLine.indexOf(value.text);
+          if (valueIndex !== -1) {
+            valuePositions.push({
+              index: valueIndex,
+              value: value.text,
+              hasValue: true
+            });
+          }
+        }
+      });
+
+      // เรียงลำดับตามตำแหน่ง
+      valuePositions.sort((a, b) => a.index - b.index);
+
+      // วาดข้อความทีละส่วน
+      let currentIndex = 0;
+      valuePositions.forEach((pos) => {
+        // วาดข้อความก่อนค่า
+        if (pos.index > currentIndex) {
+          const beforeText = remainingLine.substring(currentIndex, pos.index);
+          doc.setFontSize(11);
+          doc.setFont('Sarabun', 'bold');
+          doc.text(beforeText, lineX, headerY);
+          lineX += doc.getTextWidth(beforeText);
+        }
+
+        // วาดค่าพร้อมเส้นประ
+        doc.setFontSize(11);
+        doc.setFont('Sarabun', 'bold');
+        doc.text(pos.value, lineX, headerY);
+        drawDashedUnderline(lineX, headerY, pos.value, 11);
+        lineX += doc.getTextWidth(pos.value);
+
+        currentIndex = pos.index + pos.value.length;
+      });
+
+      // วาดข้อความที่เหลือ
+      if (currentIndex < remainingLine.length) {
+        const afterText = remainingLine.substring(currentIndex);
+        doc.setFontSize(11);
+        doc.setFont('Sarabun', 'bold');
+        doc.text(afterText, lineX, headerY);
+      }
+    } else {
+      // ถ้าไม่มีค่าให้วาดปกติ
+      doc.text(line, lineX, headerY);
+    }
+
+    headerY += 7;
+  });
+
+  // วาดเส้นขีดปิดใต้ header เพื่อแบ่งส่วน
+  const headerHeight = headerLines.length * 7; // Approximate line height
+  const separatorY = 15 + headerHeight + 0.5; // วางเส้นใต้ header ห่าง 0.5mm
+  doc.setLineWidth(0.5);
+  doc.setDrawColor(0, 0, 0);
+  doc.line(14, separatorY, 196, separatorY); // เส้นเต็มความกว้าง (210mm - 14mm margin)
 
   // Calculate starting Y position after header
-  const headerHeight = headerLines.length * 7; // Approximate line height
-  let currentY = 15 + headerHeight + 5;
+  let currentY = separatorY + 5; // ห่างจากเส้นขีด 5mm
 
   // Column definitions (same for all tables)
   const columns = [
@@ -89,13 +177,13 @@ export function createCostPDF(jsonData) {
     // Track starting page for this table
     const tableStartPage = doc.internal.getNumberOfPages();
 
-    // Add table name/title for first page
+    // Add table name/title for first page - วางใกล้ตารางมากขึ้น
     doc.setFontSize(9);
     doc.setTextColor(40);
     doc.setFont('Sarabun', 'bold');
     doc.text(tablename || `Table ${index + 1}`, 14, currentY);
 
-    currentY += 5;
+    currentY += 2; // ลดระยะห่างจาก 5mm เป็น 2mm เพื่อให้ใกล้ตารางมากขึ้น
 
     // Handle different table types
     if (type === 'cost') {
@@ -233,11 +321,14 @@ export function createCostPDF(jsonData) {
           // Show table name on continuation pages (pages after the first page of this table)
           const currentPageNum = data.pageNumber;
           if (currentPageNum > tableStartPage) {
-            const yPos = data.settings.margin.top || 20;
+            // เพิ่มระยะห่างจาก margin.top เพื่อไม่ให้ทับกับตาราง
+            const yPos = (data.settings.margin.top || 20) + 5;
             doc.setFontSize(9);
             doc.setTextColor(40);
             doc.setFont('Sarabun', 'bold');
-            doc.text(tablename || `Table ${index + 1}`, 14, yPos);
+            // ใช้ doc.text แบบที่รองรับภาษาไทยดีกว่า
+            const tableNameText = tablename || `Table ${index + 1}`;
+            doc.text(tableNameText, 14, yPos);
           }
         },
         theme: 'grid',
@@ -315,116 +406,183 @@ export function createCostPDF(jsonData) {
     }
 
     // Add summary title
-    doc.setFontSize(9);
+    doc.setFontSize(12); // เพิ่ม 3 size จาก 9
     doc.setFont('Sarabun', 'bold');
     doc.text('สรุป', 14, currentY);
     currentY += 10;
 
     const pageWidth = doc.internal.pageSize.getWidth();
     const leftX = 14;
-    const leftColumnWidth = (pageWidth - 28) * 0.65; // 65% of usable width
-    const rightX = leftX + leftColumnWidth + 5; // Right column starts after 70% + spacing
+    const leftColumnWidth = (pageWidth - 28) * 0.5; // 50% of usable width
+    const rightX = leftX + leftColumnWidth + 10; // Right column starts after 50% + spacing
     const startY = currentY;
 
-    // Left column - Labor and vehicles
-    doc.setFontSize(7);
+    doc.setFontSize(10); // เพิ่ม 3 size จาก 7
     doc.setFont('Sarabun', 'normal');
-
-    let leftY = startY;
     const lineHeight = 7;
 
-    // Define tab positions for alignment (within 60% width)
-    const col1 = leftX;           // Label start
-    const col2 = leftX + 35;      // First number
-    const col3 = leftX + 45;      // "คน" position
-    const col4 = leftX + 50;      // "ทำงาน" text
-    const col5 = leftX + 70;      // Second number (days)
-    const col6 = leftX + 75;      // "วัน" position
-    const col7 = leftX + 80;     // "รวม" text
-    const col8 = leftX + 90;     // Final number
+    // Helper function to draw dashed line under text
+    const drawDashedUnderline = (x, y, text, fontSize) => {
+      const textWidth = doc.getTextWidth(text);
+      const dashLength = 1;
+      const gapLength = 1;
+      let currentX = x;
+      doc.setLineWidth(0.1);
+      doc.setDrawColor(0, 0, 0);
+      while (currentX < x + textWidth) {
+        doc.line(currentX, y + 1, Math.min(currentX + dashLength, x + textWidth), y + 1);
+        currentX += dashLength + gapLength;
+      }
+    };
 
-    // Row 1: Workers - ใช้คนทำงาน 10 คน ทำงาน 5 วัน รวม 50 แรงงาน
-    doc.text('ใช้คนทำงาน', col1, leftY);
-    doc.text(String(summary.workers || '___'), col2, leftY, { align: 'right' });
-    doc.text('คน', col3, leftY);
-    doc.text('ทำงาน', col4, leftY);
-    doc.text(String(summary.work_days || '___'), col5, leftY, { align: 'right' });
-    doc.text('วัน', col6, leftY);
-    doc.text('รวม', col7, leftY);
-    doc.text(String(summary.total_labor || '___'), col8, leftY);
-    doc.text('แรงงาน', col8 + 10, leftY);
+    // Left column
+    let leftY = startY;
+    const valueFontSize = 10; // เพิ่ม 3 size จาก 7
+
+    // ACCESSORIES = x% = (จำนวนเงิน (กำไร%)) × x% ของ Additional Features & Options = ค่า Accessories
+    const additionalFeaturesTotal = summary.additional_features_total || 0;
+    const accessoriesText = `ACCESSORIES = ${summary.accessories_percent || 0}% = ${formatCurrency(additionalFeaturesTotal)} × ${summary.accessories_percent || 0}% = `;
+    const accessoriesValue = formatCurrency(summary.accessories_amount || 0);
+    doc.text(accessoriesText, leftX, leftY);
+    const accessoriesValueX = leftX + doc.getTextWidth(accessoriesText);
+    doc.setFontSize(valueFontSize);
+    doc.text(accessoriesValue, accessoriesValueX, leftY);
+    drawDashedUnderline(accessoriesValueX, leftY, accessoriesValue, valueFontSize);
+    doc.setFontSize(10); // เพิ่ม 3 size จาก 7
     leftY += lineHeight;
 
-    // Row 2: Trucks - ใช้รถยนต์บรรทุก 2 คัน ทำงาน 3 วัน รวม 6 เที่ยว
-    doc.text('ใช้รถยนต์บรรทุก', col1, leftY);
-    doc.text(String(summary.trucks || '___'), col2, leftY, { align: 'right' });
-    doc.text('คัน', col3, leftY);
-    doc.text('ทำงาน', col4, leftY);
-    doc.text(String(summary.truck_days || '___'), col5, leftY, { align: 'right' });
-    doc.text('วัน', col6, leftY);
-    doc.text('รวม', col7, leftY);
-    doc.text(String(summary.total_truck_trips || '___'), col8, leftY);
-    doc.text('เที่ยว', col8 + 10, leftY);
+    // ต้นทุนงานเอกสาร
+    const documentText = `ต้นทุนงานเอกสาร = `;
+    const documentValue = formatCurrency(summary.document_cost || 0);
+    doc.text(documentText, leftX, leftY);
+    const documentValueX = leftX + doc.getTextWidth(documentText);
+    doc.setFontSize(valueFontSize);
+    doc.text(documentValue, documentValueX, leftY);
+    drawDashedUnderline(documentValueX, leftY, documentValue, valueFontSize);
+    doc.setFontSize(10); // เพิ่ม 3 size จาก 7
     leftY += lineHeight;
 
-    // Row 3: Cars - นั่ง 1 คัน ทำงาน 5 วัน รวม 5 เที่ยว
-    doc.text('นั่ง', col1, leftY);
-    doc.text(String(summary.cars || '___'), col2, leftY, { align: 'right' });
-    doc.text('คัน', col3, leftY);
-    doc.text('ทำงาน', col4, leftY);
-    doc.text(String(summary.car_days || '___'), col5, leftY, { align: 'right' });
-    doc.text('วัน', col6, leftY);
-    doc.text('รวม', col7, leftY);
-    doc.text(String(summary.total_car_trips || '___'), col8, leftY);
-    doc.text('เที่ยว', col8 + 10, leftY);
+    // ค่าเดินทาง = ค่าเดินทาง: + ค่าแรง = ค่าแรง:
+    const travelText1 = `ค่าเดินทาง = `;
+    const travelValue1 = formatCurrency(summary.travel_cost || 0);
+    const travelText2 = ` + ค่าแรง = `;
+    const travelValue2 = formatCurrency(summary.travel_labor || 0);
+    doc.text(travelText1, leftX, leftY);
+    let currentX = leftX + doc.getTextWidth(travelText1);
+    doc.setFontSize(valueFontSize);
+    doc.text(travelValue1, currentX, leftY);
+    drawDashedUnderline(currentX, leftY, travelValue1, valueFontSize);
+    doc.setFontSize(10); // เพิ่ม 3 size จาก 7
+    currentX += doc.getTextWidth(travelValue1);
+    doc.text(travelText2, currentX, leftY);
+    currentX += doc.getTextWidth(travelText2);
+    doc.setFontSize(valueFontSize);
+    doc.text(travelValue2, currentX, leftY);
+    drawDashedUnderline(currentX, leftY, travelValue2, valueFontSize);
+    doc.setFontSize(10); // เพิ่ม 3 size จาก 7
     leftY += lineHeight;
 
-    // Row 4: Hiab - เฮี๊ยบ 1 คัน ทำงาน 2 วัน รวม 2 เที่ยว
-    doc.text('เฮี๊ยบ', col1, leftY);
-    doc.text(String(summary.hiab || '___'), col2, leftY, { align: 'right' });
-    doc.text('คัน', col3, leftY);
-    doc.text('ทำงาน', col4, leftY);
-    doc.text(String(summary.hiab_days || '___'), col5, leftY, { align: 'right' });
-    doc.text('วัน', col6, leftY);
-    doc.text('รวม', col7, leftY);
-    doc.text(String(summary.total_hiab_trips || '___'), col8, leftY);
-    doc.text('เที่ยว', col8 + 10, leftY);
+    // + ค่าที่พัก = ค่าที่พัก + อาหาร: + ค่าเดินทางระหว่างที่พัก = ค่าเดินทางระหว่างที่พัก: = รวมค่าเดินทาง:
+    const accommodationText1 = `+ ค่าที่พัก = `;
+    const accommodationValue1 = formatCurrency(summary.accommodation_food || 0);
+    const accommodationText2 = ` + ค่าเดินทางระหว่างที่พัก = `;
+    const accommodationValue2 = formatCurrency(summary.travel_between_accommodation || 0);
+    const accommodationText3 = ` = `;
+    const accommodationValue3 = formatCurrency(summary.total_travel_cost || 0);
+    doc.text(accommodationText1, leftX, leftY);
+    currentX = leftX + doc.getTextWidth(accommodationText1);
+    doc.setFontSize(valueFontSize);
+    doc.text(accommodationValue1, currentX, leftY);
+    drawDashedUnderline(currentX, leftY, accommodationValue1, valueFontSize);
+    doc.setFontSize(10); // เพิ่ม 3 size จาก 7
+    currentX += doc.getTextWidth(accommodationValue1);
+    doc.text(accommodationText2, currentX, leftY);
+    currentX += doc.getTextWidth(accommodationText2);
+    doc.setFontSize(valueFontSize);
+    doc.text(accommodationValue2, currentX, leftY);
+    drawDashedUnderline(currentX, leftY, accommodationValue2, valueFontSize);
+    doc.setFontSize(10); // เพิ่ม 3 size จาก 7
+    currentX += doc.getTextWidth(accommodationValue2);
+    doc.text(accommodationText3, currentX, leftY);
+    currentX += doc.getTextWidth(accommodationText3);
+    doc.setFontSize(valueFontSize);
+    doc.text(accommodationValue3, currentX, leftY);
+    drawDashedUnderline(currentX, leftY, accommodationValue3, valueFontSize);
+    doc.setFontSize(10); // เพิ่ม 3 size จาก 7
+    leftY += lineHeight;
 
-    // Draw vertical line separator (at 60% mark)
-    const separatorX = leftX + leftColumnWidth;
-    doc.setLineWidth(0.5);
-    doc.setDrawColor(0, 0, 0);
-    doc.line(separatorX, startY - 5, separatorX, leftY + 10);
-
-    // Right column - Cost summary
+    // Right column
     let rightY = startY;
 
-    doc.text(`ต้นทุนรวม = ${summary.total_cost || '___'}`, rightX, rightY);
+    // ต้นทุนรวม = ต้นทุนงานเอกสาร
+    const totalCostText = `ต้นทุนรวม = `;
+    const totalCostValue = formatCurrency(summary.total_cost || 0);
+    doc.text(totalCostText, rightX, rightY);
+    const totalCostValueX = rightX + doc.getTextWidth(totalCostText);
+    doc.setFontSize(valueFontSize);
+    doc.text(totalCostValue, totalCostValueX, rightY);
+    drawDashedUnderline(totalCostValueX, rightY, totalCostValue, valueFontSize);
+    doc.setFontSize(10); // เพิ่ม 3 size จาก 7
     rightY += lineHeight;
 
-    doc.text(`ค่าเดินทาง = ${summary.travel_cost || '___'}`, rightX, rightY);
+    // กำไร = x% = จำนวนเงิน (กำไร%)
+    const profitText = `กำไร = ${summary.profit_percent || 0}% = `;
+    const profitValue = formatCurrency(summary.profit_amount || 0);
+    doc.text(profitText, rightX, rightY);
+    const profitValueX = rightX + doc.getTextWidth(profitText);
+    doc.setFontSize(valueFontSize);
+    doc.text(profitValue, profitValueX, rightY);
+    drawDashedUnderline(profitValueX, rightY, profitValue, valueFontSize);
+    doc.setFontSize(10); // เพิ่ม 3 size จาก 7
     rightY += lineHeight;
 
-    doc.text(`กำไร ${summary.profit || '___'}% เป็นเงิน = ${summary.profit_amount || '___'}`, rightX, rightY);
+    // ต้นทุน + กำไร = ราคารวมสร้างสถานีรวมกำไร
+    const costProfitText = `ต้นทุน + กำไร = `;
+    const costProfitValue = formatCurrency(summary.cost_and_profit || 0);
+    doc.text(costProfitText, rightX, rightY);
+    const costProfitValueX = rightX + doc.getTextWidth(costProfitText);
+    doc.setFontSize(valueFontSize);
+    doc.text(costProfitValue, costProfitValueX, rightY);
+    drawDashedUnderline(costProfitValueX, rightY, costProfitValue, valueFontSize);
+    doc.setFontSize(10); // เพิ่ม 3 size จาก 7
     rightY += lineHeight;
 
-    doc.text(`ต้นทุน + กำไร = ${summary.cost_and_profit || '___'}`, rightX, rightY);
+    // ค่าCom = x% = จำนวนเงิน (CF%)
+    const cfText = `ค่าCom = ${summary.cf_percent || 0}% = `;
+    const cfValue = formatCurrency(summary.cf_amount || 0);
+    doc.text(cfText, rightX, rightY);
+    const cfValueX = rightX + doc.getTextWidth(cfText);
+    doc.setFontSize(valueFontSize);
+    doc.text(cfValue, cfValueX, rightY);
+    drawDashedUnderline(cfValueX, rightY, cfValue, valueFontSize);
+    doc.setFontSize(10); // เพิ่ม 3 size จาก 7
     rightY += lineHeight;
 
-    doc.text(`ค่า Com ${summary.commission || '___'}% เป็นเงิน = ${summary.commission_amount || '___'}`, rightX, rightY);
+    // Draw vertical line separator
+    const separatorX = leftX + leftColumnWidth + 5;
+    doc.setLineWidth(0.5);
+    doc.setDrawColor(0, 0, 0);
+    doc.line(separatorX, startY - 5, separatorX, Math.max(leftY, rightY) + 5);
 
-    currentY = Math.max(leftY, rightY) + 15;
+    // เสนอราคารวม (ย้ายไปฝั่งซ้าย)
+    const finalY = Math.max(leftY, rightY) + 10;
+    doc.setFont('Sarabun', 'bold');
+    doc.setFontSize(12); // เพิ่ม 3 size จาก 9
+    const finalOfferText = `เสนอราคารวม = `;
+    const finalOfferValue = formatCurrency(summary.final_offer_price || 0);
+    doc.text(finalOfferText, leftX, finalY);
+    const finalOfferValueX = leftX + doc.getTextWidth(finalOfferText);
+    doc.text(finalOfferValue, finalOfferValueX, finalY);
+    drawDashedUnderline(finalOfferValueX, finalY, finalOfferValue, 12);
+
+    currentY = finalY + 15;
   }
 
   // Add signature section
-  // Check if we need a new page
-  // ปรับ threshold ให้ใช้หน้ากระดาษได้ดีขึ้น
-  if (currentY > 250) {
-    doc.addPage();
-    currentY = 20;
-  }
-
-  currentY += 10; // Add some spacing
+  // วาง signature ในหน้าสุดท้ายเท่านั้น โดยวางให้อยู่เหนือ page number
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const pageNumberY = pageHeight - 10; // Page number อยู่ที่ 10mm จากขอบล่าง
+  const signatureY = pageNumberY - 12; // วาง signature ห่างจาก page number 12mm (ห่างจากขอบล่าง 22mm)
 
   doc.setFontSize(7);
   doc.setFont('Sarabun', 'normal');
@@ -434,13 +592,17 @@ export function createCostPDF(jsonData) {
   const leftSignX = 30;
   const rightSignX = pageWidth / 2 + 15;
 
+  // วาง signature ในหน้าสุดท้ายเท่านั้น
+  const totalPages = doc.internal.getNumberOfPages();
+  doc.setPage(totalPages);
+
   // Left signature: ผู้ทำราคา
-  doc.text('ผู้ทำราคา', leftSignX, currentY);
-  doc.line(leftSignX + 25, currentY, leftSignX + 70, currentY); // Signature line
+  doc.text('ผู้ทำราคา', leftSignX, signatureY);
+  doc.line(leftSignX + 25, signatureY, leftSignX + 70, signatureY); // Signature line
 
   // Right signature: ผู้อนุมัติ
-  doc.text('ผู้อนุมัติ', rightSignX, currentY);
-  doc.line(rightSignX + 25, currentY, rightSignX + 70, currentY); // Signature line
+  doc.text('ผู้อนุมัติ', rightSignX, signatureY);
+  doc.line(rightSignX + 25, signatureY, rightSignX + 70, signatureY); // Signature line
 
   // Add page numbers
   const pageCount = doc.internal.getNumberOfPages();
@@ -470,25 +632,49 @@ export function createCostPDF(jsonData) {
  */
 function buildHeaderText(header) {
   const {
-    prefix = 'cost #1.1',
-    data1 = '______________',
-    data2 = '______________',
-    data3 = '______________',
-    data4 = '______________',
+    prefix = '',
+    data1 = '',
+    data2 = '',
+    data3 = '',
+    data4 = '',
     template = null
   } = header;
 
+  // แทนที่ค่าที่ว่างเปล่าด้วย ____________
+  const displayPrefix = prefix && prefix.trim() !== '' ? prefix : '____________';
+  const displayData1 = data1 && data1.trim() !== '' ? data1 : '____________';
+  const displayData2 = data2 && data2.trim() !== '' ? data2 : '____________';
+  const displayData3 = data3 && data3.trim() !== '' ? data3 : '____________';
+  const displayData4 = data4 && data4.trim() !== '' ? data4 : '____________';
+
   // If custom template provided, use it
   if (template) {
-    return template
-      .replace('{data1}', data1)
-      .replace('{data2}', data2)
-      .replace('{data3}', data3)
-      .replace('{data4}', data4);
+    return {
+      text: template
+        .replace('{data1}', displayData1)
+        .replace('{data2}', displayData2)
+        .replace('{data3}', displayData3)
+        .replace('{data4}', displayData4),
+      values: [
+        { text: displayData1, hasValue: data1 && data1.trim() !== '' },
+        { text: displayData2, hasValue: data2 && data2.trim() !== '' },
+        { text: displayData3, hasValue: data3 && data3.trim() !== '' },
+        { text: displayData4, hasValue: data4 && data4.trim() !== '' }
+      ]
+    };
   }
 
   // Default template with new format
-  return `${prefix}_ใบถอดต้นทุน EV ${data1} สถานที่ ${data2} พนง.ขาย ${data3} วันที่ ${data4}`.trim();
+  return {
+    text: `${displayPrefix}_ใบถอดต้นทุน EV ${displayData1} สถานที่ ${displayData2} พนง.ขาย ${displayData3} วันที่ ${displayData4}`.trim(),
+    values: [
+      { text: displayPrefix, hasValue: prefix && prefix.trim() !== '' },
+      { text: displayData1, hasValue: data1 && data1.trim() !== '' },
+      { text: displayData2, hasValue: data2 && data2.trim() !== '' },
+      { text: displayData3, hasValue: data3 && data3.trim() !== '' },
+      { text: displayData4, hasValue: data4 && data4.trim() !== '' }
+    ]
+  };
 }
 
 /**
@@ -524,15 +710,101 @@ export function createCostPDFSimple(jsonData, options = {}) {
 
   doc.setFont('Sarabun');
 
-  // Header
-  doc.setFontSize(9);
-  doc.setTextColor(40);
-  const headerText = buildHeaderText(header);
-  const headerLines = doc.splitTextToSize(headerText, 180);
-  doc.text(headerLines, 14, 15);
+  // Helper function to draw dashed underline
+  const drawDashedUnderline = (x, y, text, fontSize) => {
+    const textWidth = doc.getTextWidth(text);
+    const dashLength = 1;
+    const gapLength = 1;
+    let dashX = x;
+    doc.setLineWidth(0.1);
+    doc.setDrawColor(0, 0, 0);
+    while (dashX < x + textWidth) {
+      doc.line(dashX, y + 1, Math.min(dashX + dashLength, x + textWidth), y + 1);
+      dashX += dashLength + gapLength;
+    }
+  };
 
+  // Header
+  doc.setFontSize(13); // เพิ่ม 4 size จาก 9
+  doc.setFont('Sarabun', 'bold'); // ทำตัวหนา
+  doc.setTextColor(40);
+  const headerResult = buildHeaderText(header);
+  const headerText = headerResult.text || headerResult;
+  const headerValues = headerResult.values || [];
+  const headerLines = doc.splitTextToSize(headerText, 180);
+
+  // วาด header พร้อมเส้นประใต้ค่าที่มี
+  let headerY = 15;
+  headerLines.forEach((line, lineIndex) => {
+    let lineX = 14;
+    let remainingLine = line;
+
+    // แบ่งบรรทัดออกเป็นส่วนๆ เพื่อวาดเส้นประใต้ค่าที่มี
+    if (headerValues && headerValues.length > 0) {
+      // หาตำแหน่งของแต่ละค่าในบรรทัด
+      const valuePositions = [];
+      headerValues.forEach((value) => {
+        if (value.hasValue && remainingLine.includes(value.text)) {
+          const valueIndex = remainingLine.indexOf(value.text);
+          if (valueIndex !== -1) {
+            valuePositions.push({
+              index: valueIndex,
+              value: value.text,
+              hasValue: true
+            });
+          }
+        }
+      });
+
+      // เรียงลำดับตามตำแหน่ง
+      valuePositions.sort((a, b) => a.index - b.index);
+
+      // วาดข้อความทีละส่วน
+      let currentIndex = 0;
+      valuePositions.forEach((pos) => {
+        // วาดข้อความก่อนค่า
+        if (pos.index > currentIndex) {
+          const beforeText = remainingLine.substring(currentIndex, pos.index);
+          doc.setFontSize(13);
+          doc.setFont('Sarabun', 'bold');
+          doc.text(beforeText, lineX, headerY);
+          lineX += doc.getTextWidth(beforeText);
+        }
+
+        // วาดค่าพร้อมเส้นประ
+        doc.setFontSize(13);
+        doc.setFont('Sarabun', 'bold');
+        doc.text(pos.value, lineX, headerY);
+        drawDashedUnderline(lineX, headerY, pos.value, 13);
+        lineX += doc.getTextWidth(pos.value);
+
+        currentIndex = pos.index + pos.value.length;
+      });
+
+      // วาดข้อความที่เหลือ
+      if (currentIndex < remainingLine.length) {
+        const afterText = remainingLine.substring(currentIndex);
+        doc.setFontSize(13);
+        doc.setFont('Sarabun', 'bold');
+        doc.text(afterText, lineX, headerY);
+      }
+    } else {
+      // ถ้าไม่มีค่าให้วาดปกติ
+      doc.text(line, lineX, headerY);
+    }
+
+    headerY += 7;
+  });
+
+  // วาดเส้นขีดปิดใต้ header เพื่อแบ่งส่วน
   const headerHeight = headerLines.length * 7;
-  let currentY = 15 + headerHeight + 5;
+  const separatorY = 15 + headerHeight + 0.5; // วางเส้นใต้ header ห่าง 0.5mm
+  doc.setLineWidth(0.5);
+  doc.setDrawColor(0, 0, 0);
+  doc.line(14, separatorY, 196, separatorY); // เส้นเต็มความกว้าง (210mm - 14mm margin)
+
+  // Calculate starting Y position after header
+  let currentY = separatorY + 5; // ห่างจากเส้นขีด 5mm
 
   // Column headers (Thai)
   const columnHeaders = ['รหัส', 'ประเภท', 'รายการสินค้า', 'จำนวนชิ้น', 'ระยะ', 'ค่าของรวม', 'ค่าแรงรวม', 'ราคารวม'];

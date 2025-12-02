@@ -497,6 +497,16 @@ function MoreDetailCard(props: any) {
     total: 0,
   });
 
+  // State สำหรับเก็บค่าเดินทางของงานสร้างสถานี
+  const [constructionTravelCost, setConstructionTravelCost] = useState({
+    travelBetweenAccommodation: 0, // ค่าเดินทางระหว่างที่พัก
+    travelCost: 0,
+    accommodationAndFood: 0,
+    laborCost: 0,
+    trainingCost: 0,
+    total: 0,
+  });
+
   const [transformerSelection, setTransformerSelection] = useState(props.transformerSelection || 'no');
 
   const [transformerType, setTransformerType] = useState(props.transformerType || '');
@@ -918,22 +928,53 @@ function MoreDetailCard(props: any) {
     ? getCommunicationPricing(routerBaseRowNum, routerBaseQuantity)
     : null;
   const routerCableRowNum = 7;
-  const routerCableLabel = getCommunicationRowName(routerCableRowNum);
-  const routerCableLengthValue = wifi4gHub === 'yes' ? parsePositiveNumber(routerCableDistance) : 0;
+  // ดึงชื่อจาก __EMPTY_1 ที่ row 7
+  const routerCableRow = communicationSheet.find((entry: any) => entry.__rowNum__ === routerCableRowNum);
+  const routerCableLabel = routerCableRow?.__EMPTY_1 || getCommunicationRowName(routerCableRowNum);
+  // ค่าเริ่มต้น: 10 (2ช่องจอด), เพิ่มทีละ 5 ต่อช่องจอด
+  // สูตร: 5 + (parkingSlotsCount - 1) * 5 หรือ 5 * parkingSlotsCount
+  // 1 ช่อง = 5, 2 ช่อง = 10, 3 ช่อง = 15
+  const routerCableDefaultDistance = 5 * parkingSlotsCount;
+
+  // อัปเดตค่าเริ่มต้นเมื่อเลือก "มี" หรือเมื่อจำนวนช่องจอดเปลี่ยน
+  React.useEffect(() => {
+    if (wifi4gHub === 'yes') {
+      const defaultDistance = 5 * parkingSlotsCount;
+      setRouterCableDistance(defaultDistance.toString());
+    }
+  }, [wifi4gHub, parkingSlotsCount]);
+
+  const routerCableLengthValue = wifi4gHub === 'yes' ? parsePositiveNumber(routerCableDistance || routerCableDefaultDistance.toString()) : 0;
   const routerCablePricing = wifi4gHub === 'yes' && routerCableLengthValue > 0
     ? getCommunicationPricing(routerCableRowNum, routerCableLengthValue)
     : null;
 
   const cctvBaseRowNum = 9;
   const cctvBaseLabel = getCommunicationRowName(cctvBaseRowNum) || 'CCTV';
-  const cctvQuantityMultiplier = Math.max(1, Math.ceil(parkingSlotsCount / 6));
-  const cctvQuantity = cctvQuantityMultiplier * 4;
+  // เริ่มต้น 4 ชิ้น, เพิ่มทีละ 4 ชิ้น ทุกครั้งที่เกิน 6 ช่อง
+  // 6 ช่อง = 4, 7 ช่อง = 8, 13 ช่อง = 12
+  const cctvQuantity = parkingSlotsCount <= 6 ? 4 : 4 + Math.floor((parkingSlotsCount - 1) / 6) * 4;
   const cctvBasePricing = cctv === 'yes'
     ? getCommunicationPricing(cctvBaseRowNum, cctvQuantity)
     : null;
   const cctvCableRowNum = 10;
-  const cctvCableLabel = getCommunicationRowName(cctvCableRowNum);
-  const cctvCableLengthValue = cctv === 'yes' ? parsePositiveNumber(cctvCableDistance) : 0;
+  // ดึงชื่อจาก __EMPTY_1 ที่ row 10
+  const cctvCableRow = communicationSheet.find((entry: any) => entry.__rowNum__ === cctvCableRowNum);
+  const cctvCableLabel = cctvCableRow?.__EMPTY_1 || getCommunicationRowName(cctvCableRowNum);
+  // ค่าเริ่มต้น: 42 (2ช่องจอด), เพิ่มทีละ 3 ต่อช่องจอด
+  // สูตร: 39 + (parkingSlotsCount - 1) * 3 หรือ 36 + 3 * parkingSlotsCount
+  // 1 ช่อง = 39, 2 ช่อง = 42, 3 ช่อง = 45
+  const cctvCableDefaultDistance = 36 + (3 * parkingSlotsCount);
+
+  // อัปเดตค่าเริ่มต้นเมื่อเลือก "มี" หรือเมื่อจำนวนช่องจอดเปลี่ยน
+  React.useEffect(() => {
+    if (cctv === 'yes') {
+      const defaultDistance = 36 + (3 * parkingSlotsCount);
+      setCctvCableDistance(defaultDistance.toString());
+    }
+  }, [cctv, parkingSlotsCount]);
+
+  const cctvCableLengthValue = cctv === 'yes' ? parsePositiveNumber(cctvCableDistance || cctvCableDefaultDistance.toString()) : 0;
   const cctvCablePricing = cctv === 'yes' && cctvCableLengthValue > 0
     ? getCommunicationPricing(cctvCableRowNum, cctvCableLengthValue)
     : null;
@@ -945,8 +986,23 @@ function MoreDetailCard(props: any) {
     ? getCommunicationPricing(lightingBaseRowNum, lightingQuantity)
     : null;
   const lightingCableRowNum = 13;
-  const lightingCableLabel = getCommunicationRowName(lightingCableRowNum);
-  const lightingCableLengthValue = lighting === 'yes' ? parsePositiveNumber(lightingCableDistance) : 0;
+  // ดึงชื่อจาก __EMPTY_1 ที่ row 13
+  const lightingCableRow = communicationSheet.find((entry: any) => entry.__rowNum__ === lightingCableRowNum);
+  const lightingCableLabel = lightingCableRow?.__EMPTY_1 || getCommunicationRowName(lightingCableRowNum);
+  // ค่าเริ่มต้น: 25 (2ช่องจอด), เพิ่มทีละ 3 ต่อช่องจอด
+  // สูตร: 22 + (parkingSlotsCount - 1) * 3 หรือ 19 + 3 * parkingSlotsCount
+  // 1 ช่อง = 22, 2 ช่อง = 25, 3 ช่อง = 28
+  const lightingCableDefaultDistance = 19 + (3 * parkingSlotsCount);
+
+  // อัปเดตค่าเริ่มต้นเมื่อเลือก "มี" หรือเมื่อจำนวนช่องจอดเปลี่ยน
+  React.useEffect(() => {
+    if (lighting === 'yes') {
+      const defaultDistance = 19 + (3 * parkingSlotsCount);
+      setLightingCableDistance(defaultDistance.toString());
+    }
+  }, [lighting, parkingSlotsCount]);
+
+  const lightingCableLengthValue = lighting === 'yes' ? parsePositiveNumber(lightingCableDistance || lightingCableDefaultDistance.toString()) : 0;
   const lightingCablePricing = lighting === 'yes' && lightingCableLengthValue > 0
     ? getCommunicationPricing(lightingCableRowNum, lightingCableLengthValue)
     : null;
@@ -1639,7 +1695,7 @@ function MoreDetailCard(props: any) {
     const total = parsePrice(travelCostResult);
     return {
       material: 0,
-      labor: total,
+      labor: 0, // ค่าเดินทางไม่ใช่ค่าแรง
       total,
     };
   }, [travelCostResult]);
@@ -1657,7 +1713,7 @@ function MoreDetailCard(props: any) {
       mdbTotals,
       mdbToChargerTotals,
       additionalFeaturesTotals,
-      travelTotals,
+      // ไม่รวม travelTotals เพราะค่าเดินทางไม่เกี่ยวข้องกับราคารวมสร้างสถานี
     ];
 
     return totals.reduce((acc, current) => {
@@ -1667,7 +1723,7 @@ function MoreDetailCard(props: any) {
         total: acc.total + (current?.total || 0),
       };
     }, { material: 0, labor: 0, total: 0 });
-  }, [transformerTotals, highVoltageTotals, installationTotals, trToMdbTotals, mdbTotals, mdbToChargerTotals, additionalFeaturesTotals, travelTotals]);
+  }, [transformerTotals, highVoltageTotals, installationTotals, trToMdbTotals, mdbTotals, mdbToChargerTotals, additionalFeaturesTotals]);
 
   // ราคารวมสำหรับคำนวณกำไร% (section 1-7 ไม่รวม 8.ค่าเดินทาง)
   const baseStationTotalsForProfit = React.useMemo(() => {
@@ -1812,7 +1868,7 @@ function MoreDetailCard(props: any) {
   const finalStationTotals = React.useMemo(() => {
     return {
       material: stationTotals.material + profitAmount + cfAmount,
-      labor: stationTotals.labor + travelTotals.total,
+      labor: stationTotals.labor, // ไม่รวมค่าเดินทางในค่าแรง (ค่าเดินทางบวกเฉพาะในราคารวมสุดท้าย)
       total: stationTotalWithProfitAndCF + travelTotals.total + accessoriesAmount + documentCost, // บวก Accessories และต้นทุนงานเอกสารสด ไม่รวมค่าดำเนินการทางไฟฟ้า
       profitAmount,
       cfAmount,
@@ -1846,6 +1902,14 @@ function MoreDetailCard(props: any) {
           const row3 = lowVoltageSheet.find((row: any) => row.__rowNum__ === 3);
 
           if (row2) {
+            // ดึงรหัสจากคอลัมน์ "ตาราง ระบบงานแรงสูง:"
+            let code2 = '';
+            const keys2 = Object.keys(row2);
+            const codeKey2 = keys2.find(key => key.includes('ตาราง') && key.includes('ระบบงานแรงสูง'));
+            if (codeKey2) {
+              code2 = row2[codeKey2] || '';
+            }
+
             const quantity = row2.__EMPTY_3 || '';
             const isDistance = typeof quantity === 'string' && (quantity.includes('ม.') || quantity.includes('เมตร'));
             const distance = parseFloat(lowVoltageDistance2) || 0;
@@ -1855,9 +1919,9 @@ function MoreDetailCard(props: any) {
             const labor = isDistance ? laborUnit * distance : laborUnit;
 
             products.push({
-              type: `หม้อแปลง ${row2.__EMPTY || ''}`,
-              code: row2.__EMPTY || '',
-              productName: `${transformerSize} kVA`,
+              type: 'การขอแรงต่ำ',
+              code: code2, // รหัสจากคอลัมน์ "ตาราง ระบบงานแรงสูง:"
+              productName: row2.__EMPTY || '', // ย้ายค่าจาก code ไปที่ productName
               distance: isDistance ? `${distance} เมตร` : undefined,
               materialTotal: material,
               laborTotal: labor,
@@ -1867,6 +1931,14 @@ function MoreDetailCard(props: any) {
           }
 
           if (row3) {
+            // ดึงรหัสจากคอลัมน์ "ตาราง ระบบงานแรงสูง:"
+            let code3 = '';
+            const keys3 = Object.keys(row3);
+            const codeKey3 = keys3.find(key => key.includes('ตาราง') && key.includes('ระบบงานแรงสูง'));
+            if (codeKey3) {
+              code3 = row3[codeKey3] || '';
+            }
+
             const quantity = row3.__EMPTY_3 || '';
             const isDistance = typeof quantity === 'string' && (quantity.includes('ม.') || quantity.includes('เมตร'));
             const distance = parseFloat(lowVoltageDistance3) || 0;
@@ -1876,9 +1948,9 @@ function MoreDetailCard(props: any) {
             const labor = isDistance ? laborUnit * distance : laborUnit;
 
             products.push({
-              type: `หม้อแปลง ${row3.__EMPTY || ''}`,
-              code: row3.__EMPTY || '',
-              productName: `${transformerSize} kVA`,
+              type: 'การขอแรงต่ำ',
+              code: code3, // รหัสจากคอลัมน์ "ตาราง ระบบงานแรงสูง:"
+              productName: row3.__EMPTY || '', // ย้ายค่าจาก code ไปที่ productName
               distance: isDistance ? `${distance} เมตร` : undefined,
               materialTotal: material,
               laborTotal: labor,
@@ -1940,9 +2012,9 @@ function MoreDetailCard(props: any) {
 
             if (mainRow) {
               products.push({
-                type: mainRow.__EMPTY || '',
+                type: 'ระบบแรงสูง',
                 code: mainRow.__EMPTY_7 || '-',
-                productName: '-',
+                productName: mainRow.__EMPTY || '', // ย้ายข้อมูลจาก type ไปที่ productName
                 materialTotal: parseFloat(mainRow.__EMPTY_4 || 0) || 0,
                 laborTotal: parseFloat(mainRow.__EMPTY_5 || 0) || 0,
                 totalPrice: parseFloat(mainRow.__EMPTY_6 || 0) || 0,
@@ -1955,9 +2027,9 @@ function MoreDetailCard(props: any) {
               const materialUnit = parseFloat(distanceRow.__EMPTY_4 || 0) || 0;
               const laborUnit = parseFloat(distanceRow.__EMPTY_5 || 0) || 0;
               products.push({
-                type: distanceRow.__EMPTY || '',
+                type: 'ระบบแรงสูง',
                 code: '-',
-                productName: '-',
+                productName: distanceRow.__EMPTY || '', // ย้ายข้อมูลจาก type ไปที่ productName
                 distance: `${distance} เมตร`,
                 materialTotal: materialUnit * distance,
                 laborTotal: laborUnit * distance,
@@ -1968,9 +2040,9 @@ function MoreDetailCard(props: any) {
 
             if (detailRow1) {
               products.push({
-                type: detailRow1.__EMPTY || '',
+                type: 'ระบบแรงสูง',
                 code: '-',
-                productName: '-',
+                productName: detailRow1.__EMPTY || '', // ย้ายข้อมูลจาก type ไปที่ productName
                 materialTotal: parseFloat(detailRow1.__EMPTY_4 || 0) || 0,
                 laborTotal: parseFloat(detailRow1.__EMPTY_5 || 0) || 0,
                 totalPrice: parseFloat(detailRow1.__EMPTY_6 || 0) || 0,
@@ -1980,9 +2052,9 @@ function MoreDetailCard(props: any) {
 
             if (detailRow2) {
               products.push({
-                type: detailRow2.__EMPTY || '',
+                type: 'ระบบแรงสูง',
                 code: '-',
-                productName: '-',
+                productName: detailRow2.__EMPTY || '', // ย้ายข้อมูลจาก type ไปที่ productName
                 materialTotal: parseFloat(detailRow2.__EMPTY_4 || 0) || 0,
                 laborTotal: parseFloat(detailRow2.__EMPTY_5 || 0) || 0,
                 totalPrice: parseFloat(detailRow2.__EMPTY_6 || 0) || 0,
@@ -1997,9 +2069,9 @@ function MoreDetailCard(props: any) {
                 const poleMaterialPerUnit = parseFloat(poleRow.__EMPTY_4 || 0) || 0;
                 const poleLaborPerUnit = parseFloat(poleRow.__EMPTY_5 || 0) || 0;
                 products.push({
-                  type: poleRow.__EMPTY || '',
+                  type: 'ระบบแรงสูง',
                   code: '-',
-                  productName: '-',
+                  productName: poleRow.__EMPTY || '', // ย้ายข้อมูลจาก type ไปที่ productName
                   materialTotal: poleMaterialPerUnit * poleCount,
                   laborTotal: poleLaborPerUnit * poleCount,
                   totalPrice: (parseFloat(poleRow.__EMPTY_6 || 0) || 0) * poleCount,
@@ -2610,7 +2682,7 @@ function MoreDetailCard(props: any) {
     mdbSelection, mdbConfiguration, mccbSubBrand, getMccbSubData,
     chargerSelection, chargerResults, chargerLineDistances,
     additionalFeaturesTotals,
-    travelCostResult, travelDistance,
+    travelCostResult, travelDistance, travelType, constructionTravelCost, installationTravelCost, installationTravelDistance,
     getMdbCabinetData,
     getExcelData,
     props.trWiringSize, props.trWireConduit, props.chargerWiringCableAll, props.chargerWiringCable, props.chargerWiringType
@@ -2697,11 +2769,12 @@ function MoreDetailCard(props: any) {
     });
 
     // Header - ดึงจากข้อมูลงาน
+    // ถ้ายังไม่ได้กรอกค่าให้ส่งค่าว่าง เพื่อให้ PDF แสดง "____________" แทน
     const header = {
       prefix: "1.1",
-      data1: jobName || "โครงการติดตั้งระบบไฟฟ้า",
-      data2: location || "กรุงเทพฯ",
-      data3: salesPerson || "คุณสมชาย ใจดี",
+      data1: jobName || "",
+      data2: location || "",
+      data3: salesPerson || "",
       data4: formattedDate
     };
 
@@ -2776,38 +2849,85 @@ function MoreDetailCard(props: any) {
 
     // 5. ค่าเดินทาง
     const travelRows: any[] = [];
-    if (travelTotals.total > 0 && travelDistance) {
+    if (travelTotals.total > 0) {
+      // ดึงข้อมูลตามประเภทค่าเดินทาง
+      const travelCost = travelType === 'construction'
+        ? constructionTravelCost.travelCost
+        : installationTravelCost.travelCost;
+
+      const travelBetweenAccommodation = travelType === 'construction'
+        ? constructionTravelCost.travelBetweenAccommodation
+        : 0; // ติดตั้งอย่างเดียวไม่มีค่าเดินทางระหว่างที่พัก
+
+      const accommodationAndFood = travelType === 'construction'
+        ? constructionTravelCost.accommodationAndFood
+        : installationTravelCost.accommodationAndFood;
+
+      const distance = travelType === 'construction'
+        ? travelDistance
+        : installationTravelDistance;
+
       travelRows.push({
-        distance: `${travelDistance} กม.`,
-        travel_cost: 0, // ต้องดึงจาก travelTotals breakdown ถ้ามี
-        travel_between_accommodation: 0,
-        accommodation_food: 0,
-        wage: travelTotals.total,
+        distance: distance ? `${distance} กม.` : '-',
+        travel_cost: travelCost, // ค่าเดินทาง: จากค่าเดินทาง (รวมค่าใช้จ่ายการสร้างสถานี)
+        travel_between_accommodation: travelBetweenAccommodation, // ค่าเดินทางระหว่างที่พัก
+        accommodation_food: accommodationAndFood, // ค่าที่พัก + ค่าอาหาร
+        wage: 0, // ไม่ใช่ค่าแรง
         total: travelTotals.total
       });
     }
 
-    // Summary
+    // Summary - ข้อมูลสำหรับส่วนสรุป
+    // คำนวณ accessoriesPercent
+    const additionalFeaturesTotal = additionalFeaturesTotals.total;
+    const stationTotal = stationTotals.total;
+    let accessoriesPercent = 0;
+    if (stationTotal < 1500000) {
+      accessoriesPercent = 7;
+    } else if (stationTotal >= 1500000 && stationTotal <= 3000000) {
+      accessoriesPercent = 5;
+    } else if (stationTotal > 5000000) {
+      accessoriesPercent = 2;
+    } else {
+      accessoriesPercent = 5;
+    }
+
+    // ดึงข้อมูลค่าเดินทาง
+    const travelCost = travelType === 'construction'
+      ? constructionTravelCost.travelCost
+      : installationTravelCost.travelCost;
+    const travelLabor = travelType === 'construction'
+      ? constructionTravelCost.laborCost
+      : installationTravelCost.laborCost;
+    const accommodationAndFood = travelType === 'construction'
+      ? constructionTravelCost.accommodationAndFood
+      : installationTravelCost.accommodationAndFood;
+    const travelBetweenAccommodation = travelType === 'construction'
+      ? constructionTravelCost.travelBetweenAccommodation
+      : 0;
+
     const summary = {
-      workers: 0, // ไม่มีข้อมูล
-      work_days: 0, // ไม่มีข้อมูล
-      total_labor: 0, // ไม่มีข้อมูล
-      trucks: 0, // ไม่มีข้อมูล
-      truck_days: 0, // ไม่มีข้อมูล
-      total_truck_trips: 0, // ไม่มีข้อมูล
-      cars: 0, // ไม่มีข้อมูล
-      car_days: 0, // ไม่มีข้อมูล
-      total_car_trips: 0, // ไม่มีข้อมูล
-      hiab: 0, // ไม่มีข้อมูล
-      hiab_days: 0, // ไม่มีข้อมูล
-      total_hiab_trips: 0, // ไม่มีข้อมูล
-      total_cost: stationTotals.total.toLocaleString('th-TH'),
-      travel_cost: travelTotals.total.toLocaleString('th-TH'),
-      profit: parseFloat(profitPercent) || 0,
-      profit_amount: profitAmount.toLocaleString('th-TH'),
-      cost_and_profit: stationTotalWithProfit.toLocaleString('th-TH'),
-      commission: parseFloat(cfPercent) || 0,
-      commission_amount: cfAmount.toLocaleString('th-TH')
+      // ฝั่งซ้าย
+      accessories_percent: accessoriesPercent,
+      accessories_amount: accessoriesAmount,
+      additional_features_total: additionalFeaturesTotal,
+      document_cost: documentCost,
+      travel_cost: travelCost,
+      travel_labor: travelLabor,
+      accommodation_food: accommodationAndFood,
+      travel_between_accommodation: travelBetweenAccommodation,
+      total_travel_cost: travelTotals.total,
+
+      // ฝั่งขวา
+      total_cost: documentCost, // ต้นทุนรวม = ต้นทุนงานเอกสาร
+      profit_percent: parseFloat(profitPercent) || 0,
+      profit_amount: profitAmount,
+      cost_and_profit: stationTotalWithProfit,
+      cf_percent: parseFloat(cfPercent) || 0,
+      cf_amount: cfAmount,
+
+      // เสนอราคารวม
+      final_offer_price: finalStationTotals.total
     };
 
     return {
@@ -2819,7 +2939,7 @@ function MoreDetailCard(props: any) {
           rows: highVoltageRows
         },
         {
-          tablename: "2.ระบบแรงต่ำ",
+          tablename: "2.ระบบแรงต่ำ", // ใช้ normalizeThaiText ใน PDF generator
           type: "default",
           rows: lowVoltageRows
         },
@@ -2914,17 +3034,21 @@ function MoreDetailCard(props: any) {
     const materialRate = toNumber(row.__EMPTY_4);
     const laborRate = toNumber(row.__EMPTY_5);
     const extraCharge = toNumber(row.__EMPTY_6);
+    const laborCost = toNumber(row.__EMPTY_8); // ค่าแรง
 
     // ค่าเดินทางระหว่างที่พัก และค่าที่พัก + อาหาร
     const travelBetweenAccommodation = toNumber(row.__EMPTY_5);
     const accommodationAndFood = toNumber(row.__EMPTY_6);
 
-    let cost = 0;
+    // คำนวณค่าเดินทาง (ค่าเดินทางตามจำนวนเครื่องชาร์จ)
+    let travelCost = 0;
     if (isWithinThreshold) {
-      cost = (materialRate + laborRate) * distance;
+      travelCost = (materialRate + laborRate) * distance;
     } else {
-      cost = (materialRate * distance) + laborRate + extraCharge;
+      travelCost = (materialRate * distance) + laborRate + extraCharge;
     }
+
+    let cost = travelCost + accommodationAndFood + laborCost;
 
     let travelCostDetails = '';
 
@@ -2938,18 +3062,29 @@ function MoreDetailCard(props: any) {
       travelCostDetails += `\nค่าเดินทางตามจำนวนเครื่องชาร์จ: (${materialRate.toLocaleString('th-TH')} × ${distance.toLocaleString('th-TH')} km) + ${laborRate.toLocaleString('th-TH')} + ${extraCharge.toLocaleString('th-TH')}`;
     }
 
+    let trainingCost = 0;
     if (trainingWork === 'yes') {
       const trainingRow = travelSheet.find((entry: any) => entry.__rowNum__ === 30);
       if (trainingRow) {
         const trainingMaterial = toNumber(trainingRow.__EMPTY_4);
         const trainingLabor = toNumber(trainingRow.__EMPTY_5);
         const trainingExtra = toNumber(trainingRow.__EMPTY_6);
-        const trainingCost = (trainingMaterial * distance) + trainingLabor + trainingExtra;
+        trainingCost = (trainingMaterial * distance) + trainingLabor + trainingExtra;
         cost += trainingCost;
 
         travelCostDetails += `\nงานฝึกอบรม (1 วัน): (${trainingMaterial.toLocaleString('th-TH')} × ${distance.toLocaleString('th-TH')} km) + ${trainingLabor.toLocaleString('th-TH')} + ${trainingExtra.toLocaleString('th-TH')}`;
       }
     }
+
+    // เก็บค่าไว้ใน state
+    setConstructionTravelCost({
+      travelBetweenAccommodation,
+      travelCost,
+      accommodationAndFood,
+      laborCost,
+      trainingCost,
+      total: cost,
+    });
 
     setTravelCostResult(cost);
     setTravelCostBreakdown(travelCostDetails);
@@ -3335,6 +3470,34 @@ function MoreDetailCard(props: any) {
                   // ดึงสเปคสายจาก row 4
                   const wireSpec = row4?.__EMPTY || '';
 
+                  // ดึงรหัสจาก row 2 - หาคอลัมน์ที่มีชื่อ "ตาราง" และ "ระบบงานแรงสูง"
+                  let code2 = '';
+                  if (row2) {
+                    const keys = Object.keys(row2);
+                    const codeKey = keys.find(key => key.includes('ตาราง') && key.includes('ระบบงานแรงสูง'));
+                    if (codeKey) {
+                      code2 = row2[codeKey] || '';
+                    }
+                  }
+
+                  // ดึงรหัสจาก row 3 - หาคอลัมน์ที่มีชื่อ "ตาราง" และ "ระบบงานแรงสูง" (ใช้คำว่า "รหัส:" แทน "อีกวัน:")
+                  let code3 = '';
+                  if (row3) {
+                    const keys = Object.keys(row3);
+                    const codeKey = keys.find(key => key.includes('ตาราง') && key.includes('ระบบงานแรงสูง'));
+                    if (codeKey) {
+                      code3 = row3[codeKey] || '';
+                    }
+                  }
+
+                  // Debug: log เพื่อตรวจสอบ
+                  console.log('Row2 keys:', row2 ? Object.keys(row2) : []);
+                  console.log('Row2 data:', row2);
+                  console.log('Code2:', code2);
+                  console.log('Row3 keys:', row3 ? Object.keys(row3) : []);
+                  console.log('Row3 data:', row3);
+                  console.log('Code3:', code3);
+
                   // ตรวจสอบว่าจำนวนเป็น "1 ม." หรือไม่
                   const quantity2 = row2.__EMPTY_3 || '';
                   const quantity3 = row3.__EMPTY_3 || '';
@@ -3370,6 +3533,8 @@ function MoreDetailCard(props: any) {
                       <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
                         <div className="font-medium text-blue-800 mb-2">{row2.__EMPTY || 'รายการที่ 1'}:</div>
                         <div className="space-y-2 text-sm">
+                          {/* รหัส */}
+                          <div><span className="font-medium">รหัส:</span> {code2 || '-'}</div>
                           {isDistance2 ? (
                             <div className="flex items-center gap-2">
                               <span className="font-medium">ระยะ:</span>
@@ -3396,6 +3561,10 @@ function MoreDetailCard(props: any) {
                       <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
                         <div className="font-medium text-blue-800 mb-2">{row3.__EMPTY || 'รายการที่ 2'}:</div>
                         <div className="space-y-2 text-sm">
+                          {/* รหัส */}
+                          <div>
+                            <span className="font-medium">รหัส:</span> {code3 || '-'}
+                          </div>
                           {/* สเปคสาย */}
                           {wireSpec && (
                             <div>
@@ -4234,16 +4403,12 @@ function MoreDetailCard(props: any) {
                   <div className="bg-gray-50 rounded-lg border border-gray-200">
                     <CollapsibleTrigger className="w-full p-4 text-left hover:bg-gray-100 transition-colors rounded-lg">
                       <div className="flex items-center justify-between">
-                        <div className="grid grid-cols-2 gap-4 w-full">
-                          <div>
-                            <div className="font-semibold text-gray-900">
-                              <span className="text-sm text-gray-600 font-medium">CODEตู้เปล่า:</span> {cabinetEmpty}
-                            </div>
+                        <div className="flex items-center gap-4 flex-1">
+                          <div className="font-semibold text-gray-900">
+                            <span className="text-sm text-gray-600 font-medium">CODEตู้เปล่า:</span> {cabinetEmpty}
                           </div>
-                          <div>
-                            <div className="font-semibold text-gray-900">
-                              <span className="text-sm text-gray-600 font-medium">ขนาดตู้ (กว้าง ยาว ลึก):</span> {cabinetSize}
-                            </div>
+                          <div className="font-semibold text-gray-900">
+                            <span className="text-sm text-gray-600 font-medium">ขนาดตู้ (กว้าง ยาว ลึก):</span> {cabinetSize}
                           </div>
                         </div>
                         <div className="flex items-center gap-4 md:gap-6">
@@ -4410,288 +4575,290 @@ function MoreDetailCard(props: any) {
           )}
         </CardContent>
       </Card>
-      {/* TR to MDB Configuration Card */}
-      <Card className="shadow-xl border-0 overflow-hidden mb-6">
+      {/* TR to MDB Configuration Card - ซ่อนเมื่อเลือก "ขอแรงต่ำ" */}
+      {!(props.powerAuthority === 'MEA' && parseInt(props.transformer || '0') <= 400 && lowVoltageRequest === 'low-voltage') && (
+        <Card className="shadow-xl border-0 overflow-hidden mb-6">
 
-        <CardHeader className="bg-gradient-to-r from-gray-50 to-blue-50 border-b">
+          <CardHeader className="bg-gradient-to-r from-gray-50 to-blue-50 border-b">
 
-          <CardTitle className="flex items-center justify-between ">
+            <CardTitle className="flex items-center justify-between ">
 
-            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2">
 
-              <Wrench className="h-5 w-5" />
+                <Wrench className="h-5 w-5" />
 
-              TR to MDB Configuration <span className="text-xs ">(การตั้งค่า TR ไป MDB)</span>
-
-            </div>
-
-            <div className="flex items-center gap-3">
-
-              <div
-
-                className={`flex items-center space-x-2 px-3 py-1 rounded-lg border border-gray-200 hover:bg-blue-50 cursor-pointer ${trMdbSelection === 'yes' ? 'bg-blue-100 border-blue-300' : ''}`}
-
-                onClick={() => setTrMdbSelection('yes')}
-
-              >
-
-                <Checkbox
-
-                  id="trMdb-yes"
-
-                  checked={trMdbSelection === 'yes'}
-
-                  onCheckedChange={(checked) => {
-
-                    if (checked) setTrMdbSelection('yes');
-
-                  }}
-
-                  className="text-blue-500 border-blue-400 data-[state=checked]:bg-blue-500"
-
-                />
-
-                <Label htmlFor="trMdb-yes" className="font-medium cursor-pointer text-blue-700 text-sm">มี</Label>
+                TR to MDB Configuration <span className="text-xs ">(การตั้งค่า TR ไป MDB)</span>
 
               </div>
 
-              <div
+              <div className="flex items-center gap-3">
 
-                className={`flex items-center space-x-2 px-3 py-1 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer ${trMdbSelection === 'no' ? 'bg-gray-100 border-gray-300' : ''}`}
+                <div
 
-                onClick={() => setTrMdbSelection('no')}
+                  className={`flex items-center space-x-2 px-3 py-1 rounded-lg border border-gray-200 hover:bg-blue-50 cursor-pointer ${trMdbSelection === 'yes' ? 'bg-blue-100 border-blue-300' : ''}`}
 
-              >
+                  onClick={() => setTrMdbSelection('yes')}
 
-                <Checkbox
+                >
 
-                  id="trMdb-no"
+                  <Checkbox
 
-                  checked={trMdbSelection === 'no'}
+                    id="trMdb-yes"
 
-                  onCheckedChange={(checked) => {
+                    checked={trMdbSelection === 'yes'}
 
-                    if (checked) setTrMdbSelection('no');
+                    onCheckedChange={(checked) => {
 
-                  }}
+                      if (checked) setTrMdbSelection('yes');
 
-                  className=" border-gray-400 data-[state=checked]:bg-gray-500"
+                    }}
 
-                />
-
-                <Label htmlFor="trMdb-no" className="font-medium cursor-pointer  text-sm">ไม่มี</Label>
-
-              </div>
-
-            </div>
-
-          </CardTitle>
-
-        </CardHeader>
-
-        <CardContent className="p-6">
-
-
-
-          {/* แสดงเนื้อหาเมื่อเลือก "มี" */}
-
-          {trMdbSelection === 'yes' && (
-
-            <div className="space-y-4">
-
-              <div className="flex flex-wrap items-center gap-4">
-
-                <div className="flex items-center gap-2">
-
-                  <span className="text-sm ">ประเภท:</span>
-
-                  <span className="font-semibold ">{props.trWiringType}</span>
-
-                </div>
-
-                <div className="flex items-center gap-2">
-
-                  <span className="text-sm ">ขนาดสาย (CV/THW):</span>
-
-                  <span className="font-semibold ">{props.trWiringSize}</span>
-
-                </div>
-
-                <div className="flex items-center gap-2">
-
-                  <span className="text-sm ">ท่อ:</span>
-
-                  <span className="font-semibold ">{props.trWireConduit}</span>
-
-                </div>
-
-              </div>
-
-
-
-              <Separator />
-
-
-
-              <div className="space-y-3">
-
-                <div className="flex items-center gap-3">
-
-                  <Label htmlFor="trDistance" className=" font-medium min-w-[100px]">ระยะ (เมตร):</Label>
-
-                  <Input
-
-                    id="trDistance"
-
-                    type="number"
-
-                    className="w-32 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-
-                    value={trDistance}
-
-                    onChange={(e) => setTrDistance(e.target.value)}
+                    className="text-blue-500 border-blue-400 data-[state=checked]:bg-blue-500"
 
                   />
 
+                  <Label htmlFor="trMdb-yes" className="font-medium cursor-pointer text-blue-700 text-sm">มี</Label>
+
                 </div>
 
-                {props.trWiringType === 'ร้อยท่อเดินในอากาศ กลุ่ม 2' && (
+                <div
 
-                  <div className="flex items-center gap-3">
+                  className={`flex items-center space-x-2 px-3 py-1 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer ${trMdbSelection === 'no' ? 'bg-gray-100 border-gray-300' : ''}`}
 
-                    <Label htmlFor="trWiringGroup2" className=" font-medium min-w-[100px]">เลือกท่อ:</Label>
+                  onClick={() => setTrMdbSelection('no')}
 
-                    <Select value={trWiringGroup2} onValueChange={setTrWiringGroup2}>
+                >
 
-                      <SelectTrigger className="w-32">
+                  <Checkbox
 
-                        <SelectValue placeholder="เลือกท่อ" />
+                    id="trMdb-no"
 
-                      </SelectTrigger>
+                    checked={trMdbSelection === 'no'}
 
-                      <SelectContent>
+                    onCheckedChange={(checked) => {
 
-                        <SelectItem value="IMC">IMC</SelectItem>
+                      if (checked) setTrMdbSelection('no');
 
-                        <SelectItem value="RSC">RSC</SelectItem>
+                    }}
 
-                      </SelectContent>
+                    className=" border-gray-400 data-[state=checked]:bg-gray-500"
 
-                    </Select>
+                  />
+
+                  <Label htmlFor="trMdb-no" className="font-medium cursor-pointer  text-sm">ไม่มี</Label>
+
+                </div>
+
+              </div>
+
+            </CardTitle>
+
+          </CardHeader>
+
+          <CardContent className="p-6">
+
+
+
+            {/* แสดงเนื้อหาเมื่อเลือก "มี" */}
+
+            {trMdbSelection === 'yes' && (
+
+              <div className="space-y-4">
+
+                <div className="flex flex-wrap items-center gap-4">
+
+                  <div className="flex items-center gap-2">
+
+                    <span className="text-sm ">ประเภท:</span>
+
+                    <span className="font-semibold ">{props.trWiringType}</span>
 
                   </div>
 
+                  <div className="flex items-center gap-2">
+
+                    <span className="text-sm ">ขนาดสาย (CV/THW):</span>
+
+                    <span className="font-semibold ">{props.trWiringSize}</span>
+
+                  </div>
+
+                  <div className="flex items-center gap-2">
+
+                    <span className="text-sm ">ท่อ:</span>
+
+                    <span className="font-semibold ">{props.trWireConduit}</span>
+
+                  </div>
+
+                </div>
+
+
+
+                <Separator />
+
+
+
+                <div className="space-y-3">
+
+                  <div className="flex items-center gap-3">
+
+                    <Label htmlFor="trDistance" className=" font-medium min-w-[100px]">ระยะ (เมตร):</Label>
+
+                    <Input
+
+                      id="trDistance"
+
+                      type="number"
+
+                      className="w-32 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+
+                      value={trDistance}
+
+                      onChange={(e) => setTrDistance(e.target.value)}
+
+                    />
+
+                  </div>
+
+                  {props.trWiringType === 'ร้อยท่อเดินในอากาศ กลุ่ม 2' && (
+
+                    <div className="flex items-center gap-3">
+
+                      <Label htmlFor="trWiringGroup2" className=" font-medium min-w-[100px]">เลือกท่อ:</Label>
+
+                      <Select value={trWiringGroup2} onValueChange={setTrWiringGroup2}>
+
+                        <SelectTrigger className="w-32">
+
+                          <SelectValue placeholder="เลือกท่อ" />
+
+                        </SelectTrigger>
+
+                        <SelectContent>
+
+                          <SelectItem value="IMC">IMC</SelectItem>
+
+                          <SelectItem value="RSC">RSC</SelectItem>
+
+                        </SelectContent>
+
+                      </Select>
+
+                    </div>
+
+                  )}
+
+                </div>
+
+                {/* แสดงข้อมูลราคา TR to MDB Configuration */}
+                {trDistance && parseFloat(trDistance) > 0 && (
+                  <Collapsible
+                    open={openItems['tr-to-mdb-price']}
+                    onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'tr-to-mdb-price': open }))}
+                  >
+                    <div className="bg-blue-50 rounded-lg border border-blue-200">
+                      <CollapsibleTrigger className="w-full p-4 text-left hover:bg-blue-100 transition-colors rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <div className="font-medium">ข้อมูลราคา TR to MDB Configuration:</div>
+                          <div className="flex items-center gap-4 md:gap-6">
+                            <div className="text-xs text-slate-500 md:text-sm">ราคารวม</div>
+                            <div className={`text-lg font-bold ${trToMdbTotals.total > 0 ? 'text-slate-800' : 'text-slate-400'}`}>
+                              {trToMdbTotals.total.toLocaleString('th-TH')} บาท
+                            </div>
+                            <div className="ml-4">
+                              {openItems['tr-to-mdb-price'] ? (
+                                <ChevronUp className="h-4 w-4 text-blue-600" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4 text-blue-600" />
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="px-4 pb-4">
+                          {(() => {
+                            const priceData = getTrToMdbPrice(
+                              props.trWiringType,
+                              props.trWiringType === 'ร้อยท่อเดินในอากาศ กลุ่ม 2' ? trWiringGroup2 : '',
+                              props.powerAuthority,
+                              props.transformer,
+                              parseFloat(trDistance)
+                            );
+
+                            if (priceData) {
+                              // ใช้ชื่อประเภทจาก TR to MDB Configuration เลย
+                              let wiringTypeDisplay = props.trWiringType;
+
+                              // เพิ่มท่อสำหรับร้อยท่อเดินในอากาศ กลุ่ม 2
+                              if (props.trWiringType === 'ร้อยท่อเดินในอากาศ กลุ่ม 2' && trWiringGroup2) {
+                                wiringTypeDisplay = `${props.trWiringType} - ${trWiringGroup2}`;
+                              }
+
+                              return (
+                                <div className="p-4 bg-green-50 rounded-lg border border-green-200 space-y-4">
+                                  {/* Header */}
+                                  <div>
+                                    <div className="text-xs text-gray-500 mt-1">
+                                      ประเภท: {wiringTypeDisplay}
+                                    </div>
+                                    <div className="mt-2 text-sm">
+                                      <span className="font-medium text-gray-700">รหัส:</span>
+                                      <span className="text-gray-600 ml-1">{priceData.productCode}</span>
+                                    </div>
+                                    <div className="mt-1 text-sm">
+                                      <span className="font-medium text-gray-700">ระยะทาง:</span>
+                                      <span className="text-gray-600 ml-1">{priceData.distance} เมตร</span>
+                                    </div>
+                                  </div>
+
+                                  {/* รวมค่าใช้จ่าย */}
+                                  <div className="grid grid-cols-3 gap-4">
+                                    <div>
+                                      <div className="text-sm text-gray-600 mb-1">ค่าของรวม:</div>
+                                      <div className="text-xl font-bold text-gray-800">
+                                        {priceData.materialPrice.toLocaleString('th-TH')} บาท
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <div className="text-sm text-gray-600 mb-1">ค่าแรงรวม:</div>
+                                      <div className="text-xl font-bold text-gray-800">
+                                        {priceData.laborPrice.toLocaleString('th-TH')} บาท
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <div className="text-sm text-green-700 font-semibold mb-1">ราคารวม:</div>
+                                      <div className="text-2xl font-bold text-green-700">
+                                        {priceData.totalPrice.toLocaleString('th-TH')} บาท
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            } else {
+                              return (
+                                <div className="text-sm text-gray-500 bg-red-50 p-3 rounded-lg border">
+                                  <div className="font-semibold text-red-800 mb-2">ไม่พบข้อมูลราคา</div>
+                                  <div>ไม่พบข้อมูลราคาสำหรับเงื่อนไขที่เลือก</div>
+                                  <div className="text-xs mt-1">กรุณาตรวจสอบ Console เพื่อดูข้อมูล Debug</div>
+                                </div>
+                              );
+                            }
+                          })()}
+                        </div>
+                      </CollapsibleContent>
+                    </div>
+                  </Collapsible>
                 )}
 
               </div>
 
-              {/* แสดงข้อมูลราคา TR to MDB Configuration */}
-              {trDistance && parseFloat(trDistance) > 0 && (
-                <Collapsible
-                  open={openItems['tr-to-mdb-price']}
-                  onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'tr-to-mdb-price': open }))}
-                >
-                  <div className="bg-blue-50 rounded-lg border border-blue-200">
-                    <CollapsibleTrigger className="w-full p-4 text-left hover:bg-blue-100 transition-colors rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <div className="font-medium">ข้อมูลราคา TR to MDB Configuration:</div>
-                        <div className="flex items-center gap-4 md:gap-6">
-                          <div className="text-xs text-slate-500 md:text-sm">ราคารวม</div>
-                          <div className={`text-lg font-bold ${trToMdbTotals.total > 0 ? 'text-slate-800' : 'text-slate-400'}`}>
-                            {trToMdbTotals.total.toLocaleString('th-TH')} บาท
-                          </div>
-                          <div className="ml-4">
-                            {openItems['tr-to-mdb-price'] ? (
-                              <ChevronUp className="h-4 w-4 text-blue-600" />
-                            ) : (
-                              <ChevronDown className="h-4 w-4 text-blue-600" />
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <div className="px-4 pb-4">
-                        {(() => {
-                          const priceData = getTrToMdbPrice(
-                            props.trWiringType,
-                            props.trWiringType === 'ร้อยท่อเดินในอากาศ กลุ่ม 2' ? trWiringGroup2 : '',
-                            props.powerAuthority,
-                            props.transformer,
-                            parseFloat(trDistance)
-                          );
+            )}
 
-                          if (priceData) {
-                            // ใช้ชื่อประเภทจาก TR to MDB Configuration เลย
-                            let wiringTypeDisplay = props.trWiringType;
-
-                            // เพิ่มท่อสำหรับร้อยท่อเดินในอากาศ กลุ่ม 2
-                            if (props.trWiringType === 'ร้อยท่อเดินในอากาศ กลุ่ม 2' && trWiringGroup2) {
-                              wiringTypeDisplay = `${props.trWiringType} - ${trWiringGroup2}`;
-                            }
-
-                            return (
-                              <div className="p-4 bg-green-50 rounded-lg border border-green-200 space-y-4">
-                                {/* Header */}
-                                <div>
-                                  <div className="text-xs text-gray-500 mt-1">
-                                    ประเภท: {wiringTypeDisplay}
-                                  </div>
-                                  <div className="mt-2 text-sm">
-                                    <span className="font-medium text-gray-700">รหัส:</span>
-                                    <span className="text-gray-600 ml-1">{priceData.productCode}</span>
-                                  </div>
-                                  <div className="mt-1 text-sm">
-                                    <span className="font-medium text-gray-700">ระยะทาง:</span>
-                                    <span className="text-gray-600 ml-1">{priceData.distance} เมตร</span>
-                                  </div>
-                                </div>
-
-                                {/* รวมค่าใช้จ่าย */}
-                                <div className="grid grid-cols-3 gap-4">
-                                  <div>
-                                    <div className="text-sm text-gray-600 mb-1">ค่าของรวม:</div>
-                                    <div className="text-xl font-bold text-gray-800">
-                                      {priceData.materialPrice.toLocaleString('th-TH')} บาท
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <div className="text-sm text-gray-600 mb-1">ค่าแรงรวม:</div>
-                                    <div className="text-xl font-bold text-gray-800">
-                                      {priceData.laborPrice.toLocaleString('th-TH')} บาท
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <div className="text-sm text-green-700 font-semibold mb-1">ราคารวม:</div>
-                                    <div className="text-2xl font-bold text-green-700">
-                                      {priceData.totalPrice.toLocaleString('th-TH')} บาท
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          } else {
-                            return (
-                              <div className="text-sm text-gray-500 bg-red-50 p-3 rounded-lg border">
-                                <div className="font-semibold text-red-800 mb-2">ไม่พบข้อมูลราคา</div>
-                                <div>ไม่พบข้อมูลราคาสำหรับเงื่อนไขที่เลือก</div>
-                                <div className="text-xs mt-1">กรุณาตรวจสอบ Console เพื่อดูข้อมูล Debug</div>
-                              </div>
-                            );
-                          }
-                        })()}
-                      </div>
-                    </CollapsibleContent>
-                  </div>
-                </Collapsible>
-              )}
-
-            </div>
-
-          )}
-
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
       {/* MDB Configuration Card */}
       <Card className="shadow-xl border-0 overflow-hidden mb-6">
 
@@ -6830,9 +6997,9 @@ function MoreDetailCard(props: any) {
                                           <span className="font-medium">ระยะ:</span>
                                           <Input
                                             type="number"
-                                            value={routerCableDistance}
+                                            value={routerCableDistance || routerCableDefaultDistance}
                                             onChange={(e) => setRouterCableDistance(e.target.value)}
-                                            placeholder="กรอกระยะ (เมตร)"
+                                            placeholder={`${routerCableDefaultDistance} เมตร`}
                                             className="w-32"
                                             min="0"
                                             onClick={(e) => e.stopPropagation()}
@@ -6967,9 +7134,9 @@ function MoreDetailCard(props: any) {
                                           <span className="font-medium">ระยะ:</span>
                                           <Input
                                             type="number"
-                                            value={cctvCableDistance}
+                                            value={cctvCableDistance || cctvCableDefaultDistance}
                                             onChange={(e) => setCctvCableDistance(e.target.value)}
-                                            placeholder="กรอกระยะ (เมตร)"
+                                            placeholder={`${cctvCableDefaultDistance} เมตร`}
                                             className="w-32"
                                             min="0"
                                             onClick={(e) => e.stopPropagation()}
@@ -7105,9 +7272,9 @@ function MoreDetailCard(props: any) {
                                           <span className="font-medium">ระยะ:</span>
                                           <Input
                                             type="number"
-                                            value={lightingCableDistance}
+                                            value={lightingCableDistance || lightingCableDefaultDistance}
                                             onChange={(e) => setLightingCableDistance(e.target.value)}
-                                            placeholder="กรอกระยะ (เมตร)"
+                                            placeholder={`${lightingCableDefaultDistance} เมตร`}
                                             className="w-32"
                                             min="0"
                                             onClick={(e) => e.stopPropagation()}
@@ -9028,26 +9195,65 @@ function MoreDetailCard(props: any) {
                     </div>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
-                    <div className="px-4 pb-4">
+                    <div className="px-4 pb-4 space-y-3">
                       <div className="text-xs mt-1">
-                        ระยะทาง: {travelDistance} กม. | จำนวน Charger: {props.numberOfChargers} Unit
+                        ระยะทาง: {travelDistance} กม.
                         {trainingWork === 'yes' && (
                           <span className="text-green-600 font-medium"> | + งานฝึกอบรม (1วัน)</span>
                         )}
                       </div>
 
                       {/* แสดงรายละเอียดการคำนวณ */}
-                      <div className="mt-3 p-3 bg-white rounded border text-xs space-y-2">
+                      <div className="p-3 bg-white rounded border text-sm space-y-3">
                         <div className="font-medium text-gray-700">รายละเอียดการคำนวณ:</div>
-                        <div>• ระยะทาง: {travelDistance} กม.</div>
-                        <div>• จำนวน Charger: {props.numberOfChargers} Unit</div>
-                        {travelCostBreakdown && travelCostBreakdown.split('\n').map((line, idx) => (
-                          <div key={idx} className="text-blue-600">
-                            • {line}
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-600">ค่าเดินทาง:</span>
+                            <span className="font-semibold text-blue-600">
+                              {constructionTravelCost.travelCost.toLocaleString('th-TH')} บาท
+                            </span>
                           </div>
-                        ))}
-                        <div className="font-medium text-blue-800">
-                          • ยอดรวมทั้งหมด: {travelCostResult.toLocaleString('th-TH')} บาท
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-600">ค่าเดินทางระหว่างที่พัก:</span>
+                            <span className="font-semibold text-blue-600">
+                              {constructionTravelCost.travelBetweenAccommodation.toLocaleString('th-TH')} บาท
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-600">ค่าที่พัก + อาหาร:</span>
+                            <span className="font-semibold text-blue-600">
+                              {constructionTravelCost.accommodationAndFood.toLocaleString('th-TH')} บาท
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-600">ค่าแรง:</span>
+                            <span className="font-semibold text-blue-600">
+                              {constructionTravelCost.laborCost.toLocaleString('th-TH')} บาท
+                            </span>
+                          </div>
+                          {trainingWork === 'yes' && constructionTravelCost.trainingCost > 0 && (
+                            <>
+                              <div className="flex justify-between items-center pt-2">
+                                <span className="text-gray-600">งานฝึกอบรม (1 วัน):</span>
+                                <span className="font-semibold text-green-600">
+                                  {constructionTravelCost.trainingCost.toLocaleString('th-TH')} บาท
+                                </span>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                        <div className="pt-2 border-t border-gray-200">
+                          <div className="flex justify-between items-center">
+                            <span className="font-medium text-blue-800">รวมค่าเดินทาง:</span>
+                            <span className="text-lg font-bold text-blue-800">
+                              {travelCostResult.toLocaleString('th-TH')} บาท
+                            </span>
+                          </div>
+                          {trainingWork === 'yes' && (
+                            <div className="text-xs text-green-600 mt-1">
+                              รวมงานฝึกอบรม (1วัน)
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -9083,7 +9289,7 @@ function MoreDetailCard(props: any) {
                   <CollapsibleContent>
                     <div className="px-4 pb-4 space-y-3">
                       <div className="text-xs mt-1">
-                        ระยะทาง: {installationTravelDistance} กม.
+                        <span className="font-medium">ระยะทาง:</span> {installationTravelDistance} กม.
                         {trainingWork === 'yes' && (
                           <span className="text-green-600 font-medium"> | + งานฝึกอบรม (1วัน)</span>
                         )}
@@ -9393,23 +9599,43 @@ function MoreDetailCard(props: any) {
 
               <CollapsibleContent>
                 <div className="px-5 pb-5">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
                     <div>
-                      <div className="text-xs text-slate-500 mb-1">ระยะทาง (กิโลเมตร)</div>
+                      <div className="text-xs text-slate-500 mb-1">ระยะทาง:</div>
                       <div className="text-base font-semibold text-slate-800">
-                        {travelDistance ? `${travelDistance} กม.` : '-'}
+                        {travelType === 'construction'
+                          ? (travelDistance ? `${travelDistance} กม.` : '-')
+                          : (installationTravelDistance ? `${installationTravelDistance} กม.` : '-')}
                       </div>
                     </div>
                     <div>
-                      <div className="text-xs text-slate-500 mb-1">งานฝึกอบรม</div>
+                      <div className="text-xs text-slate-500 mb-1">ค่าเดินทาง:</div>
                       <div className="text-base font-semibold text-slate-800">
-                        {trainingWork === 'yes' ? 'มี' : 'ไม่มี'}
+                        {formatCurrency(travelType === 'construction' ? constructionTravelCost.travelCost : installationTravelCost.travelCost)} บาท
                       </div>
                     </div>
                     <div>
-                      <div className="text-xs text-slate-500 mb-1">ราคาค่าเดินทาง</div>
+                      <div className="text-xs text-slate-500 mb-1">ค่าเดินทางระหว่างที่พัก:</div>
+                      <div className="text-base font-semibold text-slate-800">
+                        {formatCurrency(travelType === 'construction' ? constructionTravelCost.travelBetweenAccommodation : 0)} บาท
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 mb-1">ค่าที่พัก + อาหาร:</div>
+                      <div className="text-base font-semibold text-slate-800">
+                        {formatCurrency(travelType === 'construction' ? constructionTravelCost.accommodationAndFood : installationTravelCost.accommodationAndFood)} บาท
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 mb-1">ค่าแรง:</div>
+                      <div className="text-base font-semibold text-slate-800">
+                        {formatCurrency(travelType === 'construction' ? constructionTravelCost.laborCost : installationTravelCost.laborCost)} บาท
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 mb-1">รวมค่าเดินทาง:</div>
                       <div className="text-xl font-bold text-slate-900">
-                        {formatCurrency(travelTotals.total)} บาท
+                        {formatCurrency(travelCostResult || travelTotals.total)} บาท
                       </div>
                     </div>
                   </div>
@@ -9538,9 +9764,9 @@ function MoreDetailCard(props: any) {
 
           <Separator />
 
-          {/* ราคารวมสุดท้าย (รวมทุกอย่าง) */}
+          {/* เสนอราคา (รวมทุกอย่าง) */}
           <div className="p-5 rounded-xl bg-gradient-to-br from-green-900 via-green-800 to-green-900 text-white shadow-sm">
-            <div className="text-sm text-green-200/80 mb-2">ราคารวมสร้างสถานี</div>
+            <div className="text-sm text-green-200/80 mb-2">เสนอราคา</div>
             <div className="text-3xl font-bold tracking-tight">{formatCurrency(finalStationTotals.total)} บาท</div>
             <div className="text-xs text-green-200/60 mt-2">
               รวมราคารวมสร้างสถานีรวมกำไร% CF% และ ค่าเดินทาง (ไม่รวมค่าดำเนินการทางไฟฟ้า)
