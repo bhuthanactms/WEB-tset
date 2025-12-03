@@ -2954,29 +2954,163 @@ function MoreDetailCard(props: any) {
     stationCostSections.forEach((section, index) => {
       if (section.key === 'additional') {
         // สำหรับ Additional Features & Options ให้แสดงแต่ละหัวข้อย่อย
-        if (section.products && section.products.length > 0) {
-          // Group products by type
-          const productsByType = new Map<string, { material: number; labor: number; total: number }>();
+        // Map type เป็นชื่อหัวข้อที่ถูกต้อง (ชื่อแบบสั้น)
+        const typeToLabelMap: { [key: string]: string } = {
+          'อุปกรณ์ประกอบสถานี': 'อุปกรณ์ประกอบสถานี',
+          'ระบบสื่อสาร': 'ระบบสื่อสาร',
+          'งานปูน': 'งานปูน',
+          'งานทาสี': 'งานทาสี / ทาสีช่องจอด',
+          'ทาสีช่องจอด': 'งานทาสี / ทาสีช่องจอด',
+          'งานป้าย': 'งานป้าย',
+          'หลังคา': 'หลังคา'
+        };
 
+        // Group products by type
+        const productsByType = new Map<string, { material: number; labor: number; total: number }>();
+        const roofProductsByType = new Map<string, { material: number; labor: number; total: number }>();
+
+        if (section.products && section.products.length > 0) {
           section.products.forEach((product: any) => {
             const type = product.type || 'อื่นๆ';
-            if (!productsByType.has(type)) {
-              productsByType.set(type, { material: 0, labor: 0, total: 0 });
+
+            // สำหรับหลังคา ให้แยกตาม productName
+            if (type === 'หลังคา') {
+              let roofType = '';
+              const productName = product.productName || '';
+              if (productName.includes('MDB') || productName.includes('mdb')) {
+                roofType = 'หลังคาเฉพาะ MDB';
+              } else if (productName.includes('CHARGER') || productName.includes('charger') || productName.includes('เครื่องชาร์จ')) {
+                roofType = 'หลังคาเครื่องชาร์จ';
+              } else if (productName.includes('ลานจอดรถ') || productName.includes('ช่องจอด')) {
+                roofType = 'หลังคาคุมช่องจอด';
+              } else {
+                roofType = 'หลังคา';
+              }
+
+              if (!roofProductsByType.has(roofType)) {
+                roofProductsByType.set(roofType, { material: 0, labor: 0, total: 0 });
+              }
+              const totals = roofProductsByType.get(roofType)!;
+              totals.material += product.materialTotal || 0;
+              totals.labor += product.laborTotal || 0;
+              totals.total += product.totalPrice || 0;
+            } else {
+              // สำหรับ type อื่นๆ group ตาม type ปกติ
+              if (!productsByType.has(type)) {
+                productsByType.set(type, { material: 0, labor: 0, total: 0 });
+              }
+              const totals = productsByType.get(type)!;
+              totals.material += product.materialTotal || 0;
+              totals.labor += product.laborTotal || 0;
+              totals.total += product.totalPrice || 0;
             }
-            const totals = productsByType.get(type)!;
-            totals.material += product.materialTotal || 0;
-            totals.labor += product.laborTotal || 0;
-            totals.total += product.totalPrice || 0;
           });
 
-          // สร้าง row สำหรับแต่ละ type
+          // สร้าง row สำหรับแต่ละ type โดยใช้ชื่อหัวข้อที่ถูกต้อง
           productsByType.forEach((totals, type) => {
+            const label = typeToLabelMap[type] || type;
             costSummaryRows.push({
-              type: type,
+              type: label,
               material: totals.material,
               labor: totals.labor,
               total: totals.total
             });
+          });
+
+          // สร้าง row สำหรับหลังคาแต่ละประเภท (ใช้ชื่อแบบสั้น)
+          roofProductsByType.forEach((totals, roofType) => {
+            let label = '';
+            if (roofType === 'หลังคาเฉพาะ MDB') {
+              label = 'หลังคา';
+            } else if (roofType === 'หลังคาเครื่องชาร์จ') {
+              label = 'หลังคา';
+            } else if (roofType === 'หลังคาคุมช่องจอด') {
+              label = 'หลังคา';
+            } else {
+              label = 'หลังคา';
+            }
+            costSummaryRows.push({
+              type: label,
+              material: totals.material,
+              labor: totals.labor,
+              total: totals.total
+            });
+          });
+        }
+
+        // เพิ่มหัวข้อที่ไม่มี products แต่มีค่าใน totals (ใช้ชื่อแบบสั้น)
+        // 1. ระบบสื่อสาร (ถ้ามีค่า และยังไม่มีใน products)
+        if (communicationTotals.total > 0 && !productsByType.has('ระบบสื่อสาร')) {
+          costSummaryRows.push({
+            type: 'ระบบสื่อสาร',
+            material: communicationTotals.material,
+            labor: communicationTotals.labor,
+            total: communicationTotals.total
+          });
+        }
+
+        // 2. งานปูน (ถ้ามีค่า และยังไม่มีใน products)
+        if (concreteTotals.total > 0 && !productsByType.has('งานปูน')) {
+          costSummaryRows.push({
+            type: 'งานปูน',
+            material: concreteTotals.material,
+            labor: concreteTotals.labor,
+            total: concreteTotals.total
+          });
+        }
+
+        // 3. งานทาสี / ทาสีช่องจอด (ถ้ามีค่า และยังไม่มีใน products)
+        if (paintingTotals.total > 0 && !productsByType.has('งานทาสี') && !productsByType.has('ทาสีช่องจอด')) {
+          costSummaryRows.push({
+            type: 'งานทาสี / ทาสีช่องจอด',
+            material: paintingTotals.material,
+            labor: paintingTotals.labor,
+            total: paintingTotals.total
+          });
+        }
+
+        // 4. งานป้าย (ถ้ามีค่า และยังไม่มีใน products)
+        if (signageWorkTotals.total > 0 && !productsByType.has('งานป้าย')) {
+          costSummaryRows.push({
+            type: 'งานป้าย',
+            material: signageWorkTotals.material,
+            labor: signageWorkTotals.labor,
+            total: signageWorkTotals.total
+          });
+        }
+
+        // 5. หลังคา (รวมทุกประเภทเป็นแถวเดียว)
+        // สำหรับหลังคา ใช้ชื่อ "หลังคา" และรวมทุกประเภทที่ยังไม่มีใน products
+        let roofMaterial = 0;
+        let roofLabor = 0;
+        let roofTotal = 0;
+        let hasRoofData = false;
+
+        if (mdbRoofTotals.total > 0 && !roofProductsByType.has('หลังคาเฉพาะ MDB')) {
+          roofMaterial += mdbRoofTotals.material;
+          roofLabor += mdbRoofTotals.labor;
+          roofTotal += mdbRoofTotals.total;
+          hasRoofData = true;
+        }
+        if (chargerRoofTotals.total > 0 && !roofProductsByType.has('หลังคาเครื่องชาร์จ')) {
+          roofMaterial += chargerRoofTotals.material;
+          roofLabor += chargerRoofTotals.labor;
+          roofTotal += chargerRoofTotals.total;
+          hasRoofData = true;
+        }
+        if (parkingRoofTotals.total > 0 && !roofProductsByType.has('หลังคาคุมช่องจอด')) {
+          roofMaterial += parkingRoofTotals.material;
+          roofLabor += parkingRoofTotals.labor;
+          roofTotal += parkingRoofTotals.total;
+          hasRoofData = true;
+        }
+
+        if (hasRoofData) {
+          costSummaryRows.push({
+            type: 'หลังคา',
+            material: roofMaterial,
+            labor: roofLabor,
+            total: roofTotal
           });
         }
       } else {

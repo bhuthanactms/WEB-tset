@@ -190,34 +190,40 @@ export function createCostPDF(jsonData) {
 
     // Handle different table types
     if (type === 'cost') {
-      // Cost table type - ตารางซ้าย-ขวา ข้างละ 6 แถว
+      // Cost table type - ตารางซ้าย-ขวา ข้างละ 7 แถว (ขยายจาก 6 เป็น 7)
       const costRows = rows.rows || [];
       const summaryMaterial = rows.summary_material || 0;
       const summaryLabor = rows.summary_labor || 0;
       const summaryTotal = rows.summary_total || 0;
 
-      // สร้างข้อมูลสำหรับตารางซ้าย (หัวข้อ 1-6)
-      const leftTableData = costRows.slice(0, 6).map(row => [
+      // สร้างข้อมูลสำหรับตารางซ้าย (หัวข้อ 1-7)
+      const leftTableData = costRows.slice(0, 7).map(row => [
         row.type || '',
         formatCurrency(row.material || 0),
         formatCurrency(row.labor || 0),
         formatCurrency(row.total || 0)
       ]);
 
-      // สร้างข้อมูลสำหรับตารางขวา (หัวข้อ 7 + แถวสรุป)
+      // สร้างข้อมูลสำหรับตารางขวา (หัวข้อที่เหลือทั้งหมด + แถวสรุป)
       const rightTableData = [];
-      if (costRows.length >= 7) {
+      // แสดงหัวข้อทั้งหมดที่เหลือ (เริ่มจาก index 7)
+      const remainingRows = costRows.slice(7);
+      remainingRows.forEach(row => {
         rightTableData.push([
-          costRows[6].type || '',
-          formatCurrency(costRows[6].material || 0),
-          formatCurrency(costRows[6].labor || 0),
-          formatCurrency(costRows[6].total || 0)
+          row.type || '',
+          formatCurrency(row.material || 0),
+          formatCurrency(row.labor || 0),
+          formatCurrency(row.total || 0)
         ]);
-      }
-      // เพิ่มแถวว่างเพื่อให้ครบ 6 แถว
-      while (rightTableData.length < 5) {
+      });
+
+      // เพิ่มแถวว่างเพื่อให้ตารางขวามีความสูงพอๆ กับตารางซ้าย (อย่างน้อย 7 แถว)
+      // แต่ถ้ามีหัวข้อมากกว่า 7 แถวแล้ว ก็ไม่ต้องเพิ่มแถวว่าง
+      const minRows = 7; // ขยายจาก 6 เป็น 7
+      while (rightTableData.length < minRows - 1) { // -1 เพราะจะเพิ่มแถวสรุป
         rightTableData.push(['', '', '', '']);
       }
+
       // แถวสุดท้าย: ต้นทุนรวมเบื้องต้น
       rightTableData.push([
         'ต้นทุนรวมเบื้องต้น',
