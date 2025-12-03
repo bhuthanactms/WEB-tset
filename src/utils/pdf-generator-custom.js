@@ -185,22 +185,64 @@ export function createCostPDF(jsonData) {
 
     currentY += 2; // ลดระยะห่างจาก 5mm เป็น 2mm เพื่อให้ใกล้ตารางมากขึ้น
 
+    // ตัวแปรสำหรับเก็บ startY สำหรับหน้าใหม่
+    let continuationStartY = null;
+
     // Handle different table types
     if (type === 'cost') {
-      // Cost table type
-      const part_price = rows.part_price || 0;
-      const wage_price = rows.wage_price || 0;
-      const totalCost = part_price + wage_price;
+      // Cost table type - ตารางซ้าย-ขวา ข้างละ 6 แถว
+      const costRows = rows.rows || [];
+      const summaryMaterial = rows.summary_material || 0;
+      const summaryLabor = rows.summary_labor || 0;
+      const summaryTotal = rows.summary_total || 0;
 
-      const tableData = [
-        ['แรงสูง +แรงต่ำ +อุปกรณ์เพิ่มเติม', formatCurrency(part_price), formatCurrency(wage_price)],
-        ['', 'รวม', formatCurrency(totalCost)],
-      ];
+      // สร้างข้อมูลสำหรับตารางซ้าย (หัวข้อ 1-6)
+      const leftTableData = costRows.slice(0, 6).map(row => [
+        row.type || '',
+        formatCurrency(row.material || 0),
+        formatCurrency(row.labor || 0),
+        formatCurrency(row.total || 0)
+      ]);
 
+      // สร้างข้อมูลสำหรับตารางขวา (หัวข้อ 7 + แถวสรุป)
+      const rightTableData = [];
+      if (costRows.length >= 7) {
+        rightTableData.push([
+          costRows[6].type || '',
+          formatCurrency(costRows[6].material || 0),
+          formatCurrency(costRows[6].labor || 0),
+          formatCurrency(costRows[6].total || 0)
+        ]);
+      }
+      // เพิ่มแถวว่างเพื่อให้ครบ 6 แถว
+      while (rightTableData.length < 5) {
+        rightTableData.push(['', '', '', '']);
+      }
+      // แถวสุดท้าย: ต้นทุนรวมเบื้องต้น
+      rightTableData.push([
+        'ต้นทุนรวมเบื้องต้น',
+        formatCurrency(summaryMaterial),
+        formatCurrency(summaryLabor),
+        formatCurrency(summaryTotal)
+      ]);
+
+      // คำนวณความกว้างที่ใช้ได้ทั้งหมด (ไม่ให้ล้นกระดาษ)
+      const pageWidth = 210; // A4 width in mm
+      const leftMargin = 14;
+      const rightMargin = 14;
+      const gap = 5; // ระยะห่างระหว่างตาราง
+      const availableWidth = pageWidth - leftMargin - rightMargin - gap;
+      const tableWidth = availableWidth / 2; // แต่ละตารางได้ความกว้างเท่ากัน
+      const columnWidth = tableWidth / 4; // แต่ละคอลัมน์ได้ความกว้างเท่ากัน
+
+      // คำนวณตำแหน่งเริ่มต้นของตารางขวา
+      const rightTableStartX = leftMargin + tableWidth + gap;
+
+      // ตารางซ้าย (หัวข้อ 1-6)
       autoTable(doc, {
         startY: currentY,
-        head: [['ต้นทุนรวมอุปกรณ์ + ค่าแรง', 'ค่าของรวม', 'ค่าแรงรวม']],
-        body: tableData,
+        head: [['ประเภท', 'ค่าของรวม', 'ค่าแรงรวม', 'ราคารวม']],
+        body: leftTableData,
         theme: 'grid',
         headStyles: {
           fillColor: [255, 255, 255],
@@ -228,12 +270,72 @@ export function createCostPDF(jsonData) {
           fillColor: [255, 255, 255],
         },
         columnStyles: {
-          0: { halign: 'left', cellWidth: 80 },
-          1: { halign: 'right', cellWidth: 50 },
-          2: { halign: 'right', cellWidth: 50, fontStyle: 'bold' },
+          0: { halign: 'left', cellWidth: columnWidth },
+          1: { halign: 'right', cellWidth: columnWidth },
+          2: { halign: 'right', cellWidth: columnWidth },
+          3: { halign: 'right', cellWidth: columnWidth, fontStyle: 'bold' },
         },
-        margin: { left: 14, right: 14 },
+        margin: { left: leftMargin, right: pageWidth - leftMargin - tableWidth }, // คำนวณ margin ขวาให้พอดี
       });
+
+      const leftTableEndY = doc.lastAutoTable.finalY;
+
+      // ตารางขวา (หัวข้อ 7 + แถวสรุป)
+      autoTable(doc, {
+        startY: currentY,
+        head: [['ประเภท', 'ค่าของรวม', 'ค่าแรงรวม', 'ราคารวม']],
+        body: rightTableData,
+        theme: 'grid',
+        headStyles: {
+          fillColor: [255, 255, 255],
+          textColor: [0, 0, 0],
+          fontSize: 7,
+          fontStyle: 'bold',
+          halign: 'center',
+          font: 'Sarabun',
+          cellPadding: { top: 2, right: 1, bottom: 2, left: 1 },
+          minCellHeight: 5,
+          lineWidth: 0.1,
+          lineColor: [0, 0, 0],
+        },
+        styles: {
+          fontSize: 6,
+          cellPadding: { top: 2, right: 1, bottom: 2, left: 1 },
+          minCellHeight: 5,
+          font: 'Sarabun',
+          fillColor: [255, 255, 255],
+          textColor: [0, 0, 0],
+          lineWidth: 0.1,
+          lineColor: [0, 0, 0],
+        },
+        alternateRowStyles: {
+          fillColor: [255, 255, 255],
+        },
+        columnStyles: {
+          0: { halign: 'left', cellWidth: columnWidth },
+          1: { halign: 'right', cellWidth: columnWidth },
+          2: { halign: 'right', cellWidth: columnWidth },
+          3: { halign: 'right', cellWidth: columnWidth, fontStyle: 'bold' },
+        },
+        margin: { left: rightTableStartX, right: rightMargin }, // เริ่มจากตำแหน่งที่คำนวณได้
+        willDrawCell: (data) => {
+          // แถวสุดท้าย (ต้นทุนรวมเบื้องต้น) - เพิ่ม font size 1 และทำตัวหนา
+          if (data.row.index === rightTableData.length - 1) {
+            doc.setFontSize(7); // เพิ่มจาก 6 เป็น 7 (เพิ่ม 1 size)
+            doc.setFont('Sarabun', 'bold');
+          }
+        },
+        didDrawCell: (data) => {
+          // Reset font หลังจากวาด cell
+          if (data.row.index === rightTableData.length - 1) {
+            doc.setFontSize(6);
+            doc.setFont('Sarabun', 'normal');
+          }
+        },
+      });
+
+      // ใช้ตำแหน่งที่ตารางขวาจบ (หรือตารางซ้ายถ้าสูงกว่า)
+      currentY = Math.max(leftTableEndY, doc.lastAutoTable.finalY);
 
     } else if (type === 'distance') {
       // Distance table type with 2-level headers
@@ -298,9 +400,10 @@ export function createCostPDF(jsonData) {
         row.name || '',
         row.amount || 0,
         row.range === '-' || row.range === null || row.range === undefined ? '-' : row.range,
-        formatCurrency(row.parts_total || 0),
-        formatCurrency(row.wage_total || 0),
-        formatCurrency(row.total || 0),
+        // ถ้า parts_total, wage_total, หรือ total เป็น '-' ให้แสดง '-' แทน formatCurrency
+        row.parts_total === '-' ? '-' : formatCurrency(row.parts_total || 0),
+        row.wage_total === '-' ? '-' : formatCurrency(row.wage_total || 0),
+        row.total === '-' ? '-' : formatCurrency(row.total || 0),
       ]);
 
       // Calculate totals for footer row
@@ -321,14 +424,32 @@ export function createCostPDF(jsonData) {
           // Show table name on continuation pages (pages after the first page of this table)
           const currentPageNum = data.pageNumber;
           if (currentPageNum > tableStartPage) {
-            // เพิ่มระยะห่างจาก margin.top เพื่อไม่ให้ทับกับตาราง
-            const yPos = (data.settings.margin.top || 20) + 5;
+            // ตรวจสอบว่าตารางเริ่มที่ตำแหน่งไหนในหน้านี้
+            const marginTop = data.settings.margin.top || 20;
+            // หัวข้อควรอยู่เหนือตาราง โดยเพิ่มระยะห่างให้เพียงพอ (ประมาณ 15mm)
+            // ตารางจะเริ่มที่ marginTop ดังนั้นหัวข้อควรอยู่ที่ marginTop - 15
+            const yPos = Math.max(12, marginTop - 15); // อย่างน้อย 12mm จากด้านบน
             doc.setFontSize(9);
             doc.setTextColor(40);
             doc.setFont('Sarabun', 'bold');
             // ใช้ doc.text แบบที่รองรับภาษาไทยดีกว่า
             const tableNameText = tablename || `Table ${index + 1}`;
             doc.text(tableNameText, 14, yPos);
+
+            // เก็บตำแหน่ง startY สำหรับหน้าใหม่ (หัวข้อ + ระยะห่าง 10mm)
+            continuationStartY = yPos + 10;
+          }
+        },
+        willDrawCell: function (data) {
+          // ปรับ startY ของตารางในหน้าใหม่ให้ต่ำลงเมื่อมีหัวข้อ
+          if (continuationStartY !== null && data.pageNumber > tableStartPage) {
+            // ถ้าเป็นแถวแรกของตารางในหน้าใหม่ และยังไม่ได้ปรับ startY
+            if (data.row.index === 0 && data.column.index === 0) {
+              // ตรวจสอบว่า cursor.y ใกล้กับ marginTop มากเกินไป
+              if (data.cursor && data.cursor.y !== undefined && data.cursor.y < continuationStartY) {
+                data.cursor.y = continuationStartY;
+              }
+            }
           }
         },
         theme: 'grid',
@@ -439,9 +560,9 @@ export function createCostPDF(jsonData) {
     let leftY = startY;
     const valueFontSize = 10; // เพิ่ม 3 size จาก 7
 
-    // ACCESSORIES = x% = (จำนวนเงิน (กำไร%)) × x% ของ Additional Features & Options = ค่า Accessories
-    const additionalFeaturesTotal = summary.additional_features_total || 0;
-    const accessoriesText = `ACCESSORIES = ${summary.accessories_percent || 0}% = ${formatCurrency(additionalFeaturesTotal)} × ${summary.accessories_percent || 0}% = `;
+    // ACCESSORIES = x% = (ค่าที่โชว์ Accessories)
+    const accessoriesPercent = summary.accessories_percent || 0; // x%
+    const accessoriesText = `ACCESSORIES = ${accessoriesPercent}% = `;
     const accessoriesValue = formatCurrency(summary.accessories_amount || 0);
     doc.text(accessoriesText, leftX, leftY);
     const accessoriesValueX = leftX + doc.getTextWidth(accessoriesText);
@@ -482,13 +603,11 @@ export function createCostPDF(jsonData) {
     doc.setFontSize(10); // เพิ่ม 3 size จาก 7
     leftY += lineHeight;
 
-    // + ค่าที่พัก = ค่าที่พัก + อาหาร: + ค่าเดินทางระหว่างที่พัก = ค่าเดินทางระหว่างที่พัก: = รวมค่าเดินทาง:
+    // + ค่าที่พัก = ค่าที่พัก + อาหาร: + ค่าเดินทางระหว่างที่พัก = ค่าเดินทางระหว่างที่พัก:
     const accommodationText1 = `+ ค่าที่พัก = `;
     const accommodationValue1 = formatCurrency(summary.accommodation_food || 0);
     const accommodationText2 = ` + ค่าเดินทางระหว่างที่พัก = `;
     const accommodationValue2 = formatCurrency(summary.travel_between_accommodation || 0);
-    const accommodationText3 = ` = `;
-    const accommodationValue3 = formatCurrency(summary.total_travel_cost || 0);
     doc.text(accommodationText1, leftX, leftY);
     currentX = leftX + doc.getTextWidth(accommodationText1);
     doc.setFontSize(valueFontSize);
@@ -502,9 +621,13 @@ export function createCostPDF(jsonData) {
     doc.text(accommodationValue2, currentX, leftY);
     drawDashedUnderline(currentX, leftY, accommodationValue2, valueFontSize);
     doc.setFontSize(10); // เพิ่ม 3 size จาก 7
-    currentX += doc.getTextWidth(accommodationValue2);
-    doc.text(accommodationText3, currentX, leftY);
-    currentX += doc.getTextWidth(accommodationText3);
+    leftY += lineHeight;
+
+    // = รวมค่าเดินทาง: (ย้ายลงไปอีกบรรทัด)
+    const accommodationText3 = `= `;
+    const accommodationValue3 = formatCurrency(summary.total_travel_cost || 0);
+    doc.text(accommodationText3, leftX, leftY);
+    currentX = leftX + doc.getTextWidth(accommodationText3);
     doc.setFontSize(valueFontSize);
     doc.text(accommodationValue3, currentX, leftY);
     drawDashedUnderline(currentX, leftY, accommodationValue3, valueFontSize);
@@ -514,7 +637,7 @@ export function createCostPDF(jsonData) {
     // Right column
     let rightY = startY;
 
-    // ต้นทุนรวม = ต้นทุนงานเอกสาร
+    // ต้นทุนรวม = ราคารวมสร้างสถานี
     const totalCostText = `ต้นทุนรวม = `;
     const totalCostValue = formatCurrency(summary.total_cost || 0);
     doc.text(totalCostText, rightX, rightY);
