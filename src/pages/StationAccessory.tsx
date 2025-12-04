@@ -591,7 +591,8 @@ function MoreDetailCard(props: any) {
   const [lightingCableDistance, setLightingCableDistance] = useState(props.lightingCableDistance || '');
   const [bumperPoleMaterial, setBumperPoleMaterial] = useState<'steel' | 'stainless'>('steel');
   const [wheelStopMaterial, setWheelStopMaterial] = useState<'rubber' | 'concrete'>('rubber');
-  const [fireExtinguisherType, setFireExtinguisherType] = useState<'abc' | 'co2'>('abc');
+  // ถังดับเพลิง+ตู้ ใช้ CO2 เท่านั้น ไม่ต้องเลือกประเภท
+  const fireExtinguisherType: 'co2' = 'co2';
 
   // Section 2: ระบบสื่อสาร (yes=มี, no=ไม่มี)
   const [wifi4gHub, setWifi4gHub] = useState(props.wifi4gHub || 'no');
@@ -907,7 +908,8 @@ function MoreDetailCard(props: any) {
 
   const bumperPoleRowNum = bumperPoleMaterial === 'steel' ? 7 : 8;
   const wheelStopRowNum = wheelStopMaterial === 'rubber' ? 5 : 6;
-  const fireExtinguisherRowNum = fireExtinguisherType === 'abc' ? 3 : 4;
+  // ถังดับเพลิง+ตู้ ใช้ CO2 เท่านั้น (row 4)
+  const fireExtinguisherRowNum = 4;
 
   const bumperPolePricing = bumperPoles === 'yes'
     ? getAccessoryPricing(bumperPoleRowNum, bumperPoleQuantity)
@@ -1229,7 +1231,7 @@ function MoreDetailCard(props: any) {
         totals.total += item2.total;
       }
     } else if (signageStationType === 'eic') {
-      // สถานี EIC: 2.1.1-2.1.8 (row 9-15), 2.2.1-2.2.4 (row 18-21)
+      // สถานี EIC: 2.1.1-2.1.8 (row 9-15), 2.2.1-2.2.4 (row 19-21) - ลบ row 18 ออก
       for (let rowNum = 9; rowNum <= 15; rowNum++) {
         const item = getSignagePricing(rowNum);
         if (item) {
@@ -1238,18 +1240,19 @@ function MoreDetailCard(props: any) {
           totals.total += item.total;
         }
       }
-      for (let rowNum = 18; rowNum <= 21; rowNum++) {
+      for (let rowNum = 19; rowNum <= 21; rowNum++) {
         const item = getSignagePricing(rowNum);
         if (item) {
-          totals.material += item.materialTotal;
-          totals.labor += item.laborTotal;
-          totals.total += item.total;
+          // คูณราคากับจำนวนช่องจอด
+          totals.material += item.materialUnit * parkingSlotsCount;
+          totals.labor += item.laborUnit * parkingSlotsCount;
+          totals.total += item.totalUnit * parkingSlotsCount;
         }
       }
     }
 
     return totals;
-  }, [signageWorkSelection, signageStationType, signageSheet]);
+  }, [signageWorkSelection, signageStationType, signageSheet, parkingSlotsCount]);
 
   const additionalFeaturesTotals = {
     material: equipmentTotals.material + communicationTotals.material + concreteTotals.material + paintingTotals.material + parkingRoofTotals.material + mdbRoofTotals.material + chargerRoofTotals.material + signageWorkTotals.material,
@@ -1514,7 +1517,7 @@ function MoreDetailCard(props: any) {
       return emptyTotals;
     }
 
-    const conduit = props.trWiringType === 'ร้อยท่อเดินในอากาศ กลุ่ม 2' ? trWiringGroup2 : '';
+    const conduit = props.trWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2' ? trWiringGroup2 : '';
     const priceData = getTrToMdbPrice(
       props.trWiringType,
       conduit,
@@ -2208,7 +2211,7 @@ function MoreDetailCard(props: any) {
         const inputDistance = parseFloat(trDistance || '0');
         const distance = inputDistance + 9; // ระยะที่กรอก + 9 สำหรับการคำนวณ
         if (inputDistance > 0) {
-          const conduit = props.trWiringType === 'ร้อยท่อเดินในอากาศ กลุ่ม 2' ? trWiringGroup2 : '';
+          const conduit = props.trWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2' ? trWiringGroup2 : '';
           const priceData = getTrToMdbPrice(
             props.trWiringType,
             conduit,
@@ -2229,13 +2232,13 @@ function MoreDetailCard(props: any) {
             // 2. ท่อ: เพิ่มตามประเภทการเดินสาย
             let conduitDisplay = props.trWireConduit || '';
 
-            // 2.1 ถ้า ประเภท: ร้อยท่อเดินในอากาศ กลุ่ม 2 ให้เพิ่ม เลือกท่อ: ที่กดเลือกมาวางไว้หน้าค่า
-            if (props.trWiringType === 'ร้อยท่อเดินในอากาศ กลุ่ม 2' && conduit) {
+            // 2.1 ถ้า ประเภท: ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2 ให้เพิ่ม เลือกท่อ: ที่กดเลือกมาวางไว้หน้าค่า
+            if (props.trWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2' && conduit) {
               conduitDisplay = `${conduit} ${conduitDisplay}`.trim();
             }
 
-            // 2.2 ถ้า ประเภท: ร้อยท่อฝังใต้ดิน กลุ่ม 5 ให้เพิ่ม __EMPTY_11 วางหน้าค่าเดิม
-            if (props.trWiringType === 'ร้อยท่อฝังใต้ดิน กลุ่ม 5') {
+            // 2.2 ถ้า ประเภท: ขนาดสายไฟ 3P 4W ร้อยท่อฝังใต้ดิน กลุ่ม 5 ให้เพิ่ม __EMPTY_11 วางหน้าค่าเดิม
+            if (props.trWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อฝังใต้ดิน กลุ่ม 5') {
               // ดึงข้อมูล __EMPTY_11 จาก trToMdbMapping
               const transformerSize = parseInt(props.transformer || '0');
               const powerAuthority = props.powerAuthority || '';
@@ -2244,6 +2247,16 @@ function MoreDetailCard(props: any) {
               if (empty11Value) {
                 conduitDisplay = `${empty11Value} ${conduitDisplay}`.trim();
               }
+            }
+
+            // 2.3 ถ้า ประเภท: ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา ให้เพิ่ม TRAY นำหน้าค่า
+            if (props.trWiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา') {
+              conduitDisplay = `TRAY ${conduitDisplay}`.trim();
+            }
+
+            // 2.4 ถ้า ประเภท: ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา ให้เพิ่ม LADDER นำหน้าค่า
+            if (props.trWiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา') {
+              conduitDisplay = `LADDER ${conduitDisplay}`.trim();
             }
 
             if (conduitDisplay) {
@@ -2257,7 +2270,7 @@ function MoreDetailCard(props: any) {
               type: props.trWiringType || '',
               code: priceData.productCode || priceData.code || '',
               productName: productName,
-              distance: `${distance} เมตร (${inputDistance} เมตร)`, // แสดงค่าที่+9 (ค่าที่กรอก)
+              distance: inputDistance > 0 ? `${distance}(${inputDistance})` : undefined, // แสดงเป็น x(y) โดย x = distance, y = inputDistance
               materialTotal: parsePrice(priceData.materialPrice),
               laborTotal: parsePrice(priceData.laborPrice),
               totalPrice: parsePrice(priceData.totalPrice),
@@ -2283,7 +2296,7 @@ function MoreDetailCard(props: any) {
         ].filter(Boolean).join('/') || '-';
 
         products.push({
-          type: 'MDB Configuration',
+          type: 'Main MCCB',
           code: mdbConfiguration.header?.productCodeHeader || '', // รหัสสินค้า
           productName: listingValue !== '-' ? `${mdbConfiguration.mccbBrand || ''} (${listingValue})` : (mdbConfiguration.mccbBrand || ''), // ประเภท + (รายการ)
           materialTotal: mainPrice,
@@ -2300,7 +2313,7 @@ function MoreDetailCard(props: any) {
               mccbSubData.forEach((item: any) => {
                 if (item.price && item.price !== '-') {
                   products.push({
-                    type: 'MCCB Sub',
+                    type: 'Sub MCCB',
                     code: item.model || '',
                     productName: `${mccbSubBrand} MCCB SUB ${item.value || val}`, // เพิ่มยี่ห้อด้านหน้า เช่น "ABB MCCB SUB 100 A"
                     materialTotal: parsePrice(item.price),
@@ -2328,11 +2341,11 @@ function MoreDetailCard(props: any) {
             quantity: '1',
           });
 
-          // แถวที่สอง: ค่าGround
+          // แถวที่สอง: ระบบ Ground MDB
           products.push({
             type: 'ตู้ MDB',
             code: 'ตู้ MDB',
-            productName: 'ค่าGround(MDB)',
+            productName: 'ระบบ Ground MDB',
             materialTotal: getMdbCabinetData.groundPrice, // ราคาGround
             laborTotal: 0,
             totalPrice: getMdbCabinetData.groundPrice,
@@ -2364,12 +2377,12 @@ function MoreDetailCard(props: any) {
           const conduits: string[] = Array.isArray(props.chargerWireConduitAll) ? props.chargerWireConduitAll : (props.chargerWireConduit ? [props.chargerWireConduit] : []);
           let conduitDisplay = conduits[idx] || conduits[0] || '';
 
-          // 2.1 ถ้า ประเภท: ร้อยท่อเดินในอากาศ กลุ่ม 2 ให้เพิ่ม เลือกท่อ: ที่กดเลือกมาวางไว้หน้าค่า
+          // 2.1 ถ้า ประเภท: ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2 ให้เพิ่ม เลือกท่อ: ที่กดเลือกมาวางไว้หน้าค่า
           if (props.chargerWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ' && chargerConduitChoices[idx]) {
             conduitDisplay = `${chargerConduitChoices[idx]} ${conduitDisplay}`.trim();
           }
 
-          // 2.2 ถ้า ประเภท: ร้อยท่อฝังใต้ดิน กลุ่ม 5 ให้เพิ่ม __EMPTY_11 วางหน้าค่าเดิม
+          // 2.2 ถ้า ประเภท: ขนาดสายไฟ 3P 4W ร้อยท่อฝังใต้ดิน กลุ่ม 5 ให้เพิ่ม __EMPTY_11 วางหน้าค่าเดิม
           if (props.chargerWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน') {
             // ดึงข้อมูล __EMPTY_11 จาก Excel data
             const chargerName = props.chargerSummary?.[idx]?.name || '';
@@ -2400,7 +2413,7 @@ function MoreDetailCard(props: any) {
             type: props.chargerWiringType || 'MDB to Charger',
             code: result.code || '',
             productName: productName,
-            distance: inputDistance > 0 ? `${distance} เมตร (${inputDistance} เมตร)` : undefined, // แสดงค่าที่+2.5 (ค่าที่กรอก)
+            distance: inputDistance > 0 ? `${distance}(${inputDistance})` : undefined, // แสดงเป็น x(y) โดย x = distance, y = inputDistance
             materialTotal: parsePrice(result.materialCost),
             laborTotal: parsePrice(result.laborCost),
             totalPrice: parsePrice(result.materialCost) + parsePrice(result.laborCost),
@@ -2426,7 +2439,7 @@ function MoreDetailCard(props: any) {
           products.push({
             type: 'อุปกรณ์ประกอบสถานี',
             code: wheelStopPricing.row?.__EMPTY || '-',
-            productName: `ยางกั้นล้อ (${wheelStopMaterial === 'rubber' ? 'ยาง' : 'ปูน'})`,
+            productName: `ขอบกั้นล้อ (${wheelStopMaterial === 'rubber' ? 'ยาง' : 'ปูน'})`,
             materialTotal: wheelStopPricing.materialTotal,
             laborTotal: wheelStopPricing.laborTotal,
             totalPrice: wheelStopPricing.total,
@@ -2437,7 +2450,7 @@ function MoreDetailCard(props: any) {
           products.push({
             type: 'อุปกรณ์ประกอบสถานี',
             code: fireExtinguisherPricing.row?.__EMPTY || '-',
-            productName: `ถังดับเพลิง+ตู้ (${fireExtinguisherType === 'abc' ? 'A+B+C' : 'CO2'})`,
+            productName: 'ถังดับเพลิง+ตู้ (CO2)',
             materialTotal: fireExtinguisherPricing.materialTotal,
             laborTotal: fireExtinguisherPricing.laborTotal,
             totalPrice: fireExtinguisherPricing.total,
@@ -2471,8 +2484,7 @@ function MoreDetailCard(props: any) {
           });
         }
         if (wifi4gHub === 'yes' && routerCablePricing) {
-          // ถ้าไม่มีค่า (materialTotal, laborTotal, totalPrice = 0) quantity = 1 ไม่ใช่เอาระยะมาใส่
-          const hasNoValue = routerCablePricing.materialTotal === 0 && routerCablePricing.laborTotal === 0 && routerCablePricing.total === 0;
+          // Fix quantity เป็น 1 เสมอสำหรับสาย ROUTER
           products.push({
             type: 'ระบบสื่อสาร',
             code: routerCablePricing.row?.__EMPTY || '-',
@@ -2480,7 +2492,7 @@ function MoreDetailCard(props: any) {
             materialTotal: routerCablePricing.materialTotal,
             laborTotal: routerCablePricing.laborTotal,
             totalPrice: routerCablePricing.total,
-            quantity: hasNoValue ? '1' : routerCablePricing.quantity.toString(),
+            quantity: '1', // Fix เป็น 1 เสมอ
             distance: routerCableDistance ? `${routerCableDistance} เมตร` : undefined,
           });
         }
@@ -2496,8 +2508,7 @@ function MoreDetailCard(props: any) {
           });
         }
         if (cctv === 'yes' && cctvCablePricing) {
-          // ถ้าไม่มีค่า (materialTotal, laborTotal, totalPrice = 0) quantity = 1 ไม่ใช่เอาระยะมาใส่
-          const hasNoValue = cctvCablePricing.materialTotal === 0 && cctvCablePricing.laborTotal === 0 && cctvCablePricing.total === 0;
+          // Fix quantity เป็น 1 เสมอสำหรับสาย CCTV
           products.push({
             type: 'ระบบสื่อสาร',
             code: cctvCablePricing.row?.__EMPTY || '-',
@@ -2505,7 +2516,7 @@ function MoreDetailCard(props: any) {
             materialTotal: cctvCablePricing.materialTotal,
             laborTotal: cctvCablePricing.laborTotal,
             totalPrice: cctvCablePricing.total,
-            quantity: hasNoValue ? '1' : cctvCablePricing.quantity.toString(),
+            quantity: '1', // Fix เป็น 1 เสมอ
             distance: cctvCableDistance ? `${cctvCableDistance} เมตร` : undefined,
           });
         }
@@ -2521,8 +2532,7 @@ function MoreDetailCard(props: any) {
           });
         }
         if (lighting === 'yes' && lightingCablePricing) {
-          // ถ้าไม่มีค่า (materialTotal, laborTotal, totalPrice = 0) quantity = 1 ไม่ใช่เอาระยะมาใส่
-          const hasNoValue = lightingCablePricing.materialTotal === 0 && lightingCablePricing.laborTotal === 0 && lightingCablePricing.total === 0;
+          // Fix quantity เป็น 1 เสมอสำหรับสายหลอดไฟ
           products.push({
             type: 'ระบบสื่อสาร',
             code: lightingCablePricing.row?.__EMPTY || '-',
@@ -2530,7 +2540,7 @@ function MoreDetailCard(props: any) {
             materialTotal: lightingCablePricing.materialTotal,
             laborTotal: lightingCablePricing.laborTotal,
             totalPrice: lightingCablePricing.total,
-            quantity: hasNoValue ? '1' : lightingCablePricing.quantity.toString(),
+            quantity: '1', // Fix เป็น 1 เสมอ
             distance: lightingCableDistance ? `${lightingCableDistance} เมตร` : undefined,
           });
         }
@@ -2682,7 +2692,7 @@ function MoreDetailCard(props: any) {
             });
           }
         } else if (signageStationType === 'eic') {
-          // สถานี EIC: 2.1.1-2.1.8 (row 9-15), 2.2.1-2.2.4 (row 18-21)
+          // สถานี EIC: 2.1.1-2.1.8 (row 9-15), 2.2.1-2.2.4 (row 19-21) - ลบ row 18 ออก
           for (let rowNum = 9; rowNum <= 15; rowNum++) {
             const item = getSignagePricing(rowNum);
             if (item) {
@@ -2697,17 +2707,18 @@ function MoreDetailCard(props: any) {
               });
             }
           }
-          for (let rowNum = 18; rowNum <= 21; rowNum++) {
+          for (let rowNum = 19; rowNum <= 21; rowNum++) {
             const item = getSignagePricing(rowNum);
             if (item) {
+              // คูณราคากับจำนวนช่องจอด
               products.push({
                 type: 'งานป้าย',
                 code: item.row?.__EMPTY || '-',
                 productName: getSignageRowName(rowNum) || `รายการ 2.2.${rowNum - 17}`,
-                materialTotal: item.materialTotal,
-                laborTotal: item.laborTotal,
-                totalPrice: item.total,
-                quantity: '1',
+                materialTotal: item.materialUnit * parkingSlotsCount,
+                laborTotal: item.laborUnit * parkingSlotsCount,
+                totalPrice: item.totalUnit * parkingSlotsCount,
+                quantity: parkingSlotsCount.toString(),
               });
             }
           }
@@ -2719,7 +2730,7 @@ function MoreDetailCard(props: any) {
         products.push({
           type: 'หลังคา',
           code: parkingRoofData.productCode || '-',
-          productName: 'หลังคาลานจอดรถ',
+          productName: `หลังคาลานจอดรถ ${parkingSlotsCount.toLocaleString('th-TH')} ช่องจอด`,
           materialTotal: parkingRoofTotals.material,
           laborTotal: parkingRoofTotals.labor,
           totalPrice: parkingRoofTotals.total,
@@ -2763,6 +2774,25 @@ function MoreDetailCard(props: any) {
           totalPrice: parsePrice(travelCostResult),
           quantity: '1',
         });
+
+        // เพิ่มงานฝึกอบรม (1 วัน) ถ้าเลือก
+        if (trainingWork === 'yes') {
+          const trainingCost = travelType === 'construction'
+            ? constructionTravelCost.trainingCost
+            : installationTravelCost.trainingCost;
+          if (trainingCost > 0) {
+            products.push({
+              type: 'ค่าเดินทาง',
+              code: 'งานฝึกอบรม',
+              productName: 'งานฝึกอบรม (1 วัน)',
+              distance: undefined,
+              materialTotal: 0,
+              laborTotal: trainingCost,
+              totalPrice: trainingCost,
+              quantity: '1',
+            });
+          }
+        }
       }
     }
 
@@ -2776,7 +2806,7 @@ function MoreDetailCard(props: any) {
     mdbSelection, mdbConfiguration, mccbSubBrand, getMccbSubData,
     chargerSelection, chargerResults, chargerLineDistances,
     additionalFeaturesTotals,
-    travelCostResult, travelDistance, travelType, constructionTravelCost, installationTravelCost, installationTravelDistance,
+    travelCostResult, travelDistance, travelType, constructionTravelCost, installationTravelCost, installationTravelDistance, trainingWork,
     getMdbCabinetData,
     getExcelData,
     props.trWiringSize, props.trWireConduit, props.chargerWiringCableAll, props.chargerWiringCable, props.chargerWiringType
@@ -2874,12 +2904,29 @@ function MoreDetailCard(props: any) {
 
     // Helper function แปลง product เป็น row format
     const productToRow = (product: any, sectionKey?: string) => {
-      // แปลง distance จาก string เป็น number (ถ้ามี)
+      // แปลง distance จาก string - ถ้าเป็นรูปแบบ x(y) ให้แสดงทั้งหมดพร้อมหน่วย m., ถ้าเป็นตัวเลขธรรมดาให้แสดงตัวเลข
       let rangeValue: string | number = '-';
       if (product.distance && product.distance !== '-') {
-        const distanceMatch = product.distance.toString().match(/[\d.]+/);
-        if (distanceMatch) {
-          rangeValue = parseFloat(distanceMatch[0]) || '-';
+        const distanceStr = product.distance.toString();
+        // ตรวจสอบว่าเป็นรูปแบบ x(y) หรือไม่ (มีวงเล็บ)
+        if (distanceStr.includes('(') && distanceStr.includes(')')) {
+          // แปลงจาก x(y) เป็น x m.(y m.)
+          // เช่น "19(10)" -> "19 m.(10 m.)"
+          const match = distanceStr.match(/^([\d.]+)\(([\d.]+)\)/);
+          if (match) {
+            const x = match[1];
+            const y = match[2];
+            rangeValue = `${x} m.(${y} m.)`;
+          } else {
+            // ถ้า parse ไม่ได้ ให้แสดงตามเดิม
+            rangeValue = distanceStr;
+          }
+        } else {
+          // แปลงเป็นตัวเลข
+          const distanceMatch = distanceStr.match(/[\d.]+/);
+          if (distanceMatch) {
+            rangeValue = parseFloat(distanceMatch[0]) || '-';
+          }
         }
       }
 
@@ -3117,17 +3164,17 @@ function MoreDetailCard(props: any) {
         // สำหรับหัวข้ออื่นๆ ใช้ชื่อเดิม
         let typeName = '';
         if (section.key === 'transformer') {
-          typeName = 'Transformer Size';
+          typeName = 'Transformer';
         } else if (section.key === 'high-voltage') {
           typeName = 'ระบบแรงสูง';
         } else if (section.key === 'installation') {
-          typeName = 'สถานที่การติดตั้ง';
+          typeName = 'Disconnecter';
         } else if (section.key === 'tr-to-mdb') {
-          typeName = 'TR to MDB';
+          typeName = 'Cable TR to MDB';
         } else if (section.key === 'mdb') {
-          typeName = 'MDB Configuration';
+          typeName = 'MDB';
         } else if (section.key === 'mdb-to-charger') {
-          typeName = 'MDB to Charger';
+          typeName = 'Cable MDB to Charger';
         }
 
         costSummaryRows.push({
@@ -3167,12 +3214,17 @@ function MoreDetailCard(props: any) {
         ? travelDistance
         : installationTravelDistance;
 
+      const trainingCost = travelType === 'construction'
+        ? constructionTravelCost.trainingCost
+        : installationTravelCost.trainingCost;
+
       travelRows.push({
         distance: distance ? `${distance} กม.` : '-',
         travel_cost: travelCost, // ค่าเดินทาง: จากค่าเดินทาง (รวมค่าใช้จ่ายการสร้างสถานี)
         travel_between_accommodation: travelBetweenAccommodation, // ค่าเดินทางระหว่างที่พัก
         accommodation_food: accommodationAndFood, // ค่าที่พัก + ค่าอาหาร
         wage: 0, // ไม่ใช่ค่าแรง
+        training_cost: trainingCost, // งานฝึกอบรม (1 วัน)
         total: travelTotals.total
       });
     }
@@ -3216,6 +3268,7 @@ function MoreDetailCard(props: any) {
       travel_labor: travelLabor,
       accommodation_food: accommodationAndFood,
       travel_between_accommodation: travelBetweenAccommodation,
+      training_cost: travelType === 'construction' ? constructionTravelCost.trainingCost : installationTravelCost.trainingCost,
       total_travel_cost: travelTotals.total,
 
       // ฝั่งขวา
@@ -3349,7 +3402,8 @@ function MoreDetailCard(props: any) {
       travelCost = (materialRate * distance) + laborRate + extraCharge;
     }
 
-    let cost = travelCost + accommodationAndFood + laborCost;
+    // รวมค่าเดินทาง = ค่าเดินทาง + ค่าเดินทางระหว่างที่พัก + ค่าที่พัก + อาหาร + ค่าแรง
+    let cost = travelCost + travelBetweenAccommodation + accommodationAndFood + laborCost;
 
     let travelCostDetails = '';
 
@@ -3371,6 +3425,7 @@ function MoreDetailCard(props: any) {
         const trainingLabor = toNumber(trainingRow.__EMPTY_5);
         const trainingExtra = toNumber(trainingRow.__EMPTY_6);
         trainingCost = (trainingMaterial * distance) + trainingLabor + trainingExtra;
+        // เพิ่มงานฝึกอบรม (1 วัน) เข้าไปในรวมค่าเดินทาง
         cost += trainingCost;
 
         travelCostDetails += `\nงานฝึกอบรม (1 วัน): (${trainingMaterial.toLocaleString('th-TH')} × ${distance.toLocaleString('th-TH')} km) + ${trainingLabor.toLocaleString('th-TH')} + ${trainingExtra.toLocaleString('th-TH')}`;
@@ -3443,6 +3498,7 @@ function MoreDetailCard(props: any) {
     const laborCost = toNumber(row.__EMPTY_8);
 
     const travelCost = travelCostPerKm * distance;
+    // รวมค่าเดินทาง = ค่าเดินทาง + ค่าที่พัก + อาหาร + ค่าแรง (ติดตั้งอย่างเดียวไม่มีค่าเดินทางระหว่างที่พัก)
     let total = travelCost + accommodationAndFood + laborCost;
     let trainingCost = 0;
 
@@ -4992,13 +5048,13 @@ function MoreDetailCard(props: any) {
                       {(() => {
                         let conduitDisplay = props.trWireConduit || '';
 
-                        // ถ้า ประเภท: ร้อยท่อเดินในอากาศ กลุ่ม 2 ให้เพิ่ม เลือกท่อ: ที่กดเลือกมาวางไว้หน้าค่า
-                        if (props.trWiringType === 'ร้อยท่อเดินในอากาศ กลุ่ม 2' && trWiringGroup2) {
+                        // ถ้า ประเภท: ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2 ให้เพิ่ม เลือกท่อ: ที่กดเลือกมาวางไว้หน้าค่า
+                        if (props.trWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2' && trWiringGroup2) {
                           conduitDisplay = `${trWiringGroup2} ${conduitDisplay}`.trim();
                         }
 
-                        // ถ้า ประเภท: ร้อยท่อฝังใต้ดิน กลุ่ม 5 ให้เพิ่ม __EMPTY_11 วางหน้าค่า
-                        if (props.trWiringType === 'ร้อยท่อฝังใต้ดิน กลุ่ม 5') {
+                        // ถ้า ประเภท: ขนาดสายไฟ 3P 4W ร้อยท่อฝังใต้ดิน กลุ่ม 5 ให้เพิ่ม __EMPTY_11 วางหน้าค่า
+                        if (props.trWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อฝังใต้ดิน กลุ่ม 5') {
                           // ดึงข้อมูล __EMPTY_11 จาก trToMdbMapping
                           const transformerSize = parseInt(props.transformer || '0');
                           const powerAuthority = props.powerAuthority || '';
@@ -5007,6 +5063,16 @@ function MoreDetailCard(props: any) {
                           if (empty11Value) {
                             conduitDisplay = `${empty11Value} ${conduitDisplay}`.trim();
                           }
+                        }
+
+                        // ถ้า ประเภท: ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา ให้เพิ่ม TRAY นำหน้าค่า
+                        if (props.trWiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา') {
+                          conduitDisplay = `TRAY ${conduitDisplay}`.trim();
+                        }
+
+                        // ถ้า ประเภท: ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา ให้เพิ่ม LADDER นำหน้าค่า
+                        if (props.trWiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา') {
+                          conduitDisplay = `LADDER ${conduitDisplay}`.trim();
                         }
 
                         return conduitDisplay;
@@ -5045,7 +5111,7 @@ function MoreDetailCard(props: any) {
 
                   </div>
 
-                  {props.trWiringType === 'ร้อยท่อเดินในอากาศ กลุ่ม 2' && (
+                  {props.trWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2' && (
 
                     <div className="flex items-center gap-3">
 
@@ -5107,7 +5173,7 @@ function MoreDetailCard(props: any) {
                             const distance = inputDistance + 9; // ระยะที่กรอก + 9 สำหรับการคำนวณ
                             const priceData = getTrToMdbPrice(
                               props.trWiringType,
-                              props.trWiringType === 'ร้อยท่อเดินในอากาศ กลุ่ม 2' ? trWiringGroup2 : '',
+                              props.trWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2' ? trWiringGroup2 : '',
                               props.powerAuthority,
                               props.transformer,
                               distance // ใช้ distance ที่ +9 แล้วในการคำนวณ
@@ -5117,8 +5183,8 @@ function MoreDetailCard(props: any) {
                               // ใช้ชื่อประเภทจาก TR to MDB Configuration เลย
                               let wiringTypeDisplay = props.trWiringType;
 
-                              // เพิ่มท่อสำหรับร้อยท่อเดินในอากาศ กลุ่ม 2
-                              if (props.trWiringType === 'ร้อยท่อเดินในอากาศ กลุ่ม 2' && trWiringGroup2) {
+                              // เพิ่มท่อสำหรับขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2
+                              if (props.trWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2' && trWiringGroup2) {
                                 wiringTypeDisplay = `${props.trWiringType} - ${trWiringGroup2}`;
                               }
 
@@ -5400,12 +5466,12 @@ function MoreDetailCard(props: any) {
                                   </div>
                                 </div>
 
-                                {/* ราคาGround */}
+                                {/* ระบบ Ground MDB */}
                                 <div className="p-4 bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
                                   <div className="flex items-center justify-between gap-2">
                                     <div className="flex items-center gap-2">
                                       <Shield className="h-4 w-4 text-gray-400" />
-                                      <div className="text-xs text-gray-500 uppercase tracking-wide">ราคาGround</div>
+                                      <div className="text-xs text-gray-500 uppercase tracking-wide">ระบบ Ground MDB</div>
                                     </div>
                                     <div className="text-xl font-bold text-gray-800">
                                       {getMdbCabinetData.groundPrice.toLocaleString('th-TH')} <span className="text-xs font-normal text-gray-500">บาท</span>
@@ -6219,12 +6285,12 @@ function MoreDetailCard(props: any) {
                               {(() => {
                                 let conduitDisplay = conduits[idx] ?? conduits[conduits.length - 1] ?? '';
 
-                                // ถ้า ประเภท: ร้อยท่อเดินในอากาศ กลุ่ม 2 ให้เพิ่ม เลือกท่อ: ที่กดเลือกมาวางไว้หน้าค่า
+                                // ถ้า ประเภท: ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2 ให้เพิ่ม เลือกท่อ: ที่กดเลือกมาวางไว้หน้าค่า
                                 if (isGroup2Air && group2Selected) {
                                   conduitDisplay = `${group2Selected} ${conduitDisplay}`.trim();
                                 }
 
-                                // ถ้า ประเภท: ร้อยท่อฝังใต้ดิน กลุ่ม 5 ให้เพิ่ม __EMPTY_11 วางหน้าค่า
+                                // ถ้า ประเภท: ขนาดสายไฟ 3P 4W ร้อยท่อฝังใต้ดิน กลุ่ม 5 ให้เพิ่ม __EMPTY_11 วางหน้าค่า
                                 if (props.chargerWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน') {
                                   // ดึงข้อมูล __EMPTY_11 จาก Excel data
                                   const chargerName = props.chargerSummary?.[idx]?.name || '';
@@ -6372,12 +6438,12 @@ function MoreDetailCard(props: any) {
                             {(() => {
                               let conduitDisplayValue = conduitDisplay || '';
 
-                              // ถ้า ประเภท: ร้อยท่อเดินในอากาศ กลุ่ม 2 ให้เพิ่ม เลือกท่อ: ที่กดเลือกมาวางไว้หน้าค่า
+                              // ถ้า ประเภท: ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2 ให้เพิ่ม เลือกท่อ: ที่กดเลือกมาวางไว้หน้าค่า
                               if (isGroup2Air && groupConduitChoice) {
                                 conduitDisplayValue = `${groupConduitChoice} ${conduitDisplayValue}`.trim();
                               }
 
-                              // ถ้า ประเภท: ร้อยท่อฝังใต้ดิน กลุ่ม 5 ให้เพิ่ม __EMPTY_11 วางหน้าค่า
+                              // ถ้า ประเภท: ขนาดสายไฟ 3P 4W ร้อยท่อฝังใต้ดิน กลุ่ม 5 ให้เพิ่ม __EMPTY_11 วางหน้าค่า
                               if (props.chargerWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน') {
                                 // ดึงข้อมูล __EMPTY_11 จาก Excel data (ใช้ charger แรกในกลุ่ม)
                                 const firstChargerName = props.chargerSummary?.[idxs[0]]?.name || '';
@@ -6918,12 +6984,12 @@ function MoreDetailCard(props: any) {
 
                           </div>
 
-                          {/* 1.2 ยางกั้นล้อ (ปูน) */}
+                          {/* 1.2 ขอบกั้นล้อ */}
 
                           <div className="space-y-2">
                             {/* Item name and toggle buttons */}
                             <div className="flex items-center justify-between mb-2">
-                              <span className="text-base font-semibold text-gray-800">ยางกั้นล้อ (ปูน)</span>
+                              <span className="text-base font-semibold text-gray-800">ขอบกั้นล้อ</span>
                               <div className="flex items-center gap-2">
                                 <div
                                   className={`flex items-center space-x-2 px-3 py-1 rounded-lg border cursor-pointer ${wheelStops === 'yes' ? 'bg-green-100 border-green-300' : 'hover:bg-gray-50'}`}
@@ -7050,18 +7116,6 @@ function MoreDetailCard(props: any) {
 
                             {fireExtinguisherCabinet === 'yes' && (
                               <>
-                                <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600 mb-2">
-                                  <span className="font-medium">เลือกประเภท:</span>
-                                  <Select value={fireExtinguisherType} onValueChange={(value) => setFireExtinguisherType(value as 'abc' | 'co2')}>
-                                    <SelectTrigger className="w-40 h-9">
-                                      <SelectValue placeholder="เลือกประเภท" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="abc">A+B+C</SelectItem>
-                                      <SelectItem value="co2">CO2</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </div>
                                 <Collapsible
                                   open={openItems['fire-extinguisher']}
                                   onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'fire-extinguisher': open }))}
@@ -8890,11 +8944,15 @@ function MoreDetailCard(props: any) {
                                 </CollapsibleTrigger>
                                 <CollapsibleContent>
                                   <div className="px-3 pb-3 space-y-3">
-                                    {/* 2.2.1-2.2.4 row 18-21 */}
-                                    {[18, 19, 20, 21].map((rowNum, index) => {
+                                    {/* 2.2.1-2.2.4 row 19-21 (ลบ row 18 ออก) - คูณกับจำนวนช่องจอด */}
+                                    {[19, 20, 21].map((rowNum, index) => {
                                       const pricing = getSignagePricing(rowNum);
                                       if (!pricing) return null;
                                       const itemKey = `signage-eic-2-2-${index + 1}`;
+                                      // คำนวณราคาที่คูณกับจำนวนช่องจอด
+                                      const materialTotal = pricing.materialUnit * parkingSlotsCount;
+                                      const laborTotal = pricing.laborUnit * parkingSlotsCount;
+                                      const totalPrice = pricing.totalUnit * parkingSlotsCount;
                                       return (
                                         <Collapsible
                                           key={rowNum}
@@ -8918,18 +8976,35 @@ function MoreDetailCard(props: any) {
                                               <div className="px-2 pb-2 space-y-2 text-xs">
                                                 <div><span className="font-medium">รายการ:</span> {getSignageRowName(rowNum) || '-'}</div>
                                                 <div><span className="font-medium">รหัส:</span> {pricing.row?.__EMPTY || '-'}</div>
+                                                <div><span className="font-medium">จำนวน:</span> {parkingSlotsCount.toLocaleString('th-TH')} ช่องจอด</div>
                                                 <div className="grid grid-cols-3 gap-2 pt-2 border-t">
                                                   <div>
-                                                    <div className="text-gray-600 mb-1">ราคาค่าของ:</div>
+                                                    <div className="text-gray-600 mb-1">ราคาค่าของ/ชิ้น:</div>
                                                     <div className="font-semibold">{pricing.materialUnit.toLocaleString('th-TH')} บาท</div>
                                                   </div>
                                                   <div>
-                                                    <div className="text-gray-600 mb-1">ราคาค่าแรง:</div>
+                                                    <div className="text-gray-600 mb-1">ราคาค่าแรง/ชิ้น:</div>
                                                     <div className="font-semibold">{pricing.laborUnit.toLocaleString('th-TH')} บาท</div>
                                                   </div>
                                                   <div>
-                                                    <div className="text-gray-600 mb-1">ราคารวม:</div>
+                                                    <div className="text-gray-600 mb-1">ราคารวม/ชิ้น:</div>
                                                     <div className="font-semibold">{pricing.totalUnit.toLocaleString('th-TH')} บาท</div>
+                                                  </div>
+                                                </div>
+                                                <div className="pt-2 border-t border-blue-100 mt-2">
+                                                  <div className="grid grid-cols-3 gap-2">
+                                                    <div>
+                                                      <div className="text-gray-600 mb-1">ค่าของรวม:</div>
+                                                      <div className="font-semibold">{materialTotal.toLocaleString('th-TH')} บาท</div>
+                                                    </div>
+                                                    <div>
+                                                      <div className="text-gray-600 mb-1">ค่าแรงรวม:</div>
+                                                      <div className="font-semibold">{laborTotal.toLocaleString('th-TH')} บาท</div>
+                                                    </div>
+                                                    <div>
+                                                      <div className="text-gray-600 mb-1">ราคารวม:</div>
+                                                      <div className="font-semibold text-blue-700">{totalPrice.toLocaleString('th-TH')} บาท</div>
+                                                    </div>
                                                   </div>
                                                 </div>
                                               </div>
@@ -9068,6 +9143,7 @@ function MoreDetailCard(props: any) {
                       {parkingRoofData && (
                         <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200 space-y-4">
                           <div className="text-lg font-semibold text-blue-800">รวมค่าใช้จ่ายหลังคาคุมช่องจอด</div>
+                          <div className="text-sm text-gray-600">จำนวนช่องจอด: {parkingSlotsCount.toLocaleString('th-TH')} ช่องจอด</div>
 
                           {/* ราคารวม */}
                           <div className="grid grid-cols-3 gap-4">
@@ -9844,7 +9920,7 @@ function MoreDetailCard(props: any) {
                                       <td className="p-3 text-xs text-slate-800 text-right font-medium">
                                         {product.type === '-' && product.materialTotal === 0
                                           ? '-'
-                                          : (product.type === 'เบรกเกอร์' || (section.key === 'mdb' && product.type === 'MDB Configuration')) && product.materialTotal === 0
+                                          : (product.type === 'เบรกเกอร์' || (section.key === 'mdb' && product.type === 'Main MCCB')) && product.materialTotal === 0
                                             ? 'ไม่มีราคา'
                                             : `${formatCurrency(product.materialTotal)} บาท`}
                                       </td>
@@ -10521,7 +10597,7 @@ function StationAccessory() {
     // สร้าง mapping สำหรับแต่ละรายการตาม row number
     const equipmentItems = [
       { key: 'bumper-poles', rowNum: 2, name: 'เสากันชน' },
-      { key: 'wheel-stops', rowNum: 3, name: 'ยางกั้นล้อ (ปูน)' },
+      { key: 'wheel-stops', rowNum: 3, name: 'ขอบกั้นล้อ (ปูน)' },
       { key: 'fire-extinguisher', rowNum: 4, name: 'ถังดับเพลิง+ตู้' },
       { key: 'signage', rowNum: 5, name: 'ป้ายสูง + วิธีใช้งาน' },
       { key: 'wifi-4g-hub', rowNum: 8, name: 'WIFI + 4G + HUB' },
@@ -10643,7 +10719,7 @@ function StationAccessory() {
   const createTrToMdbMapping = (allSheetsData: { [sheetName: string]: any[] }) => {
     const mapping: { [key: string]: any } = {};
 
-    // 1. Sheet แบบ 9.10 (ร้อยท่อเดินในอากาศ กลุ่ม 2 - IMC)
+    // 1. Sheet แบบ 9.10 (ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2 - IMC)
     const sheet910 = allSheetsData['แบบ 9.10'];
     if (sheet910 && sheet910.length > 0) {
       mapping['imc'] = {};
@@ -10675,7 +10751,7 @@ function StationAccessory() {
       };
     }
 
-    // 2. Sheet แบบ 9.11 (ร้อยท่อเดินในอากาศ กลุ่ม 2 - RSC)
+    // 2. Sheet แบบ 9.11 (ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2 - RSC)
     const sheet911 = allSheetsData['แบบ 9.11'];
     if (sheet911 && sheet911.length > 0) {
       mapping['rsc'] = {};
@@ -10707,7 +10783,7 @@ function StationAccessory() {
       };
     }
 
-    // 3. Sheet แบบ 9.12 (ร้อยท่อฝังใต้ดิน กลุ่ม 5)
+    // 3. Sheet แบบ 9.12 (ขนาดสายไฟ 3P 4W ร้อยท่อฝังใต้ดิน กลุ่ม 5)
     const sheet912 = allSheetsData['แบบ 9.12'];
     if (sheet912 && sheet912.length > 0) {
       mapping['underground'] = {};
@@ -10739,7 +10815,7 @@ function StationAccessory() {
       };
     }
 
-    // 4. Sheet แบบ 9.15 (ราง TRAY ไม่มีฝา)
+    // 4. Sheet แบบ 9.15 (ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา)
     const sheet915 = allSheetsData['แบบ 9.15'];
     if (sheet915 && sheet915.length > 0) {
       mapping['tray'] = {};
@@ -10769,7 +10845,7 @@ function StationAccessory() {
       };
     }
 
-    // 5. Sheet แบบ 9.16 (ราง LADDER ไม่มีฝา)
+    // 5. Sheet แบบ 9.16 (ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา)
     const sheet916 = allSheetsData['แบบ 9.16'];
     if (sheet916 && sheet916.length > 0) {
       mapping['ladder'] = {};
@@ -10814,21 +10890,21 @@ function StationAccessory() {
     let data = null;
 
     // กำหนดประเภทการเดินสาย
-    if (wiringType === 'ร้อยท่อเดินในอากาศ กลุ่ม 2' && pipeType === 'IMC') {
+    if (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2' && pipeType === 'IMC') {
       data = trToMdbMapping['imc']?.[powerAuthority]?.[transformerSize];
       console.log('IMC data found:', data);
-    } else if (wiringType === 'ร้อยท่อเดินในอากาศ กลุ่ม 2' && pipeType === 'RSC') {
+    } else if (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2' && pipeType === 'RSC') {
       data = trToMdbMapping['rsc']?.[powerAuthority]?.[transformerSize];
       console.log('RSC data found:', data);
-    } else if (wiringType === 'ร้อยท่อฝังใต้ดิน กลุ่ม 5') {
+    } else if (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อฝังใต้ดิน กลุ่ม 5') {
       data = trToMdbMapping['underground']?.[powerAuthority]?.[transformerSize];
       console.log('Underground data found:', data);
       console.log('Underground mapping:', trToMdbMapping['underground']);
       console.log('MEA mapping:', trToMdbMapping['underground']?.[powerAuthority]);
-    } else if (wiringType === 'ราง TRAY ไม่มีฝา') {
+    } else if (wiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา') {
       data = trToMdbMapping['tray']?.[powerAuthority]?.[transformerSize];
       console.log('Tray data found:', data);
-    } else if (wiringType === 'ราง LADDER ไม่มีฝา') {
+    } else if (wiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา') {
       data = trToMdbMapping['ladder']?.[powerAuthority]?.[transformerSize];
       console.log('Ladder data found:', data);
     }
@@ -10853,31 +10929,31 @@ function StationAccessory() {
     let laborPrice = 0;
     let totalPrice = 0;
 
-    if (wiringType === 'ร้อยท่อเดินในอากาศ กลุ่ม 2' && pipeType === 'IMC') {
+    if (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2' && pipeType === 'IMC') {
       // Sheet แบบ 9.10
       productCode = data.__EMPTY || '';
       materialPrice = (data.__EMPTY_14 || 0) * distance;
       laborPrice = (data.__EMPTY_15 || 0) * distance;
       totalPrice = (data.__EMPTY_16 || 0) * distance;
-    } else if (wiringType === 'ร้อยท่อเดินในอากาศ กลุ่ม 2' && pipeType === 'RSC') {
+    } else if (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2' && pipeType === 'RSC') {
       // Sheet แบบ 9.11
       productCode = data.f || '';
       materialPrice = (data.__EMPTY_13 || 0) * distance;
       laborPrice = (data.__EMPTY_14 || 0) * distance;
       totalPrice = (data.__EMPTY_15 || 0) * distance;
-    } else if (wiringType === 'ร้อยท่อฝังใต้ดิน กลุ่ม 5') {
+    } else if (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อฝังใต้ดิน กลุ่ม 5') {
       // Sheet แบบ 9.12
       productCode = data.__EMPTY || '';
       materialPrice = (data.__EMPTY_14 || 0) * distance;
       laborPrice = (data.__EMPTY_15 || 0) * distance;
       totalPrice = (data.__EMPTY_16 || 0) * distance;
-    } else if (wiringType === 'ราง TRAY ไม่มีฝา') {
+    } else if (wiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา') {
       // Sheet แบบ 9.15
       productCode = data.__EMPTY || '';
       materialPrice = (data.__EMPTY_14 || 0) * distance;
       laborPrice = (data.__EMPTY_15 || 0) * distance;
       totalPrice = (data.__EMPTY_16 || 0) * distance;
-    } else if (wiringType === 'ราง LADDER ไม่มีฝา') {
+    } else if (wiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา') {
       // Sheet แบบ 9.16
       productCode = data.__EMPTY || '';
       materialPrice = (data.__EMPTY_14 || 0) * distance;

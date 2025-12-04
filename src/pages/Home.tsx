@@ -257,10 +257,10 @@ export default function Home(): React.JSX.Element {
 
   // TR wiring type options
   const trWiringTypeOptions = [
-    'ร้อยท่อเดินในอากาศ กลุ่ม 2',
-    'ร้อยท่อฝังใต้ดิน กลุ่ม 5',
-    'ราง TRAY ไม่มีฝา',
-    'ราง LADDER ไม่มีฝา'
+    'ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2',
+    'ขนาดสายไฟ 3P 4W ร้อยท่อฝังใต้ดิน กลุ่ม 5',
+    'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา',
+    'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา'
   ]
 
   // Charger wiring type options
@@ -468,16 +468,16 @@ export default function Home(): React.JSX.Element {
 
     // Mapping TR Wiring Type to columns
     const wiringTypeToCols: Record<string, string[]> = {
-      'ร้อยท่อเดินในอากาศ กลุ่ม 2': [
+      'ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2': [
         '__EMPTY_11', '__EMPTY_12', '__EMPTY_13', '__EMPTY_14', '__EMPTY_15', '__EMPTY_16', '__EMPTY_17', '__EMPTY_18', '__EMPTY_19'
       ], // __EMPTY_11 to __EMPTY_19
-      'ร้อยท่อฝังใต้ดิน กลุ่ม 5': [
+      'ขนาดสายไฟ 3P 4W ร้อยท่อฝังใต้ดิน กลุ่ม 5': [
         '__EMPTY_30', '__EMPTY_31', '__EMPTY_32', '__EMPTY_33', '__EMPTY_34', '__EMPTY_35', '__EMPTY_36', '__EMPTY_37', '__EMPTY_38', '__EMPTY_39'
       ], // __EMPTY_30 to __EMPTY_39
-      'ราง TRAY ไม่มีฝา': [
+      'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา': [
         '__EMPTY_51', '__EMPTY_52', '__EMPTY_53', '__EMPTY_54', '__EMPTY_55', '__EMPTY_56', '__EMPTY_57', '__EMPTY_58', '__EMPTY_59', '__EMPTY_60'
       ], // __EMPTY_51 to __EMPTY_60
-      'ราง LADDER ไม่มีฝา': [
+      'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา': [
         '__EMPTY_72', '__EMPTY_73', '__EMPTY_74', '__EMPTY_75', '__EMPTY_76', '__EMPTY_77', '__EMPTY_78', '__EMPTY_79', '__EMPTY_80', '__EMPTY_81'
       ], // __EMPTY_72 to __EMPTY_81
     };
@@ -497,8 +497,8 @@ export default function Home(): React.JSX.Element {
       return val;
     }).filter(Boolean).join(' ');
 
-    // เพิ่ม " )" ต่อท้ายสำหรับ "ร้อยท่อเดินในอากาศ กลุ่ม 2"
-    if (form.trWiringType === 'ร้อยท่อเดินในอากาศ กลุ่ม 2' && values) {
+    // เพิ่ม " )" ต่อท้ายสำหรับ "ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2"
+    if (form.trWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2' && values) {
       values = values + ' )';
     }
 
@@ -519,19 +519,19 @@ export default function Home(): React.JSX.Element {
 
     // Mapping TR Wiring Type to columns and units
     const wiringTypeToColsAndUnit: Record<string, { cols: string[]; unit: string }> = {
-      'ร้อยท่อเดินในอากาศ กลุ่ม 2': {
+      'ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2': {
         cols: ['__EMPTY_26', '__EMPTY_27', '__EMPTY_28'], // ตามที่ผู้ใช้ระบุ
         unit: 'นิ้ว'
       },
-      'ร้อยท่อฝังใต้ดิน กลุ่ม 5': {
+      'ขนาดสายไฟ 3P 4W ร้อยท่อฝังใต้ดิน กลุ่ม 5': {
         cols: ['__EMPTY_47', '__EMPTY_48', '__EMPTY_49'], // ตามที่ผู้ใช้ระบุ
         unit: 'มม.'
       },
-      'ราง TRAY ไม่มีฝา': {
+      'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา': {
         cols: ['__EMPTY_68'], // ตามที่ผู้ใช้ระบุ
         unit: 'ซม.'
       },
-      'ราง LADDER ไม่มีฝา': {
+      'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา': {
         cols: ['__EMPTY_89'], // ตามที่ผู้ใช้ระบุ
         unit: 'ซม.'
       },
@@ -558,16 +558,16 @@ export default function Home(): React.JSX.Element {
   const getTRWiringSizeCVs = () => {
     // Mapping TR Wiring Type to columns
     const wiringTypeToCols: Record<string, string[]> = {
-      'ร้อยท่อเดินในอากาศ กลุ่ม 2': [
+      'ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2': [
         '__EMPTY_11', '__EMPTY_12', '__EMPTY_13', '__EMPTY_14', '__EMPTY_15', '__EMPTY_16', '__EMPTY_17', '__EMPTY_18', '__EMPTY_19'
       ], // __EMPTY_11 to __EMPTY_19
-      'ร้อยท่อฝังใต้ดิน กลุ่ม 5': [
+      'ขนาดสายไฟ 3P 4W ร้อยท่อฝังใต้ดิน กลุ่ม 5': [
         '__EMPTY_30', '__EMPTY_31', '__EMPTY_32', '__EMPTY_33', '__EMPTY_34', '__EMPTY_35', '__EMPTY_36', '__EMPTY_37', '__EMPTY_38', '__EMPTY_39'
       ], // __EMPTY_30 to __EMPTY_39
-      'ราง TRAY ไม่มีฝา': [
+      'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา': [
         '__EMPTY_51', '__EMPTY_52', '__EMPTY_53', '__EMPTY_54', '__EMPTY_55', '__EMPTY_56', '__EMPTY_57', '__EMPTY_58', '__EMPTY_59', '__EMPTY_60'
       ], // __EMPTY_51 to __EMPTY_60
-      'ราง LADDER ไม่มีฝา': [
+      'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา': [
         '__EMPTY_72', '__EMPTY_73', '__EMPTY_74', '__EMPTY_75', '__EMPTY_76', '__EMPTY_77', '__EMPTY_78', '__EMPTY_79', '__EMPTY_80', '__EMPTY_81'
       ], // __EMPTY_72 to __EMPTY_81
     };
@@ -637,8 +637,8 @@ export default function Home(): React.JSX.Element {
       return val;
     }).filter(Boolean).join(' ');
 
-    // เพิ่ม " )" ต่อท้ายสำหรับ "ร้อยท่อเดินในอากาศ กลุ่ม 2"
-    if (form.trWiringType === 'ร้อยท่อเดินในอากาศ กลุ่ม 2' && value) {
+    // เพิ่ม " )" ต่อท้ายสำหรับ "ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2"
+    if (form.trWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2' && value) {
       value = value + ' )';
     }
 
@@ -898,8 +898,8 @@ export default function Home(): React.JSX.Element {
 
   // เพิ่มฟังก์ชันสำหรับเปลี่ยน label
   function getTrWireLabel(trWiringType: string) {
-    if (trWiringType === 'ราง TRAY ไม่มีฝา') return 'TR Wire tray :';
-    if (trWiringType === 'ราง LADDER ไม่มีฝา') return 'TR Wire ladder :';
+    if (trWiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา') return 'TR Wire tray :';
+    if (trWiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา') return 'TR Wire ladder :';
     return 'TR Wire conduit :';
   }
 

@@ -344,22 +344,42 @@ export function createCostPDF(jsonData) {
       currentY = Math.max(leftTableEndY, doc.lastAutoTable.finalY);
 
     } else if (type === 'distance') {
-      // Distance table type with 2-level headers
-      const tableData = rows.map(row => [
-        row.distance || '',
-        formatCurrency(row.travel_cost || 0),
-        formatCurrency(row.travel_between_accommodation || 0),
-        formatCurrency(row.accommodation_food || 0),
-        formatCurrency(row.wage || 0),
-        formatCurrency(row.total || 0),
-      ]);
+      // Distance table type
+      const firstRow = rows[0] || {};
+
+      // ตรวจสอบว่ามีงานฝึกอบรมหรือไม่
+      const hasTraining = firstRow.training_cost && firstRow.training_cost > 0;
+
+      // สร้างหัวตาราง - ถ้ามีงานฝึกอบรมให้เพิ่มคอลัมน์ "งานฝึกอบรม (1 วัน)" ก่อน "ค่าแรง"
+      const headers = hasTraining
+        ? ['ระยะทาง', 'ค่าเดินทาง', 'ค่าเดินทางระหว่างที่พัก', 'ค่าที่พัก + ค่าอาหาร', 'งานฝึกอบรม (1 วัน)', 'ค่าแรง', 'รวม']
+        : ['ระยะทาง', 'ค่าเดินทาง', 'ค่าเดินทางระหว่างที่พัก', 'ค่าที่พัก + ค่าอาหาร', 'ค่าแรง', 'รวม'];
+
+      // สร้างข้อมูลแถว - ถ้ามีงานฝึกอบรมให้เพิ่มค่า "งานฝึกอบรม (1 วัน)" ก่อน "ค่าแรง"
+      const tableData = [
+        hasTraining
+          ? [
+            firstRow.distance || '',
+            formatCurrency(firstRow.travel_cost || 0),
+            formatCurrency(firstRow.travel_between_accommodation || 0),
+            formatCurrency(firstRow.accommodation_food || 0),
+            formatCurrency(firstRow.training_cost || 0), // งานฝึกอบรม (1 วัน)
+            formatCurrency(firstRow.wage || 0), // ค่าแรง
+            formatCurrency(firstRow.total || 0),
+          ]
+          : [
+            firstRow.distance || '',
+            formatCurrency(firstRow.travel_cost || 0),
+            formatCurrency(firstRow.travel_between_accommodation || 0),
+            formatCurrency(firstRow.accommodation_food || 0),
+            formatCurrency(firstRow.wage || 0), // ค่าแรง
+            formatCurrency(firstRow.total || 0),
+          ]
+      ];
 
       autoTable(doc, {
         startY: currentY,
-        head: [
-          [{ content: 'ค่าเดินทาง', colSpan: 6, styles: { halign: 'center' } }],
-          ['ระยะทาง', 'ค่าเดินทาง', 'ค่าเดินทางระหว่างที่พัก', 'ค่าที่พัก + ค่าอาหาร', 'ค่าแรง', 'รวม']
-        ],
+        head: [headers],
         body: tableData,
         theme: 'grid',
         headStyles: {
@@ -387,14 +407,24 @@ export function createCostPDF(jsonData) {
         alternateRowStyles: {
           fillColor: [255, 255, 255],
         },
-        columnStyles: {
-          0: { halign: 'center', cellWidth: 25 },
-          1: { halign: 'right', cellWidth: 30 },
-          2: { halign: 'right', cellWidth: 35 },
-          3: { halign: 'right', cellWidth: 35 },
-          4: { halign: 'right', cellWidth: 25 },
-          5: { halign: 'right', cellWidth: 30, fontStyle: 'bold' },
-        },
+        columnStyles: hasTraining
+          ? {
+            0: { halign: 'center', cellWidth: 22 },
+            1: { halign: 'right', cellWidth: 28 },
+            2: { halign: 'right', cellWidth: 32 },
+            3: { halign: 'right', cellWidth: 30 }, // ค่าที่พัก + ค่าอาหาร (ลด 2 จาก 32)
+            4: { halign: 'right', cellWidth: 28 }, // งานฝึกอบรม (1 วัน)
+            5: { halign: 'right', cellWidth: 20 }, // ค่าแรง (ลด 2 จาก 22)
+            6: { halign: 'right', cellWidth: 28, fontStyle: 'bold' }, // รวม
+          }
+          : {
+            0: { halign: 'center', cellWidth: 25 },
+            1: { halign: 'right', cellWidth: 30 },
+            2: { halign: 'right', cellWidth: 35 },
+            3: { halign: 'right', cellWidth: 33 }, // ค่าที่พัก + ค่าอาหาร (ลด 2 จาก 35)
+            4: { halign: 'right', cellWidth: 23 }, // ค่าแรง (ลด 2 จาก 25)
+            5: { halign: 'right', cellWidth: 30, fontStyle: 'bold' }, // รวม
+          },
         margin: { left: 14, right: 14 },
       });
 
@@ -501,12 +531,12 @@ export function createCostPDF(jsonData) {
           1: { halign: 'center', cellWidth: 32 }, // ประเภท (เพิ่มจาก 20)
           2: { halign: 'left', cellWidth: 51 },   // รายการสินค้า
           3: { halign: 'center', cellWidth: 12 }, // จำนวนชิ้น (ลดจาก 20)
-          4: { halign: 'center', cellWidth: 12 }, // ระยะ (ลดจาก 15)
+          4: { halign: 'center', cellWidth: 15 }, // ระยะ (ลดจาก 18 เพราะตอนนี้เป็น xm.(ym.) ไม่มีช่องว่าง)
           5: { halign: 'right', cellWidth: 19 },  // ค่าของรวม
           6: { halign: 'right', cellWidth: 19 },  // ค่าแรงรวม
           7: { halign: 'right', cellWidth: 23, fontStyle: 'bold' }, // ราคารวม
         },
-        margin: { left: 14, right: 14 },
+        margin: { left: 12, right: 12 },
       });
     }
 
@@ -532,11 +562,11 @@ export function createCostPDF(jsonData) {
       currentY = 20;
     }
 
-    // Add summary title
-    doc.setFontSize(12); // เพิ่ม 3 size จาก 9
-    doc.setFont('Sarabun', 'bold');
-    doc.text('สรุป', 14, currentY);
-    currentY += 10;
+    // ลบคำว่า "สรุป" ออก
+    // doc.setFontSize(12); // เพิ่ม 3 size จาก 9
+    // doc.setFont('Sarabun', 'bold');
+    // doc.text('สรุป', 14, currentY);
+    // currentY += 10;
 
     const pageWidth = doc.internal.pageSize.getWidth();
     const leftX = 14;
@@ -589,9 +619,10 @@ export function createCostPDF(jsonData) {
     doc.setFontSize(10); // เพิ่ม 3 size จาก 7
     leftY += lineHeight;
 
-    // ค่าเดินทาง = ค่าเดินทาง: + ค่าแรง = ค่าแรง:
+    // ค่าเดินทาง = (ค่าเดินทาง + ค่าเดินทางระหว่างที่พัก) + ค่าแรง = ค่าแรง:
+    const travelCostWithBetween = (summary.travel_cost || 0) + (summary.travel_between_accommodation || 0);
     const travelText1 = `ค่าเดินทาง = `;
-    const travelValue1 = formatCurrency(summary.travel_cost || 0);
+    const travelValue1 = formatCurrency(travelCostWithBetween);
     const travelText2 = ` + ค่าแรง = `;
     const travelValue2 = formatCurrency(summary.travel_labor || 0);
     doc.text(travelText1, leftX, leftY);
@@ -609,11 +640,11 @@ export function createCostPDF(jsonData) {
     doc.setFontSize(10); // เพิ่ม 3 size จาก 7
     leftY += lineHeight;
 
-    // + ค่าที่พัก = ค่าที่พัก + อาหาร: + ค่าเดินทางระหว่างที่พัก = ค่าเดินทางระหว่างที่พัก:
+    // + ค่าที่พัก = ค่าที่พัก + อาหาร: + งานฝึกอบรม (1 วัน): = งานฝึกอบรม (1 วัน):
     const accommodationText1 = `+ ค่าที่พัก = `;
     const accommodationValue1 = formatCurrency(summary.accommodation_food || 0);
-    const accommodationText2 = ` + ค่าเดินทางระหว่างที่พัก = `;
-    const accommodationValue2 = formatCurrency(summary.travel_between_accommodation || 0);
+    const accommodationText2 = ` + งานฝึกอบรม (1 วัน): = `;
+    const accommodationValue2 = formatCurrency(summary.training_cost || 0);
     doc.text(accommodationText1, leftX, leftY);
     currentX = leftX + doc.getTextWidth(accommodationText1);
     doc.setFontSize(valueFontSize);
@@ -1008,12 +1039,12 @@ export function createCostPDFSimple(jsonData, options = {}) {
         1: { halign: 'center', cellWidth: 25 }, // ประเภท (เพิ่มจาก 20)
         2: { halign: 'left', cellWidth: 45 },
         3: { halign: 'center', cellWidth: 17 }, // จำนวนชิ้น (ลดจาก 18)
-        4: { halign: 'center', cellWidth: 12 }, // ระยะ (ลดจาก 15)
+        4: { halign: 'center', cellWidth: 15 }, // ระยะ (ลดจาก 18 เพราะตอนนี้เป็น xm.(ym.) ไม่มีช่องว่าง)
         5: { halign: 'right', cellWidth: 23 },
         6: { halign: 'right', cellWidth: 23 },
         7: { halign: 'right', cellWidth: 23, fontStyle: 'bold' },
       },
-      margin: { left: 14, right: 14 },
+      margin: { left: 12, right: 12 },
     });
 
     currentY = doc.lastAutoTable.finalY + 15;
