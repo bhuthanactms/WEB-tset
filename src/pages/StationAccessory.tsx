@@ -2416,6 +2416,88 @@ function MoreDetailCard(props: any) {
               quantity: '1',
             });
 
+            // เพิ่มรายการ "เหล็กเท้าแขนสามเหลี่ยมรับ TRAY-LADDER" และ "Support ยึดพื้น TRAY / LADDER" สำหรับกรณี TRAY หรือ LADDER
+            if ((props.trWiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' || props.trWiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา') && inputDistance > 0) {
+              const transformerSize = parseInt(props.transformer || '0');
+              const powerAuthority = props.powerAuthority || '';
+
+              // กำหนด Sheet และ row mapping ตามประเภท
+              let sheetName = '';
+              let rowNum = null;
+
+              if (props.trWiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา') {
+                sheetName = 'แบบ 9.15';
+                // Row mapping สำหรับ TRAY (ใช้ได้ทั้ง MEA และ PEA สำหรับ transformer size เดียวกัน)
+                const trayRowMapping: { [key: number]: number } = {
+                  // PEA
+                  250: 12, 315: 13,
+                  // MEA และ PEA
+                  400: 18, 500: 19, 630: 20, 800: 24, 1000: 26, 1250: 30, 1500: 32
+                };
+                rowNum = trayRowMapping[transformerSize];
+              } else if (props.trWiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา') {
+                sheetName = 'แบบ 9.16';
+                // Row mapping สำหรับ LADDER (ใช้ได้ทั้ง MEA และ PEA สำหรับ transformer size เดียวกัน)
+                const ladderRowMapping: { [key: number]: number } = {
+                  // PEA
+                  250: 12, 315: 13,
+                  // MEA และ PEA
+                  400: 18, 500: 19, 630: 20, 800: 24, 1000: 25, 1250: 30, 1500: 31
+                };
+                rowNum = ladderRowMapping[transformerSize];
+              }
+
+              if (rowNum && trToMdbMapping?.[props.trWiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' ? 'tray' : 'ladder']?.[powerAuthority]?.[transformerSize]) {
+                const sheet = getExcelData(sheetName);
+                const row = sheet.find((r: any) => r.__rowNum__ === rowNum);
+
+                if (row) {
+                  // คำนวณจำนวนชิ้น: distance / 1.2 (ปัดเศษ: <0.5 ปัดลง, >=0.5 ปัดขึ้น)
+                  const divided = inputDistance / 1.2;
+                  const fractional = divided - Math.floor(divided);
+                  const quantity = fractional < 0.5 ? Math.floor(divided) : Math.ceil(divided);
+
+                  // 1. เหล็กเท้าแขนสามเหลี่ยมรับ TRAY-LADDER
+                  const bracketProductName = row.__EMPTY_34 || 'เหล็กเท้าแขนสามเหลี่ยมรับ TRAY-LADDER';
+                  const bracketMaterialUnit = parsePrice(row.__EMPTY_28 || 0);
+                  const bracketLaborUnit = parsePrice(row.__EMPTY_30 || 0);
+                  const bracketTotalUnit = parsePrice(row.__EMPTY_32 || 0);
+
+                  if (quantity > 0 && (bracketMaterialUnit > 0 || bracketLaborUnit > 0 || bracketTotalUnit > 0)) {
+                    products.push({
+                      type: 'เหล็กเท้าแขนสามเหลี่ยมรับ TRAY-LADDER',
+                      code: '-',
+                      productName: bracketProductName,
+                      distance: undefined,
+                      materialTotal: bracketMaterialUnit * quantity,
+                      laborTotal: bracketLaborUnit * quantity,
+                      totalPrice: bracketTotalUnit * quantity,
+                      quantity: quantity.toString(),
+                    });
+                  }
+
+                  // 2. Support ยึดพื้น TRAY / LADDER
+                  const supportProductName = row.__EMPTY_44 || 'Support ยึดพื้น TRAY / LADDER';
+                  const supportMaterialUnit = parsePrice(row.__EMPTY_38 || 0);
+                  const supportLaborUnit = parsePrice(row.__EMPTY_40 || 0);
+                  const supportTotalUnit = parsePrice(row.__EMPTY_42 || 0);
+
+                  if (quantity > 0 && (supportMaterialUnit > 0 || supportLaborUnit > 0 || supportTotalUnit > 0)) {
+                    products.push({
+                      type: 'Support ยึดพื้น TRAY / LADDER',
+                      code: '-',
+                      productName: supportProductName,
+                      distance: undefined,
+                      materialTotal: supportMaterialUnit * quantity,
+                      laborTotal: supportLaborUnit * quantity,
+                      totalPrice: supportTotalUnit * quantity,
+                      quantity: quantity.toString(),
+                    });
+                  }
+                }
+              }
+            }
+
             // เพิ่มรายการ "เหล็กเท้าแขนสามเหลี่ยมรับท่อ" สำหรับกรณี "ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2"
             if (props.trWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2' && conduit && (conduit === 'IMC' || conduit === 'RSC')) {
               const transformerSize = parseInt(props.transformer || '0');
@@ -2891,7 +2973,7 @@ function MoreDetailCard(props: any) {
               materialTotal: item.materialTotal,
               laborTotal: item.laborTotal,
               totalPrice: item.total,
-              quantity: quantity.toString(),
+              quantity: '1',
               distance: `${excavation30cm} เมตร`,
             });
           }
@@ -2909,7 +2991,7 @@ function MoreDetailCard(props: any) {
               materialTotal: item.materialTotal,
               laborTotal: item.laborTotal,
               totalPrice: item.total,
-              quantity: quantity.toString(),
+              quantity: '1',
               distance: `${excavation60cm} เมตร`,
             });
           }
@@ -2927,7 +3009,7 @@ function MoreDetailCard(props: any) {
               materialTotal: item.materialTotal,
               laborTotal: item.laborTotal,
               totalPrice: item.total,
-              quantity: quantity.toString(),
+              quantity: '1',
               distance: `${excavation10cm} ตารางเมตร`,
             });
           }
@@ -2945,7 +3027,7 @@ function MoreDetailCard(props: any) {
               materialTotal: item.materialTotal,
               laborTotal: item.laborTotal,
               totalPrice: item.total,
-              quantity: quantity.toString(),
+              quantity: '1',
               distance: `${excavation20cm} ตารางเมตร`,
             });
           }
@@ -2963,7 +3045,7 @@ function MoreDetailCard(props: any) {
               materialTotal: item.materialTotal,
               laborTotal: item.laborTotal,
               totalPrice: item.total,
-              quantity: quantity.toString(),
+              quantity: '1',
               distance: `${excavation30cmFloor} ตารางเมตร`,
             });
           }
@@ -2981,7 +3063,7 @@ function MoreDetailCard(props: any) {
               materialTotal: item.materialTotal,
               laborTotal: item.laborTotal,
               totalPrice: item.total,
-              quantity: quantity.toString(),
+              quantity: '1',
               distance: `${excavationLevel} ลูกบาศก์เมตร`,
             });
           }
@@ -2999,7 +3081,7 @@ function MoreDetailCard(props: any) {
               materialTotal: item.materialTotal,
               laborTotal: item.laborTotal,
               totalPrice: item.total,
-              quantity: quantity.toString(),
+              quantity: '1',
               distance: `${excavationFill} ลูกบาศก์เมตร`,
             });
           }
@@ -5642,6 +5724,132 @@ function MoreDetailCard(props: any) {
                                       </div>
                                     </div>
                                   </div>
+
+                                  {/* แสดงเหล็กเท้าแขนสามเหลี่ยมรับ TRAY-LADDER และ Support ยึดพื้น สำหรับกรณี TRAY หรือ LADDER */}
+                                  {(() => {
+                                    const isTrayOrLadder = props.trWiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' || props.trWiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา';
+                                    const inputDistance = parseFloat(trDistance || '0');
+
+                                    if (isTrayOrLadder && inputDistance > 0) {
+                                      const transformerSize = parseInt(props.transformer || '0');
+                                      const powerAuthority = props.powerAuthority || '';
+
+                                      // กำหนด Sheet และ row mapping ตามประเภท
+                                      let sheetName = '';
+                                      let rowNum = null;
+
+                                      if (props.trWiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา') {
+                                        sheetName = 'แบบ 9.15';
+                                        const trayRowMapping: { [key: number]: number } = {
+                                          400: 18, 500: 19, 630: 20, 800: 24, 1000: 26, 1250: 30, 1500: 32,
+                                          250: 12, 315: 13
+                                        };
+                                        rowNum = trayRowMapping[transformerSize];
+                                      } else if (props.trWiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา') {
+                                        sheetName = 'แบบ 9.16';
+                                        const ladderRowMapping: { [key: number]: number } = {
+                                          400: 18, 500: 19, 630: 20, 800: 24, 1000: 25, 1250: 30, 1500: 31,
+                                          250: 12, 315: 13
+                                        };
+                                        rowNum = ladderRowMapping[transformerSize];
+                                      }
+
+                                      if (rowNum && trToMdbMapping?.[props.trWiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' ? 'tray' : 'ladder']?.[powerAuthority]?.[transformerSize]) {
+                                        const sheet = getExcelData(sheetName);
+                                        const row = sheet.find((r: any) => r.__rowNum__ === rowNum);
+
+                                        if (row) {
+                                          // คำนวณจำนวนชิ้น: distance / 1.2 (ปัดเศษ: <0.5 ปัดลง, >=0.5 ปัดขึ้น)
+                                          const divided = inputDistance / 1.2;
+                                          const fractional = divided - Math.floor(divided);
+                                          const quantity = fractional < 0.5 ? Math.floor(divided) : Math.ceil(divided);
+
+                                          // 1. เหล็กเท้าแขนสามเหลี่ยมรับ TRAY-LADDER
+                                          const bracketProductName = row.__EMPTY_34 || 'เหล็กเท้าแขนสามเหลี่ยมรับ TRAY-LADDER';
+                                          const bracketMaterialUnit = parsePrice(row.__EMPTY_28 || 0);
+                                          const bracketLaborUnit = parsePrice(row.__EMPTY_30 || 0);
+                                          const bracketTotalUnit = parsePrice(row.__EMPTY_32 || 0);
+
+                                          // 2. Support ยึดพื้น TRAY / LADDER
+                                          const supportProductName = row.__EMPTY_44 || 'Support ยึดพื้น TRAY / LADDER';
+                                          const supportMaterialUnit = parsePrice(row.__EMPTY_38 || 0);
+                                          const supportLaborUnit = parsePrice(row.__EMPTY_40 || 0);
+                                          const supportTotalUnit = parsePrice(row.__EMPTY_42 || 0);
+
+                                          return (
+                                            <>
+                                              {/* เหล็กเท้าแขนสามเหลี่ยมรับ TRAY-LADDER */}
+                                              {quantity > 0 && (bracketMaterialUnit > 0 || bracketLaborUnit > 0 || bracketTotalUnit > 0) && (
+                                                <div className="mt-4 pt-4 border-t border-green-300">
+                                                  <div className="text-sm font-semibold text-gray-700 mb-2">เหล็กเท้าแขนสามเหลี่ยมรับ TRAY-LADDER</div>
+                                                  <div className="text-xs text-gray-600 mb-2">
+                                                    <span className="font-medium">รายการ:</span> {bracketProductName}
+                                                  </div>
+                                                  <div className="text-xs text-gray-600 mb-2">
+                                                    <span className="font-medium">จำนวนชิ้น:</span> {quantity} ชิ้น
+                                                  </div>
+                                                  <div className="grid grid-cols-3 gap-4">
+                                                    <div>
+                                                      <div className="text-xs text-gray-600 mb-1">ค่าของ:</div>
+                                                      <div className="text-sm font-semibold text-gray-800">
+                                                        {(bracketMaterialUnit * quantity).toLocaleString('th-TH')} บาท
+                                                      </div>
+                                                    </div>
+                                                    <div>
+                                                      <div className="text-xs text-gray-600 mb-1">ค่าแรงรวม:</div>
+                                                      <div className="text-sm font-semibold text-gray-800">
+                                                        {(bracketLaborUnit * quantity).toLocaleString('th-TH')} บาท
+                                                      </div>
+                                                    </div>
+                                                    <div>
+                                                      <div className="text-xs text-green-700 font-semibold mb-1">ราคารวม:</div>
+                                                      <div className="text-sm font-semibold text-green-700">
+                                                        {(bracketTotalUnit * quantity).toLocaleString('th-TH')} บาท
+                                                      </div>
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              )}
+
+                                              {/* Support ยึดพื้น TRAY / LADDER */}
+                                              {quantity > 0 && (supportMaterialUnit > 0 || supportLaborUnit > 0 || supportTotalUnit > 0) && (
+                                                <div className="mt-4 pt-4 border-t border-green-300">
+                                                  <div className="text-sm font-semibold text-gray-700 mb-2">Support ยึดพื้น TRAY / LADDER</div>
+                                                  <div className="text-xs text-gray-600 mb-2">
+                                                    <span className="font-medium">รายการ:</span> {supportProductName}
+                                                  </div>
+                                                  <div className="text-xs text-gray-600 mb-2">
+                                                    <span className="font-medium">จำนวนชิ้น:</span> {quantity} ชิ้น
+                                                  </div>
+                                                  <div className="grid grid-cols-3 gap-4">
+                                                    <div>
+                                                      <div className="text-xs text-gray-600 mb-1">ค่าของ:</div>
+                                                      <div className="text-sm font-semibold text-gray-800">
+                                                        {(supportMaterialUnit * quantity).toLocaleString('th-TH')} บาท
+                                                      </div>
+                                                    </div>
+                                                    <div>
+                                                      <div className="text-xs text-gray-600 mb-1">ค่าแรงรวม:</div>
+                                                      <div className="text-sm font-semibold text-gray-800">
+                                                        {(supportLaborUnit * quantity).toLocaleString('th-TH')} บาท
+                                                      </div>
+                                                    </div>
+                                                    <div>
+                                                      <div className="text-xs text-green-700 font-semibold mb-1">ราคารวม:</div>
+                                                      <div className="text-sm font-semibold text-green-700">
+                                                        {(supportTotalUnit * quantity).toLocaleString('th-TH')} บาท
+                                                      </div>
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              )}
+                                            </>
+                                          );
+                                        }
+                                      }
+                                    }
+                                    return null;
+                                  })()}
 
                                   {/* แสดงเหล็กเท้าแขนสามเหลี่ยมรับท่อ สำหรับกรณี "ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2" */}
                                   {(() => {
