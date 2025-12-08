@@ -254,10 +254,10 @@ function MoreDetailCard(props: any) {
         }
 
         // Map kW to row number according to specifications
-        // 180 kW ใช้ค่าเดียวกับ 200 kW (row 20)
+        // 180 kW ใช้ค่าเดียวกับ 200 kW (row 18)
         const rowMapping: { [key: number]: number } = {
-          30: 11, 40: 12, 60: 14, 80: 15, 120: 17, 160: 19, 180: 20, 200: 20,
-          240: 24, 320: 27, 360: 30, 480: 31, 600: 36, 640: 37, 720: 40, 800: 24
+          30: 9, 40: 10, 60: 12, 80: 13, 120: 15, 160: 17, 180: 18, 200: 18,
+          240: 22, 320: 25, 360: 28, 480: 29, 600: 34, 640: 35, 720: 38, 800: 22
         };
 
         const rowNum = rowMapping[kw];
@@ -391,11 +391,22 @@ function MoreDetailCard(props: any) {
       const kw = kwMatch ? parseInt(kwMatch[1]) : 0;
 
       // Map kW to row number according to specifications
-      // 180 kW ใช้ค่าเดียวกับ 200 kW (row 20)
-      const rowMapping: { [key: number]: number } = {
-        30: 11, 40: 12, 60: 14, 80: 15, 120: 17, 160: 19, 180: 20, 200: 20,
-        240: 24, 320: 27, 360: 30, 480: 31, 600: 36, 640: 37, 720: 40, 800: 24
-      };
+      // สำหรับ "กลุ่ม 2 เดินในอากาศ" ใช้ row mapping ใหม่
+      // สำหรับ "กลุ่ม 5 ฝังใต้ดิน" ใช้ row mapping เก่า
+      let rowMapping: { [key: number]: number };
+      if (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ') {
+        // Row mapping ใหม่สำหรับกลุ่ม 2 เดินในอากาศ
+        rowMapping = {
+          30: 9, 40: 10, 60: 12, 80: 13, 120: 15, 160: 17, 180: 18, 200: 18,
+          240: 22, 320: 25, 360: 28, 480: 29, 600: 34, 640: 35, 720: 38, 800: 22
+        };
+      } else {
+        // Row mapping เก่าสำหรับกลุ่ม 5 ฝังใต้ดิน
+        rowMapping = {
+          30: 11, 40: 12, 60: 14, 80: 15, 120: 17, 160: 19, 180: 20, 200: 20,
+          240: 24, 320: 27, 360: 30, 480: 31, 600: 36, 640: 37, 720: 40, 800: 24
+        };
+      }
 
       const rowNum = rowMapping[kw];
       if (!rowNum) {
@@ -606,7 +617,18 @@ function MoreDetailCard(props: any) {
   const [generalConcreteFloor, setGeneralConcreteFloor] = useState(props.generalConcreteFloor || 'no');
   const [generalConcreteFloorArea, setGeneralConcreteFloorArea] = useState(props.generalConcreteFloorArea || '');
 
-  // Section 4: งานทาสีช่องจอด (yes=มี, no=ไม่มี)
+  // Section 4: งานขุดดิน (yes=มี, no=ไม่มี)
+  const [excavationSelection, setExcavationSelection] = useState(props.excavationSelection || 'no');
+  // รายการงานขุดดิน 7 รายการ
+  const [excavation30cm, setExcavation30cm] = useState(props.excavation30cm || ''); // สกัดปูน กว้าง 30 ซม. (ความยาว เมตร)
+  const [excavation60cm, setExcavation60cm] = useState(props.excavation60cm || ''); // สกัดปูน กว้าง 60 ซม. (ความยาว เมตร)
+  const [excavation10cm, setExcavation10cm] = useState(props.excavation10cm || ''); // สกัดพื้นปูนหนา 10 ซม. (ตารางเมตร)
+  const [excavation20cm, setExcavation20cm] = useState(props.excavation20cm || ''); // สกัดพื้นปูนหนา 20 ซม. (ตารางเมตร)
+  const [excavation30cmFloor, setExcavation30cmFloor] = useState(props.excavation30cmFloor || ''); // สกัดพื้นปูนหนา 30 ซม. (ตารางเมตร)
+  const [excavationLevel, setExcavationLevel] = useState(props.excavationLevel || ''); // ขุดดินออกเพื่อปรับระดับ (ลูกบาศก์เมตร)
+  const [excavationFill, setExcavationFill] = useState(props.excavationFill || ''); // เติมดินหรือทรายเพื่อปรับระดับ (ลูกบาศก์เมตร)
+
+  // Section 5: งานทาสีช่องจอด (yes=มี, no=ไม่มี)
   const [parkingPaintType, setParkingPaintType] = useState(() => {
     if (props.parkingPaintType) {
       return props.parkingPaintType === '' ? 'none' : props.parkingPaintType;
@@ -776,6 +798,33 @@ function MoreDetailCard(props: any) {
       materialTotal: materialUnit,
       laborTotal: laborUnit,
       total: totalUnit,
+    };
+  };
+
+  // Sheet for excavation work (งานขุดดิน)
+  const excavationSheet = useMemo(() => {
+    return props.excelData?.['ต้นทุนงานดิน'] || [];
+  }, [props.excelData]);
+
+  // ฟังก์ชันดึงข้อมูลงานขุดดิน
+  const getExcavationPricing = (rowNum: number, quantity: number): AccessoryPricing | null => {
+    if (!rowNum || !excavationSheet || excavationSheet.length === 0) return null;
+    const row = excavationSheet.find((entry: any) => entry.__rowNum__ === rowNum);
+    if (!row) return null;
+
+    const materialUnit = parsePrice(row.__EMPTY_41 || 0);
+    const laborUnit = parsePrice(row.__EMPTY_43 || 0);
+    const totalUnit = parsePrice(row.__EMPTY_45 || 0) || (materialUnit + laborUnit);
+
+    return {
+      row,
+      quantity,
+      materialUnit,
+      laborUnit,
+      totalUnit,
+      materialTotal: materialUnit * quantity,
+      laborTotal: laborUnit * quantity,
+      total: totalUnit * quantity,
     };
   };
 
@@ -1209,6 +1258,93 @@ function MoreDetailCard(props: any) {
     }
     : { material: 0, labor: 0, total: 0 };
 
+  // งานขุดดิน totals
+  const excavationTotals = React.useMemo(() => {
+    const totals = { material: 0, labor: 0, total: 0 };
+    if (excavationSelection !== 'yes') {
+      return totals;
+    }
+
+    // 1. สกัดปูน กว้าง 30 ซม. หน้า 10 ซม. + ขุดดินลึก 30 ซม. + ฝังท่อ + เทปูนปิด (row 3) - หน่วยเมตร
+    if (excavation30cm) {
+      const quantity = parsePositiveNumber(excavation30cm);
+      const item = getExcavationPricing(3, quantity);
+      if (item) {
+        totals.material += item.materialTotal;
+        totals.labor += item.laborTotal;
+        totals.total += item.total;
+      }
+    }
+
+    // 2. สกัดปูน กว้าง 60 ซม. หน้า 10 ซม. + ขุดดินลึก 30 ซม. + ฝังท่อ + เทปูนปิด (row 4) - หน่วยเมตร
+    if (excavation60cm) {
+      const quantity = parsePositiveNumber(excavation60cm);
+      const item = getExcavationPricing(4, quantity);
+      if (item) {
+        totals.material += item.materialTotal;
+        totals.labor += item.laborTotal;
+        totals.total += item.total;
+      }
+    }
+
+    // 3. สกัดพื้นปูนหนา 10 ซม. (row 5) - หน่วยตารางเมตร
+    if (excavation10cm) {
+      const quantity = parsePositiveNumber(excavation10cm);
+      const item = getExcavationPricing(5, quantity);
+      if (item) {
+        totals.material += item.materialTotal;
+        totals.labor += item.laborTotal;
+        totals.total += item.total;
+      }
+    }
+
+    // 4. สกัดพื้นปูนหนา 20 ซม. (row 6) - หน่วยตารางเมตร
+    if (excavation20cm) {
+      const quantity = parsePositiveNumber(excavation20cm);
+      const item = getExcavationPricing(6, quantity);
+      if (item) {
+        totals.material += item.materialTotal;
+        totals.labor += item.laborTotal;
+        totals.total += item.total;
+      }
+    }
+
+    // 5. สกัดพื้นปูนหนา 30 ซม. (row 7) - หน่วยตารางเมตร
+    if (excavation30cmFloor) {
+      const quantity = parsePositiveNumber(excavation30cmFloor);
+      const item = getExcavationPricing(7, quantity);
+      if (item) {
+        totals.material += item.materialTotal;
+        totals.labor += item.laborTotal;
+        totals.total += item.total;
+      }
+    }
+
+    // 6. ขุดดินออกเพื่อปรับระดับ (row 8) - หน่วยลูกบาศก์เมตร
+    if (excavationLevel) {
+      const quantity = parsePositiveNumber(excavationLevel);
+      const item = getExcavationPricing(8, quantity);
+      if (item) {
+        totals.material += item.materialTotal;
+        totals.labor += item.laborTotal;
+        totals.total += item.total;
+      }
+    }
+
+    // 7. เติมดินหรือทรายเพื่อปรับระดับ (row 9) - หน่วยลูกบาศก์เมตร
+    if (excavationFill) {
+      const quantity = parsePositiveNumber(excavationFill);
+      const item = getExcavationPricing(9, quantity);
+      if (item) {
+        totals.material += item.materialTotal;
+        totals.labor += item.laborTotal;
+        totals.total += item.total;
+      }
+    }
+
+    return totals;
+  }, [excavationSelection, excavation30cm, excavation60cm, excavation10cm, excavation20cm, excavation30cmFloor, excavationLevel, excavationFill, excavationSheet]);
+
   // งานป้าย totals
   const signageWorkTotals = React.useMemo(() => {
     const totals = { material: 0, labor: 0, total: 0 };
@@ -1255,9 +1391,9 @@ function MoreDetailCard(props: any) {
   }, [signageWorkSelection, signageStationType, signageSheet, parkingSlotsCount]);
 
   const additionalFeaturesTotals = {
-    material: equipmentTotals.material + communicationTotals.material + concreteTotals.material + paintingTotals.material + parkingRoofTotals.material + mdbRoofTotals.material + chargerRoofTotals.material + signageWorkTotals.material,
-    labor: equipmentTotals.labor + communicationTotals.labor + concreteTotals.labor + paintingTotals.labor + parkingRoofTotals.labor + mdbRoofTotals.labor + chargerRoofTotals.labor + signageWorkTotals.labor,
-    total: equipmentTotals.total + communicationTotals.total + concreteTotals.total + paintingTotals.total + parkingRoofTotals.total + mdbRoofTotals.total + chargerRoofTotals.total + signageWorkTotals.total
+    material: equipmentTotals.material + communicationTotals.material + concreteTotals.material + paintingTotals.material + parkingRoofTotals.material + mdbRoofTotals.material + chargerRoofTotals.material + signageWorkTotals.material + excavationTotals.material,
+    labor: equipmentTotals.labor + communicationTotals.labor + concreteTotals.labor + paintingTotals.labor + parkingRoofTotals.labor + mdbRoofTotals.labor + chargerRoofTotals.labor + signageWorkTotals.labor + excavationTotals.labor,
+    total: equipmentTotals.total + communicationTotals.total + concreteTotals.total + paintingTotals.total + parkingRoofTotals.total + mdbRoofTotals.total + chargerRoofTotals.total + signageWorkTotals.total + excavationTotals.total
   };
 
   const transformerTotals = React.useMemo(() => {
@@ -1822,18 +1958,21 @@ function MoreDetailCard(props: any) {
     const stationTotal = stationTotals.total;
 
     let percentage = 0;
-    if (stationTotal < 1500000) {
-      // ต่ำกว่า 1.5 ล้านบาท: คูณ 7%
+    if (stationTotal < 500000) {
+      // ต่ำกว่า 5 แสนบาท: คูณ 7%
       percentage = 7;
-    } else if (stationTotal >= 1500000 && stationTotal <= 3000000) {
-      // 1.5-3 ล้านบาท: คูณ 6%
+    } else if (stationTotal < 1500000) {
+      // ต่ำกว่า 1.5 ล้านบาท: คูณ 6%
       percentage = 6;
-    } else if (stationTotal > 5000000) {
+    } else if (stationTotal >= 1500000 && stationTotal <= 3000000) {
+      // 1.5-3 ล้านบาท: คูณ 5%
+      percentage = 5;
+    } else if (stationTotal > 3000000 && stationTotal <= 5000000) {
+      // 3-5 ล้านบาท: คูณ 4%
+      percentage = 4;
+    } else {
       // มากกว่า 5 ล้านบาท: คูณ 3%
       percentage = 3;
-    } else {
-      // 3-5 ล้านบาท: ใช้ 5% (ช่วงที่ไม่ได้ระบุชัดเจน)
-      percentage = 5;
     }
 
     // คำนวณเป็น % ของ ราคารวมสร้างสถานี แทน Additional Features Total
@@ -2276,6 +2415,76 @@ function MoreDetailCard(props: any) {
               totalPrice: parsePrice(priceData.totalPrice),
               quantity: '1',
             });
+
+            // เพิ่มรายการ "เหล็กเท้าแขนสามเหลี่ยมรับท่อ" สำหรับกรณี "ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2"
+            if (props.trWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2' && conduit && (conduit === 'IMC' || conduit === 'RSC')) {
+              const transformerSize = parseInt(props.transformer || '0');
+              const powerAuthority = props.powerAuthority || '';
+
+              // ใช้ row number จาก trToMdbMapping โดยใช้ row number ที่เก็บไว้ใน mapping
+              // จาก createTrToMdbMapping: row number ถูกเก็บไว้ใน mapping แล้ว
+              let rowNum = null;
+              const conduitType = conduit;
+
+              // Row mapping สำหรับ IMC (แบบ 9.10)
+              const imcRowMapping: { [key: number]: number } = {
+                // MEA
+                400: 25, 500: 27, 630: 30, 800: 32, 1000: 36, 1250: 40, 1500: 42,
+                // PEA
+                100: 15, 160: 17, 250: 23, 315: 24
+              };
+
+              // Row mapping สำหรับ RSC (แบบ 9.11)
+              const rscRowMapping: { [key: number]: number } = {
+                // MEA
+                400: 25, 500: 27, 630: 30, 800: 32, 1000: 36, 1250: 40, 1500: 42,
+                // PEA
+                100: 15, 160: 17, 250: 23, 315: 24
+              };
+
+              if (conduitType === 'IMC' && trToMdbMapping?.['imc']?.[powerAuthority]?.[transformerSize]) {
+                rowNum = imcRowMapping[transformerSize];
+              } else if (conduitType === 'RSC' && trToMdbMapping?.['rsc']?.[powerAuthority]?.[transformerSize]) {
+                rowNum = rscRowMapping[transformerSize];
+              }
+
+              if (rowNum) {
+                // กำหนด Sheet ตาม conduit type
+                let sheetName = '';
+                if (conduitType === 'IMC') {
+                  sheetName = 'แบบ 9.10';
+                } else if (conduitType === 'RSC') {
+                  sheetName = 'แบบ 9.11';
+                }
+
+                if (sheetName) {
+                  const sheet = getExcelData(sheetName);
+                  const row = sheet.find((r: any) => r.__rowNum__ === rowNum);
+
+                  if (row) {
+                    const multiplier = parsePrice(row.__EMPTY_28 || 1); // ตัวคูณ
+                    const productName = row.__EMPTY_35 || 'เหล็กเท้าแขนสามเหลี่ยมรับท่อ';
+                    const materialUnit = parsePrice(row.__EMPTY_29 || 0);
+                    const laborUnit = parsePrice(row.__EMPTY_31 || 0);
+                    const totalUnit = parsePrice(row.__EMPTY_33 || 0);
+
+                    // เพิ่มเฉพาะเมื่อมีข้อมูลครบ
+                    if (multiplier > 0 && (materialUnit > 0 || laborUnit > 0 || totalUnit > 0)) {
+                      products.push({
+                        type: 'เหล็กเท้าแขนสามเหลี่ยมรับท่อ',
+                        code: '-',
+                        productName: productName,
+                        distance: undefined,
+                        materialTotal: materialUnit * multiplier,
+                        laborTotal: laborUnit * multiplier,
+                        totalPrice: totalUnit * multiplier,
+                        quantity: multiplier.toString(),
+                      });
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -2419,6 +2628,68 @@ function MoreDetailCard(props: any) {
             totalPrice: parsePrice(result.materialCost) + parsePrice(result.laborCost),
             quantity: '1',
           });
+
+          // เพิ่มรายการ "เหล็กเท้าแขนสามเหลี่ยมรับท่อ" สำหรับกรณี "ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ"
+          if (props.chargerWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ' && chargerConduitChoices[idx] && (chargerConduitChoices[idx] === 'IMC' || chargerConduitChoices[idx] === 'RSC')) {
+            const chargerName = props.chargerSummary?.[idx]?.name || '';
+            const kwMatch = chargerName.match(/(\d+)\s*kW/i);
+            const kw = kwMatch ? parseInt(kwMatch[1]) : 0;
+            const rowMapping: { [key: number]: number } = {
+              30: 9, 40: 10, 60: 12, 80: 13, 120: 15, 160: 17, 180: 18, 200: 18,
+              240: 22, 320: 25, 360: 28, 480: 29, 600: 34, 640: 35, 720: 38, 800: 22
+            };
+            const rowNum = rowMapping[kw];
+
+            if (rowNum) {
+              // กำหนด Sheet ตาม conduit type
+              const conduitType = chargerConduitChoices[idx];
+              let sheetName = '';
+              if (conduitType === 'IMC') {
+                sheetName = 'แบบ 9.10';
+              } else if (conduitType === 'RSC') {
+                sheetName = 'แบบ 9.11';
+              }
+
+              if (sheetName) {
+                const sheet = getExcelData(sheetName);
+                const row = sheet.find((r: any) => r.__rowNum__ === rowNum);
+
+                if (row) {
+                  let multiplier, productName, materialUnit, laborUnit, totalUnit;
+
+                  if (conduitType === 'RSC') {
+                    // RSC: ใช้ __EMPTY_27 เป็นตัวคูณ, __EMPTY_34 เป็นรายการ, __EMPTY_28 เป็นค่าของ, __EMPTY_30 เป็นค่าแรงรวม, __EMPTY_32 เป็นราคารวม
+                    multiplier = parsePrice(row.__EMPTY_27 || 1);
+                    productName = row.__EMPTY_34 || 'เหล็กเท้าแขนสามเหลี่ยมรับท่อ';
+                    materialUnit = parsePrice(row.__EMPTY_28 || 0);
+                    laborUnit = parsePrice(row.__EMPTY_30 || 0);
+                    totalUnit = parsePrice(row.__EMPTY_32 || 0);
+                  } else {
+                    // IMC: ใช้เงื่อนไขเดิม
+                    multiplier = parsePrice(row.__EMPTY_28 || 1);
+                    productName = row.__EMPTY_35 || 'เหล็กเท้าแขนสามเหลี่ยมรับท่อ';
+                    materialUnit = parsePrice(row.__EMPTY_29 || 0);
+                    laborUnit = parsePrice(row.__EMPTY_31 || 0);
+                    totalUnit = parsePrice(row.__EMPTY_33 || 0);
+                  }
+
+                  // เพิ่มเฉพาะเมื่อมีข้อมูลครบ
+                  if (multiplier > 0 && (materialUnit > 0 || laborUnit > 0 || totalUnit > 0)) {
+                    products.push({
+                      type: 'เหล็กเท้าแขนสามเหลี่ยมรับท่อ',
+                      code: '-',
+                      productName: productName,
+                      distance: undefined,
+                      materialTotal: materialUnit * multiplier,
+                      laborTotal: laborUnit * multiplier,
+                      totalPrice: totalUnit * multiplier,
+                      quantity: multiplier.toString(),
+                    });
+                  }
+                }
+              }
+            }
+          }
         });
       }
     } else if (sectionKey === 'additional') {
@@ -2606,7 +2877,136 @@ function MoreDetailCard(props: any) {
         }
       }
 
-      // 4. งานทาสี
+      // 4. งานขุดดิน
+      if (excavationSelection === 'yes') {
+        // 1. สกัดปูน กว้าง 30 ซม. หน้า 10 ซม. + ขุดดินลึก 30 ซม. + ฝังท่อ + เทปูนปิด (row 3)
+        if (excavation30cm) {
+          const quantity = parsePositiveNumber(excavation30cm);
+          const item = getExcavationPricing(3, quantity);
+          if (item) {
+            products.push({
+              type: 'งานขุดดิน',
+              code: item.row?.__EMPTY || '-',
+              productName: 'สกัดปูน กว้าง 30 ซม. หน้า 10 ซม. + ขุดดินลึก 30 ซม. + ฝังท่อ + เทปูนปิด',
+              materialTotal: item.materialTotal,
+              laborTotal: item.laborTotal,
+              totalPrice: item.total,
+              quantity: quantity.toString(),
+              distance: `${excavation30cm} เมตร`,
+            });
+          }
+        }
+
+        // 2. สกัดปูน กว้าง 60 ซม. หน้า 10 ซม. + ขุดดินลึก 30 ซม. + ฝังท่อ + เทปูนปิด (row 4)
+        if (excavation60cm) {
+          const quantity = parsePositiveNumber(excavation60cm);
+          const item = getExcavationPricing(4, quantity);
+          if (item) {
+            products.push({
+              type: 'งานขุดดิน',
+              code: item.row?.__EMPTY || '-',
+              productName: 'สกัดปูน กว้าง 60 ซม. หน้า 10 ซม. + ขุดดินลึก 30 ซม. + ฝังท่อ + เทปูนปิด',
+              materialTotal: item.materialTotal,
+              laborTotal: item.laborTotal,
+              totalPrice: item.total,
+              quantity: quantity.toString(),
+              distance: `${excavation60cm} เมตร`,
+            });
+          }
+        }
+
+        // 3. สกัดพื้นปูนหนา 10 ซม. (row 5)
+        if (excavation10cm) {
+          const quantity = parsePositiveNumber(excavation10cm);
+          const item = getExcavationPricing(5, quantity);
+          if (item) {
+            products.push({
+              type: 'งานขุดดิน',
+              code: item.row?.__EMPTY || '-',
+              productName: 'สกัดพื้นปูนหนา 10 ซม.',
+              materialTotal: item.materialTotal,
+              laborTotal: item.laborTotal,
+              totalPrice: item.total,
+              quantity: quantity.toString(),
+              distance: `${excavation10cm} ตารางเมตร`,
+            });
+          }
+        }
+
+        // 4. สกัดพื้นปูนหนา 20 ซม. (row 6)
+        if (excavation20cm) {
+          const quantity = parsePositiveNumber(excavation20cm);
+          const item = getExcavationPricing(6, quantity);
+          if (item) {
+            products.push({
+              type: 'งานขุดดิน',
+              code: item.row?.__EMPTY || '-',
+              productName: 'สกัดพื้นปูนหนา 20 ซม.',
+              materialTotal: item.materialTotal,
+              laborTotal: item.laborTotal,
+              totalPrice: item.total,
+              quantity: quantity.toString(),
+              distance: `${excavation20cm} ตารางเมตร`,
+            });
+          }
+        }
+
+        // 5. สกัดพื้นปูนหนา 30 ซม. (row 7)
+        if (excavation30cmFloor) {
+          const quantity = parsePositiveNumber(excavation30cmFloor);
+          const item = getExcavationPricing(7, quantity);
+          if (item) {
+            products.push({
+              type: 'งานขุดดิน',
+              code: item.row?.__EMPTY || '-',
+              productName: 'สกัดพื้นปูนหนา 30 ซม.',
+              materialTotal: item.materialTotal,
+              laborTotal: item.laborTotal,
+              totalPrice: item.total,
+              quantity: quantity.toString(),
+              distance: `${excavation30cmFloor} ตารางเมตร`,
+            });
+          }
+        }
+
+        // 6. ขุดดินออกเพื่อปรับระดับ (row 8)
+        if (excavationLevel) {
+          const quantity = parsePositiveNumber(excavationLevel);
+          const item = getExcavationPricing(8, quantity);
+          if (item) {
+            products.push({
+              type: 'งานขุดดิน',
+              code: item.row?.__EMPTY || '-',
+              productName: 'ขุดดินออกเพื่อปรับระดับ',
+              materialTotal: item.materialTotal,
+              laborTotal: item.laborTotal,
+              totalPrice: item.total,
+              quantity: quantity.toString(),
+              distance: `${excavationLevel} ลูกบาศก์เมตร`,
+            });
+          }
+        }
+
+        // 7. เติมดินหรือทรายเพื่อปรับระดับ (row 9)
+        if (excavationFill) {
+          const quantity = parsePositiveNumber(excavationFill);
+          const item = getExcavationPricing(9, quantity);
+          if (item) {
+            products.push({
+              type: 'งานขุดดิน',
+              code: item.row?.__EMPTY || '-',
+              productName: 'เติมดินหรือทรายเพื่อปรับระดับ',
+              materialTotal: item.materialTotal,
+              laborTotal: item.laborTotal,
+              totalPrice: item.total,
+              quantity: quantity.toString(),
+              distance: `${excavationFill} ลูกบาศก์เมตร`,
+            });
+          }
+        }
+      }
+
+      // 5. งานทาสี
       if (paintingSelection === 'yes') {
         if (selectedPaintItem && parkingPaintType && parkingPaintType !== 'none') {
           products.push({
@@ -2663,7 +3063,7 @@ function MoreDetailCard(props: any) {
         }
       }
 
-      // 5. งานป้าย
+      // 6. งานป้าย
       if (signageWorkSelection === 'yes') {
         if (signageStationType === 'general') {
           // สถานีทั่วไป: 1.1 (row 5), 1.2 (row 6)
@@ -2809,7 +3209,8 @@ function MoreDetailCard(props: any) {
     travelCostResult, travelDistance, travelType, constructionTravelCost, installationTravelCost, installationTravelDistance, trainingWork,
     getMdbCabinetData,
     getExcelData,
-    props.trWiringSize, props.trWireConduit, props.chargerWiringCableAll, props.chargerWiringCable, props.chargerWiringType
+    props.trWiringSize, props.trWireConduit, props.chargerWiringCableAll, props.chargerWiringCable, props.chargerWiringType,
+    excavationSelection, excavation30cm, excavation60cm, excavation10cm, excavation20cm, excavation30cmFloor, excavationLevel, excavationFill, getExcavationPricing
   ]);
 
   const stationCostSections = React.useMemo(() => ([
@@ -3006,6 +3407,7 @@ function MoreDetailCard(props: any) {
           'อุปกรณ์ประกอบสถานี': 'อุปกรณ์ประกอบสถานี',
           'ระบบสื่อสาร': 'ระบบสื่อสาร',
           'งานปูน': 'งานปูน',
+          'งานขุดดิน': 'งานขุดดิน',
           'งานทาสี': 'งานทาสี / ทาสีช่องจอด',
           'ทาสีช่องจอด': 'งานทาสี / ทาสีช่องจอด',
           'งานป้าย': 'งานป้าย',
@@ -3106,7 +3508,17 @@ function MoreDetailCard(props: any) {
           });
         }
 
-        // 3. งานทาสี / ทาสีช่องจอด (ถ้ามีค่า และยังไม่มีใน products)
+        // 3. งานขุดดิน (ถ้ามีค่า และยังไม่มีใน products)
+        if (excavationTotals.total > 0 && !productsByType.has('งานขุดดิน')) {
+          costSummaryRows.push({
+            type: 'งานขุดดิน',
+            material: excavationTotals.material,
+            labor: excavationTotals.labor,
+            total: excavationTotals.total
+          });
+        }
+
+        // 4. งานทาสี / ทาสีช่องจอด (ถ้ามีค่า และยังไม่มีใน products)
         if (paintingTotals.total > 0 && !productsByType.has('งานทาสี') && !productsByType.has('ทาสีช่องจอด')) {
           costSummaryRows.push({
             type: 'งานทาสี / ทาสีช่องจอด',
@@ -3116,7 +3528,7 @@ function MoreDetailCard(props: any) {
           });
         }
 
-        // 4. งานป้าย (ถ้ามีค่า และยังไม่มีใน products)
+        // 5. งานป้าย (ถ้ามีค่า และยังไม่มีใน products)
         if (signageWorkTotals.total > 0 && !productsByType.has('งานป้าย')) {
           costSummaryRows.push({
             type: 'งานป้าย',
@@ -3234,14 +3646,16 @@ function MoreDetailCard(props: any) {
     const additionalFeaturesTotal = additionalFeaturesTotals.total;
     const stationTotal = stationTotals.total;
     let accessoriesPercent = 0;
-    if (stationTotal < 1500000) {
+    if (stationTotal < 500000) {
       accessoriesPercent = 7;
-    } else if (stationTotal >= 1500000 && stationTotal <= 3000000) {
+    } else if (stationTotal < 1500000) {
       accessoriesPercent = 6;
-    } else if (stationTotal > 5000000) {
-      accessoriesPercent = 3;
-    } else {
+    } else if (stationTotal >= 1500000 && stationTotal <= 3000000) {
       accessoriesPercent = 5;
+    } else if (stationTotal > 3000000 && stationTotal <= 5000000) {
+      accessoriesPercent = 4;
+    } else {
+      accessoriesPercent = 3;
     }
 
     // ดึงข้อมูลค่าเดินทาง
@@ -3333,7 +3747,9 @@ function MoreDetailCard(props: any) {
     'equipment': false,
     'communication': false,
     'concrete': false,
+    'excavation': false,
     'painting': false,
+    'signage-work': false,
     'roof-cover': false,
     'mdb-roof': false,
     'charger-roof': false
@@ -5226,6 +5642,114 @@ function MoreDetailCard(props: any) {
                                       </div>
                                     </div>
                                   </div>
+
+                                  {/* แสดงเหล็กเท้าแขนสามเหลี่ยมรับท่อ สำหรับกรณี "ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2" */}
+                                  {(() => {
+                                    const isGroup2Air = props.trWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2';
+                                    const conduitType = trWiringGroup2;
+                                    const hasValidConduit = conduitType === 'IMC' || conduitType === 'RSC';
+
+                                    if (isGroup2Air && hasValidConduit) {
+                                      const transformerSize = parseInt(props.transformer || '0');
+                                      const powerAuthority = props.powerAuthority || '';
+
+                                      // Row mapping
+                                      const imcRowMapping: { [key: number]: number } = {
+                                        400: 25, 500: 27, 630: 30, 800: 32, 1000: 36, 1250: 40, 1500: 42,
+                                        100: 15, 160: 17, 250: 23, 315: 24
+                                      };
+                                      const rscRowMapping: { [key: number]: number } = {
+                                        400: 25, 500: 27, 630: 30, 800: 32, 1000: 36, 1250: 40, 1500: 42,
+                                        100: 15, 160: 17, 250: 23, 315: 24
+                                      };
+
+                                      let rowNum = null;
+                                      if (conduitType === 'IMC' && trToMdbMapping?.['imc']?.[powerAuthority]?.[transformerSize]) {
+                                        rowNum = imcRowMapping[transformerSize];
+                                      } else if (conduitType === 'RSC' && trToMdbMapping?.['rsc']?.[powerAuthority]?.[transformerSize]) {
+                                        rowNum = rscRowMapping[transformerSize];
+                                      }
+
+                                      console.log('TR to MDB - Row lookup', {
+                                        transformerSize,
+                                        powerAuthority,
+                                        conduitType,
+                                        rowNum,
+                                        hasMapping: conduitType === 'IMC' ? !!trToMdbMapping?.['imc']?.[powerAuthority]?.[transformerSize] : !!trToMdbMapping?.['rsc']?.[powerAuthority]?.[transformerSize]
+                                      });
+
+                                      if (rowNum) {
+                                        const sheetName = conduitType === 'IMC' ? 'แบบ 9.10' : 'แบบ 9.11';
+                                        const sheet = getExcelData(sheetName);
+                                        const row = sheet.find((r: any) => r.__rowNum__ === rowNum);
+
+                                        console.log('TR to MDB - Excel lookup', {
+                                          sheetName,
+                                          rowNum,
+                                          sheetLength: sheet.length,
+                                          foundRow: !!row,
+                                          rowData: row ? {
+                                            __EMPTY_28: row.__EMPTY_28,
+                                            __EMPTY_29: row.__EMPTY_29,
+                                            __EMPTY_31: row.__EMPTY_31,
+                                            __EMPTY_33: row.__EMPTY_33,
+                                            __EMPTY_35: row.__EMPTY_35
+                                          } : null
+                                        });
+
+                                        if (row) {
+                                          const multiplier = parsePrice(row.__EMPTY_28 || 0);
+                                          const productName = row.__EMPTY_35 || 'เหล็กเท้าแขนสามเหลี่ยมรับท่อ';
+                                          const materialUnit = parsePrice(row.__EMPTY_29 || 0);
+                                          const laborUnit = parsePrice(row.__EMPTY_31 || 0);
+                                          const totalUnit = parsePrice(row.__EMPTY_33 || 0);
+
+                                          console.log('TR to MDB - Calculated values', {
+                                            multiplier,
+                                            productName,
+                                            materialUnit,
+                                            laborUnit,
+                                            totalUnit
+                                          });
+
+                                          // แสดงผลเสมอถ้ามี row
+                                          return (
+                                            <div className="mt-4 pt-4 border-t border-green-300">
+                                              <div className="text-sm font-semibold text-gray-700 mb-2">เหล็กเท้าแขนสามเหลี่ยมรับท่อ</div>
+                                              <div className="text-xs text-gray-600 mb-2">
+                                                <span className="font-medium">รายการ:</span> {productName || 'เหล็กเท้าแขนสามเหลี่ยมรับท่อ'}
+                                              </div>
+                                              <div className="grid grid-cols-3 gap-4">
+                                                <div>
+                                                  <div className="text-xs text-gray-600 mb-1">ค่าของ:</div>
+                                                  <div className="text-sm font-semibold text-gray-800">
+                                                    {(materialUnit * (multiplier || 1)).toLocaleString('th-TH')} บาท
+                                                  </div>
+                                                </div>
+                                                <div>
+                                                  <div className="text-xs text-gray-600 mb-1">ค่าแรงรวม:</div>
+                                                  <div className="text-sm font-semibold text-gray-800">
+                                                    {(laborUnit * (multiplier || 1)).toLocaleString('th-TH')} บาท
+                                                  </div>
+                                                </div>
+                                                <div>
+                                                  <div className="text-xs text-green-700 font-semibold mb-1">ราคารวม:</div>
+                                                  <div className="text-sm font-semibold text-green-700">
+                                                    {(totalUnit * (multiplier || 1)).toLocaleString('th-TH')} บาท
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          );
+                                        } else {
+                                          console.warn(`TR to MDB - Row ${rowNum} not found in sheet ${sheetName}`);
+                                        }
+                                      } else {
+                                        console.warn(`TR to MDB - No row mapping for transformer ${transformerSize} kVA`);
+                                      }
+                                    }
+                                    return null;
+                                  })()}
                                 </div>
                               );
                             } else {
@@ -6614,6 +7138,137 @@ function MoreDetailCard(props: any) {
                                     </div>
                                   </div>
                                 </div>
+
+                                {/* แสดงเหล็กเท้าแขนสามเหลี่ยมรับท่อ สำหรับกรณี "ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ" */}
+                                {(() => {
+                                  // ตรวจสอบเงื่อนไข
+                                  const isGroup2Air = props.chargerWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ';
+                                  const conduitChoice = chargerConduitChoices && chargerConduitChoices[chargerIndex];
+                                  const hasValidConduit = conduitChoice === 'IMC' || conduitChoice === 'RSC';
+
+                                  // Debug log
+                                  if (isGroup2Air) {
+                                    console.log('MDB to Charger - Group 2 Air detected', {
+                                      chargerIndex,
+                                      conduitChoice,
+                                      hasValidConduit,
+                                      chargerConduitChoices: chargerConduitChoices
+                                    });
+                                  }
+
+                                  if (isGroup2Air && hasValidConduit) {
+                                    const chargerName = props.chargerSummary?.[chargerIndex]?.name || '';
+                                    const kwMatch = chargerName.match(/(\d+)\s*kW/i);
+                                    const kw = kwMatch ? parseInt(kwMatch[1]) : 0;
+                                    const rowMapping: { [key: number]: number } = {
+                                      30: 9, 40: 10, 60: 12, 80: 13, 120: 15, 160: 17, 180: 18, 200: 18,
+                                      240: 22, 320: 25, 360: 28, 480: 29, 600: 34, 640: 35, 720: 38, 800: 22
+                                    };
+                                    const rowNum = rowMapping[kw];
+
+                                    console.log('MDB to Charger - Row lookup', {
+                                      chargerName,
+                                      kw,
+                                      rowNum,
+                                      conduitChoice
+                                    });
+
+                                    if (rowNum) {
+                                      const conduitType = conduitChoice;
+                                      const sheetName = conduitType === 'IMC' ? 'แบบ 9.10' : 'แบบ 9.11';
+                                      const sheet = getExcelData(sheetName);
+                                      const row = sheet.find((r: any) => r.__rowNum__ === rowNum);
+
+                                      console.log('MDB to Charger - Excel lookup', {
+                                        sheetName,
+                                        rowNum,
+                                        conduitType,
+                                        sheetLength: sheet.length,
+                                        foundRow: !!row,
+                                        rowData: row ? (conduitType === 'RSC' ? {
+                                          __EMPTY_27: row.__EMPTY_27,
+                                          __EMPTY_28: row.__EMPTY_28,
+                                          __EMPTY_30: row.__EMPTY_30,
+                                          __EMPTY_32: row.__EMPTY_32,
+                                          __EMPTY_34: row.__EMPTY_34
+                                        } : {
+                                          __EMPTY_28: row.__EMPTY_28,
+                                          __EMPTY_29: row.__EMPTY_29,
+                                          __EMPTY_31: row.__EMPTY_31,
+                                          __EMPTY_33: row.__EMPTY_33,
+                                          __EMPTY_35: row.__EMPTY_35
+                                        }) : null
+                                      });
+
+                                      if (row) {
+                                        let multiplier, productName, materialUnit, laborUnit, totalUnit;
+
+                                        if (conduitType === 'RSC') {
+                                          // RSC: ใช้ __EMPTY_27 เป็นตัวคูณ, __EMPTY_34 เป็นรายการ, __EMPTY_28 เป็นค่าของ, __EMPTY_30 เป็นค่าแรงรวม, __EMPTY_32 เป็นราคารวม
+                                          multiplier = parsePrice(row.__EMPTY_27 || 0);
+                                          productName = row.__EMPTY_34 || 'เหล็กเท้าแขนสามเหลี่ยมรับท่อ';
+                                          materialUnit = parsePrice(row.__EMPTY_28 || 0);
+                                          laborUnit = parsePrice(row.__EMPTY_30 || 0);
+                                          totalUnit = parsePrice(row.__EMPTY_32 || 0);
+                                        } else {
+                                          // IMC: ใช้เงื่อนไขเดิม
+                                          multiplier = parsePrice(row.__EMPTY_28 || 0);
+                                          productName = row.__EMPTY_35 || 'เหล็กเท้าแขนสามเหลี่ยมรับท่อ';
+                                          materialUnit = parsePrice(row.__EMPTY_29 || 0);
+                                          laborUnit = parsePrice(row.__EMPTY_31 || 0);
+                                          totalUnit = parsePrice(row.__EMPTY_33 || 0);
+                                        }
+
+                                        console.log('MDB to Charger - Calculated values', {
+                                          conduitType,
+                                          multiplier,
+                                          productName,
+                                          materialUnit,
+                                          laborUnit,
+                                          totalUnit,
+                                          materialTotal: materialUnit * (multiplier || 1),
+                                          laborTotal: laborUnit * (multiplier || 1),
+                                          totalTotal: totalUnit * (multiplier || 1)
+                                        });
+
+                                        // แสดงผลเสมอถ้ามี row (แม้ว่าบางค่าเป็น 0)
+                                        return (
+                                          <div className="mt-4 pt-4 border-t border-blue-300">
+                                            <div className="text-sm font-semibold text-gray-700 mb-2">เหล็กเท้าแขนสามเหลี่ยมรับท่อ</div>
+                                            <div className="text-xs text-gray-600 mb-2">
+                                              <span className="font-medium">รายการ:</span> {productName || 'เหล็กเท้าแขนสามเหลี่ยมรับท่อ'}
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-4">
+                                              <div>
+                                                <div className="text-xs text-gray-600 mb-1">ค่าของ:</div>
+                                                <div className="text-sm font-semibold text-gray-800">
+                                                  {(materialUnit * (multiplier || 1)).toLocaleString('th-TH')} บาท
+                                                </div>
+                                              </div>
+                                              <div>
+                                                <div className="text-xs text-gray-600 mb-1">ค่าแรงรวม:</div>
+                                                <div className="text-sm font-semibold text-gray-800">
+                                                  {(laborUnit * (multiplier || 1)).toLocaleString('th-TH')} บาท
+                                                </div>
+                                              </div>
+                                              <div>
+                                                <div className="text-xs text-blue-700 font-semibold mb-1">ราคารวม:</div>
+                                                <div className="text-sm font-semibold text-blue-700">
+                                                  {(totalUnit * (multiplier || 1)).toLocaleString('th-TH')} บาท
+                                                </div>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        );
+                                      } else {
+                                        console.warn(`MDB to Charger - Row ${rowNum} not found in sheet ${sheetName}`);
+                                      }
+                                    } else {
+                                      console.warn(`MDB to Charger - No row mapping for ${kw} kW`);
+                                    }
+                                  }
+                                  return null;
+                                })()}
                               </div>
                             </CollapsibleContent>
                           </div>
@@ -8269,7 +8924,468 @@ function MoreDetailCard(props: any) {
 
               <Separator />
 
-              {/* 4. งานทาสีช่องจอด */}
+              {/* 4. งานขุดดิน */}
+              <Collapsible
+                open={openSections['excavation']}
+                onOpenChange={(open) => setOpenSections(prev => ({ ...prev, 'excavation': open }))}
+              >
+                <div className="bg-gray-50 rounded-lg border border-gray-200">
+                  <CollapsibleTrigger asChild>
+                    <div className="w-full p-4 text-left hover:bg-gray-100 transition-colors rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-semibold flex items-center gap-2">
+                          <Wrench className="h-5 w-5" />
+                          4. งานขุดดิน
+                        </h3>
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                            <div
+                              className={`flex items-center space-x-2 px-3 py-1 rounded-lg border cursor-pointer ${excavationSelection === 'yes' ? 'bg-green-100 border-green-300' : 'hover:bg-gray-50'}`}
+                              onClick={() => {
+                                setExcavationSelection('yes');
+                                setOpenSections(prev => ({ ...prev, 'excavation': true }));
+                              }}
+                            >
+                              <Checkbox
+                                id="excavation-yes"
+                                checked={excavationSelection === 'yes'}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setExcavationSelection('yes');
+                                    setOpenSections(prev => ({ ...prev, 'excavation': true }));
+                                  }
+                                }}
+                                className="border-green-400 data-[state=checked]:bg-green-500"
+                              />
+                              <Label htmlFor="excavation-yes" className="font-medium cursor-pointer text-sm">มี</Label>
+                            </div>
+                            <div
+                              className={`flex items-center space-x-2 px-3 py-1 rounded-lg border cursor-pointer ${excavationSelection === 'no' ? 'bg-gray-100 border-gray-300' : 'hover:bg-gray-50'}`}
+                              onClick={() => setExcavationSelection('no')}
+                            >
+                              <Checkbox
+                                id="excavation-no"
+                                checked={excavationSelection === 'no'}
+                                onCheckedChange={(checked) => { if (checked) setExcavationSelection('no'); }}
+                                className="border-gray-400 data-[state=checked]:bg-gray-500"
+                              />
+                              <Label htmlFor="excavation-no" className="font-medium cursor-pointer text-sm">ไม่มี</Label>
+                            </div>
+                          </div>
+                          <div className="ml-4">
+                            {openSections['excavation'] ? (
+                              <ChevronUp className="h-5 w-5 text-gray-600" />
+                            ) : (
+                              <ChevronDown className="h-5 w-5 text-gray-600" />
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="px-4 pb-4 space-y-3">
+                      {excavationSelection === 'yes' && (
+                        <>
+                          {/* 1. สกัดปูน กว้าง 30 ซม. */}
+                          <Collapsible
+                            open={openItems['excavation-30cm']}
+                            onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'excavation-30cm': open }))}
+                          >
+                            <div className="bg-white rounded-lg border border-gray-200">
+                              <CollapsibleTrigger className="w-full p-3 text-left hover:bg-gray-50 transition-colors rounded-lg">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3 flex-1">
+                                    <span className="text-sm font-medium">สกัดปูน กว้าง 30 ซม. หน้า 10 ซม. + ขุดดินลึก 30 ซม. + ฝังท่อ + เทปูนปิด</span>
+                                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                      <Input
+                                        type="number"
+                                        placeholder="กรอกความยาว"
+                                        value={excavation30cm}
+                                        onChange={(e) => setExcavation30cm(e.target.value)}
+                                        className="w-24 h-8 text-sm"
+                                        min="0"
+                                        step="0.01"
+                                      />
+                                      <span className="text-xs text-gray-600 whitespace-nowrap">เมตร</span>
+                                    </div>
+                                  </div>
+                                  <div className="ml-2">
+                                    {openItems['excavation-30cm'] ? (
+                                      <ChevronUp className="h-4 w-4 text-gray-600" />
+                                    ) : (
+                                      <ChevronDown className="h-4 w-4 text-gray-600" />
+                                    )}
+                                  </div>
+                                </div>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent>
+                                <div className="px-3 pb-3">
+                                  {excavation30cm && (() => {
+                                    const quantity = parsePositiveNumber(excavation30cm);
+                                    const pricing = getExcavationPricing(3, quantity);
+                                    if (pricing) {
+                                      return (
+                                        <div className="mt-2 space-y-1 text-xs">
+                                          <div><span className="font-medium">ค่าของ:</span> {pricing.materialTotal.toLocaleString('th-TH')} บาท</div>
+                                          <div><span className="font-medium">ค่าแรง:</span> {pricing.laborTotal.toLocaleString('th-TH')} บาท</div>
+                                          <div><span className="font-medium">รวม:</span> {pricing.total.toLocaleString('th-TH')} บาท</div>
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
+                                </div>
+                              </CollapsibleContent>
+                            </div>
+                          </Collapsible>
+
+                          {/* 2. สกัดปูน กว้าง 60 ซม. */}
+                          <Collapsible
+                            open={openItems['excavation-60cm']}
+                            onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'excavation-60cm': open }))}
+                          >
+                            <div className="bg-white rounded-lg border border-gray-200">
+                              <CollapsibleTrigger className="w-full p-3 text-left hover:bg-gray-50 transition-colors rounded-lg">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3 flex-1">
+                                    <span className="text-sm font-medium">สกัดปูน กว้าง 60 ซม. หน้า 10 ซม. + ขุดดินลึก 30 ซม. + ฝังท่อ + เทปูนปิด</span>
+                                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                      <Input
+                                        type="number"
+                                        placeholder="กรอกความยาว"
+                                        value={excavation60cm}
+                                        onChange={(e) => setExcavation60cm(e.target.value)}
+                                        className="w-24 h-8 text-sm"
+                                        min="0"
+                                        step="0.01"
+                                      />
+                                      <span className="text-xs text-gray-600 whitespace-nowrap">เมตร</span>
+                                    </div>
+                                  </div>
+                                  <div className="ml-2">
+                                    {openItems['excavation-60cm'] ? (
+                                      <ChevronUp className="h-4 w-4 text-gray-600" />
+                                    ) : (
+                                      <ChevronDown className="h-4 w-4 text-gray-600" />
+                                    )}
+                                  </div>
+                                </div>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent>
+                                <div className="px-3 pb-3">
+                                  {excavation60cm && (() => {
+                                    const quantity = parsePositiveNumber(excavation60cm);
+                                    const pricing = getExcavationPricing(4, quantity);
+                                    if (pricing) {
+                                      return (
+                                        <div className="mt-2 space-y-1 text-xs">
+                                          <div><span className="font-medium">ค่าของ:</span> {pricing.materialTotal.toLocaleString('th-TH')} บาท</div>
+                                          <div><span className="font-medium">ค่าแรง:</span> {pricing.laborTotal.toLocaleString('th-TH')} บาท</div>
+                                          <div><span className="font-medium">รวม:</span> {pricing.total.toLocaleString('th-TH')} บาท</div>
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
+                                </div>
+                              </CollapsibleContent>
+                            </div>
+                          </Collapsible>
+
+                          {/* 3. สกัดพื้นปูนหนา 10 ซม. */}
+                          <Collapsible
+                            open={openItems['excavation-10cm']}
+                            onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'excavation-10cm': open }))}
+                          >
+                            <div className="bg-white rounded-lg border border-gray-200">
+                              <CollapsibleTrigger className="w-full p-3 text-left hover:bg-gray-50 transition-colors rounded-lg">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3 flex-1">
+                                    <span className="text-sm font-medium">สกัดพื้นปูนหนา 10 ซม.</span>
+                                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                      <Input
+                                        type="number"
+                                        placeholder="กรอกตารางเมตร"
+                                        value={excavation10cm}
+                                        onChange={(e) => setExcavation10cm(e.target.value)}
+                                        className="w-24 h-8 text-sm"
+                                        min="0"
+                                        step="0.01"
+                                      />
+                                      <span className="text-xs text-gray-600 whitespace-nowrap">ตารางเมตร</span>
+                                    </div>
+                                  </div>
+                                  <div className="ml-2">
+                                    {openItems['excavation-10cm'] ? (
+                                      <ChevronUp className="h-4 w-4 text-gray-600" />
+                                    ) : (
+                                      <ChevronDown className="h-4 w-4 text-gray-600" />
+                                    )}
+                                  </div>
+                                </div>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent>
+                                <div className="px-3 pb-3">
+                                  {excavation10cm && (() => {
+                                    const quantity = parsePositiveNumber(excavation10cm);
+                                    const pricing = getExcavationPricing(5, quantity);
+                                    if (pricing) {
+                                      return (
+                                        <div className="mt-2 space-y-1 text-xs">
+                                          <div><span className="font-medium">ค่าของ:</span> {pricing.materialTotal.toLocaleString('th-TH')} บาท</div>
+                                          <div><span className="font-medium">ค่าแรง:</span> {pricing.laborTotal.toLocaleString('th-TH')} บาท</div>
+                                          <div><span className="font-medium">รวม:</span> {pricing.total.toLocaleString('th-TH')} บาท</div>
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
+                                </div>
+                              </CollapsibleContent>
+                            </div>
+                          </Collapsible>
+
+                          {/* 4. สกัดพื้นปูนหนา 20 ซม. */}
+                          <Collapsible
+                            open={openItems['excavation-20cm']}
+                            onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'excavation-20cm': open }))}
+                          >
+                            <div className="bg-white rounded-lg border border-gray-200">
+                              <CollapsibleTrigger className="w-full p-3 text-left hover:bg-gray-50 transition-colors rounded-lg">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3 flex-1">
+                                    <span className="text-sm font-medium">สกัดพื้นปูนหนา 20 ซม.</span>
+                                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                      <Input
+                                        type="number"
+                                        placeholder="กรอกตารางเมตร"
+                                        value={excavation20cm}
+                                        onChange={(e) => setExcavation20cm(e.target.value)}
+                                        className="w-24 h-8 text-sm"
+                                        min="0"
+                                        step="0.01"
+                                      />
+                                      <span className="text-xs text-gray-600 whitespace-nowrap">ตารางเมตร</span>
+                                    </div>
+                                  </div>
+                                  <div className="ml-2">
+                                    {openItems['excavation-20cm'] ? (
+                                      <ChevronUp className="h-4 w-4 text-gray-600" />
+                                    ) : (
+                                      <ChevronDown className="h-4 w-4 text-gray-600" />
+                                    )}
+                                  </div>
+                                </div>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent>
+                                <div className="px-3 pb-3">
+                                  {excavation20cm && (() => {
+                                    const quantity = parsePositiveNumber(excavation20cm);
+                                    const pricing = getExcavationPricing(6, quantity);
+                                    if (pricing) {
+                                      return (
+                                        <div className="mt-2 space-y-1 text-xs">
+                                          <div><span className="font-medium">ค่าของ:</span> {pricing.materialTotal.toLocaleString('th-TH')} บาท</div>
+                                          <div><span className="font-medium">ค่าแรง:</span> {pricing.laborTotal.toLocaleString('th-TH')} บาท</div>
+                                          <div><span className="font-medium">รวม:</span> {pricing.total.toLocaleString('th-TH')} บาท</div>
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
+                                </div>
+                              </CollapsibleContent>
+                            </div>
+                          </Collapsible>
+
+                          {/* 5. สกัดพื้นปูนหนา 30 ซม. */}
+                          <Collapsible
+                            open={openItems['excavation-30cm-floor']}
+                            onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'excavation-30cm-floor': open }))}
+                          >
+                            <div className="bg-white rounded-lg border border-gray-200">
+                              <CollapsibleTrigger className="w-full p-3 text-left hover:bg-gray-50 transition-colors rounded-lg">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3 flex-1">
+                                    <span className="text-sm font-medium">สกัดพื้นปูนหนา 30 ซม.</span>
+                                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                      <Input
+                                        type="number"
+                                        placeholder="กรอกตารางเมตร"
+                                        value={excavation30cmFloor}
+                                        onChange={(e) => setExcavation30cmFloor(e.target.value)}
+                                        className="w-24 h-8 text-sm"
+                                        min="0"
+                                        step="0.01"
+                                      />
+                                      <span className="text-xs text-gray-600 whitespace-nowrap">ตารางเมตร</span>
+                                    </div>
+                                  </div>
+                                  <div className="ml-2">
+                                    {openItems['excavation-30cm-floor'] ? (
+                                      <ChevronUp className="h-4 w-4 text-gray-600" />
+                                    ) : (
+                                      <ChevronDown className="h-4 w-4 text-gray-600" />
+                                    )}
+                                  </div>
+                                </div>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent>
+                                <div className="px-3 pb-3">
+                                  {excavation30cmFloor && (() => {
+                                    const quantity = parsePositiveNumber(excavation30cmFloor);
+                                    const pricing = getExcavationPricing(7, quantity);
+                                    if (pricing) {
+                                      return (
+                                        <div className="mt-2 space-y-1 text-xs">
+                                          <div><span className="font-medium">ค่าของ:</span> {pricing.materialTotal.toLocaleString('th-TH')} บาท</div>
+                                          <div><span className="font-medium">ค่าแรง:</span> {pricing.laborTotal.toLocaleString('th-TH')} บาท</div>
+                                          <div><span className="font-medium">รวม:</span> {pricing.total.toLocaleString('th-TH')} บาท</div>
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
+                                </div>
+                              </CollapsibleContent>
+                            </div>
+                          </Collapsible>
+
+                          {/* 6. ขุดดินออกเพื่อปรับระดับ */}
+                          <Collapsible
+                            open={openItems['excavation-level']}
+                            onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'excavation-level': open }))}
+                          >
+                            <div className="bg-white rounded-lg border border-gray-200">
+                              <CollapsibleTrigger className="w-full p-3 text-left hover:bg-gray-50 transition-colors rounded-lg">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3 flex-1">
+                                    <span className="text-sm font-medium">ขุดดินออกเพื่อปรับระดับ</span>
+                                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                      <Input
+                                        type="number"
+                                        placeholder="กรอกลูกบาศก์เมตร"
+                                        value={excavationLevel}
+                                        onChange={(e) => setExcavationLevel(e.target.value)}
+                                        className="w-24 h-8 text-sm"
+                                        min="0"
+                                        step="0.01"
+                                      />
+                                      <span className="text-xs text-gray-600 whitespace-nowrap">ลูกบาศก์เมตร</span>
+                                    </div>
+                                  </div>
+                                  <div className="ml-2">
+                                    {openItems['excavation-level'] ? (
+                                      <ChevronUp className="h-4 w-4 text-gray-600" />
+                                    ) : (
+                                      <ChevronDown className="h-4 w-4 text-gray-600" />
+                                    )}
+                                  </div>
+                                </div>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent>
+                                <div className="px-3 pb-3">
+                                  {excavationLevel && (() => {
+                                    const quantity = parsePositiveNumber(excavationLevel);
+                                    const pricing = getExcavationPricing(8, quantity);
+                                    if (pricing) {
+                                      return (
+                                        <div className="mt-2 space-y-1 text-xs">
+                                          <div><span className="font-medium">ค่าของ:</span> {pricing.materialTotal.toLocaleString('th-TH')} บาท</div>
+                                          <div><span className="font-medium">ค่าแรง:</span> {pricing.laborTotal.toLocaleString('th-TH')} บาท</div>
+                                          <div><span className="font-medium">รวม:</span> {pricing.total.toLocaleString('th-TH')} บาท</div>
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
+                                </div>
+                              </CollapsibleContent>
+                            </div>
+                          </Collapsible>
+
+                          {/* 7. เติมดินหรือทรายเพื่อปรับระดับ */}
+                          <Collapsible
+                            open={openItems['excavation-fill']}
+                            onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'excavation-fill': open }))}
+                          >
+                            <div className="bg-white rounded-lg border border-gray-200">
+                              <CollapsibleTrigger className="w-full p-3 text-left hover:bg-gray-50 transition-colors rounded-lg">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3 flex-1">
+                                    <span className="text-sm font-medium">เติมดินหรือทรายเพื่อปรับระดับ</span>
+                                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                      <Input
+                                        type="number"
+                                        placeholder="กรอกลูกบาศก์เมตร"
+                                        value={excavationFill}
+                                        onChange={(e) => setExcavationFill(e.target.value)}
+                                        className="w-24 h-8 text-sm"
+                                        min="0"
+                                        step="0.01"
+                                      />
+                                      <span className="text-xs text-gray-600 whitespace-nowrap">ลูกบาศก์เมตร</span>
+                                    </div>
+                                  </div>
+                                  <div className="ml-2">
+                                    {openItems['excavation-fill'] ? (
+                                      <ChevronUp className="h-4 w-4 text-gray-600" />
+                                    ) : (
+                                      <ChevronDown className="h-4 w-4 text-gray-600" />
+                                    )}
+                                  </div>
+                                </div>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent>
+                                <div className="px-3 pb-3">
+                                  {excavationFill && (() => {
+                                    const quantity = parsePositiveNumber(excavationFill);
+                                    const pricing = getExcavationPricing(9, quantity);
+                                    if (pricing) {
+                                      return (
+                                        <div className="mt-2 space-y-1 text-xs">
+                                          <div><span className="font-medium">ค่าของ:</span> {pricing.materialTotal.toLocaleString('th-TH')} บาท</div>
+                                          <div><span className="font-medium">ค่าแรง:</span> {pricing.laborTotal.toLocaleString('th-TH')} บาท</div>
+                                          <div><span className="font-medium">รวม:</span> {pricing.total.toLocaleString('th-TH')} บาท</div>
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
+                                </div>
+                              </CollapsibleContent>
+                            </div>
+                          </Collapsible>
+
+                          {/* รวมค่าใช้จ่ายงานขุดดิน */}
+                          <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                            <div className="text-lg font-semibold text-green-800">รวมค่าใช้จ่ายงานขุดดิน</div>
+                            <div className="mt-2 grid grid-cols-3 gap-4 text-sm">
+                              <div>
+                                <div className="text-gray-600 mb-1">ราคาค่าของ:</div>
+                                <div className="text-lg font-semibold text-green-700">{excavationTotals.material.toLocaleString('th-TH')} บาท</div>
+                              </div>
+                              <div>
+                                <div className="text-gray-600 mb-1">ราคาค่าแรง:</div>
+                                <div className="text-lg font-semibold text-green-700">{excavationTotals.labor.toLocaleString('th-TH')} บาท</div>
+                              </div>
+                              <div>
+                                <div className="text-gray-600 mb-1">ราคารวม:</div>
+                                <div className="text-lg font-semibold text-green-700">{excavationTotals.total.toLocaleString('th-TH')} บาท</div>
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </CollapsibleContent>
+                </div>
+              </Collapsible>
+
+              <Separator />
+
+              {/* 5. งานทาสีช่องจอด */}
 
               <Collapsible
                 open={openSections['painting']}
@@ -8281,7 +9397,7 @@ function MoreDetailCard(props: any) {
                       <div className="flex items-center justify-between">
                         <h3 className="text-lg font-semibold flex items-center gap-2">
                           <Paintbrush className="h-5 w-5" />
-                          4. งานทาสีช่องจอด
+                          5. งานทาสีช่องจอด
                         </h3>
                         <div className="flex items-center gap-4">
                           <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
@@ -8638,7 +9754,7 @@ function MoreDetailCard(props: any) {
                       <div className="flex items-center justify-between">
                         <h3 className="text-lg font-semibold flex items-center gap-2">
                           <Shield className="h-5 w-5" />
-                          5. งานป้าย
+                          6. งานป้าย
                         </h3>
                         <div className="flex items-center gap-4">
                           <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
@@ -9461,7 +10577,7 @@ function MoreDetailCard(props: any) {
                   </div>
                 </div>
                 <div className="text-xs text-slate-500">
-                  รวมค่าใช้จ่ายจากทุกหัวข้อย่อย: อุปกรณ์ประกอบสถานี, ระบบสื่อสาร, งานปูน, งานทาสีช่องจอด, งานป้าย และหลังคาทุกประเภท
+                  รวมค่าใช้จ่ายจากทุกหัวข้อย่อย: อุปกรณ์ประกอบสถานี, ระบบสื่อสาร, งานปูน, งานขุดดิน, งานทาสีช่องจอด, งานป้าย และหลังคาทุกประเภท
                 </div>
               </div>
 
