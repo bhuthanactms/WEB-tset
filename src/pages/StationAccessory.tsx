@@ -196,6 +196,58 @@ function MoreDetailCard(props: any) {
   const [openChargers, setOpenChargers] = useState<{ [key: number]: boolean }>({});
   const [isCalculating, setIsCalculating] = useState(false);
 
+  // ฟังก์ชัน helper สำหรับดึง Row Mapping ตามเงื่อนไข
+  const getMdbToChargerRowMapping = (wiringType: string, conduitType: string, powerAuthority: string): { [key: number]: number } => {
+    // 180 kW ใช้ค่าเดียวกับ 200 kW เสมอ
+    const kw180 = 200; // จะ map เป็นค่าเดียวกับ 200 kW
+
+    if (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ') {
+      if (conduitType === 'IMC') {
+        if (powerAuthority === 'PEA') {
+          return {
+            30: 9, 40: 10, 60: 12, 80: 13, 120: 15, 160: 17, 180: 21, 200: 21,
+            240: 22, 320: 25, 360: 28, 480: 29, 600: 34, 640: 35, 720: 38, 800: 22
+          };
+        } else if (powerAuthority === 'MEA') {
+          return {
+            30: 9, 40: 10, 60: 12, 80: 13, 120: 15, 160: 17, 180: 18, 200: 18,
+            240: 22, 320: 25, 360: 28, 480: 29, 600: 34, 640: 35, 720: 38, 800: 22
+          };
+        }
+      } else if (conduitType === 'RSC') {
+        if (powerAuthority === 'PEA') {
+          return {
+            30: 9, 40: 10, 60: 12, 80: 13, 120: 15, 160: 17, 180: 21, 200: 21,
+            240: 22, 320: 25, 360: 28, 480: 29, 600: 34, 640: 35, 720: 38, 800: 22
+          };
+        } else if (powerAuthority === 'MEA') {
+          return {
+            30: 9, 40: 10, 60: 12, 80: 13, 120: 15, 160: 17, 180: 18, 200: 18,
+            240: 22, 320: 25, 360: 28, 480: 29, 600: 34, 640: 35, 720: 38, 800: 22
+          };
+        }
+      }
+    } else if (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน') {
+      if (powerAuthority === 'PEA') {
+        return {
+          30: 9, 40: 10, 60: 12, 80: 13, 120: 15, 160: 17, 180: 22, 200: 22,
+          240: 23, 320: 25, 360: 28, 480: 30, 600: 34, 640: 34, 720: 35, 800: 23
+        };
+      } else if (powerAuthority === 'MEA') {
+        return {
+          30: 9, 40: 10, 60: 12, 80: 13, 120: 15, 160: 17, 180: 18, 200: 18,
+          240: 22, 320: 23, 360: 25, 480: 28, 600: 30, 640: 34, 720: 35, 800: 23
+        };
+      }
+    }
+
+    // Default fallback (ไม่ควรเกิดขึ้น)
+    return {
+      30: 9, 40: 10, 60: 12, 80: 13, 120: 15, 160: 17, 180: 18, 200: 18,
+      240: 22, 320: 25, 360: 28, 480: 29, 600: 34, 640: 35, 720: 38, 800: 22
+    };
+  };
+
   // ฟังก์ชันคำนวณราคา MDB to Charger Configuration - New Section
   const calculateMdbToChargerResults = async (distance: number) => {
     try {
@@ -212,6 +264,7 @@ function MoreDetailCard(props: any) {
       console.log('ใช้ข้อมูลจาก props.excelData (cache)');
 
       const results: any[] = [];
+      const powerAuthority = props.powerAuthority || 'MEA'; // Default to MEA if not set
 
       // Process each charger
       for (let i = 0; i < props.chargerSummary.length; i++) {
@@ -221,7 +274,7 @@ function MoreDetailCard(props: any) {
 
         // Extract kW from charger name
         const kwMatch = chargerName.match(/(\d+)\s*kW/i);
-        const kw = kwMatch ? parseInt(kwMatch[1]) : 0;
+        let kw = kwMatch ? parseInt(kwMatch[1]) : 0;
 
         // Determine sheet and conduit type
         let sheetName = '';
@@ -253,20 +306,16 @@ function MoreDetailCard(props: any) {
           continue;
         }
 
-        // Map kW to row number according to specifications
-        // 180 kW ใช้ค่าเดียวกับ 200 kW (row 18)
-        const rowMapping: { [key: number]: number } = {
-          30: 9, 40: 10, 60: 12, 80: 13, 120: 15, 160: 17, 180: 18, 200: 18,
-          240: 22, 320: 25, 360: 28, 480: 29, 600: 34, 640: 35, 720: 38, 800: 22
-        };
-
+        // Get Row Mapping ตามเงื่อนไข
+        const rowMapping = getMdbToChargerRowMapping(wiringType, conduitType, powerAuthority);
         const rowNum = rowMapping[kw];
+
         if (!rowNum) {
           console.error(`No row mapping found for ${kw} kW`);
           continue;
         }
 
-        const row = sheet[rowNum];
+        const row = sheet.find((r: any) => r.__rowNum__ === rowNum);
         if (!row) {
           console.error(`Row ${rowNum} not found in sheet ${sheetName}`);
           continue;
@@ -370,6 +419,8 @@ function MoreDetailCard(props: any) {
 
       console.log('ใช้ข้อมูลจาก props.excelData (cache) สำหรับ MDB to Charger');
 
+      const powerAuthority = props.powerAuthority || 'MEA'; // Default to MEA if not set
+
       // Find the correct sheet based on wiring type and conduit type
       let sheetName = '';
       if (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ' && conduitType === 'IMC') {
@@ -385,30 +436,14 @@ function MoreDetailCard(props: any) {
         return null;
       }
 
-
       // Extract kW from charger name
       const kwMatch = chargerName.match(/(\d+)\s*kW/i);
       const kw = kwMatch ? parseInt(kwMatch[1]) : 0;
 
-      // Map kW to row number according to specifications
-      // สำหรับ "กลุ่ม 2 เดินในอากาศ" ใช้ row mapping ใหม่
-      // สำหรับ "กลุ่ม 5 ฝังใต้ดิน" ใช้ row mapping เก่า
-      let rowMapping: { [key: number]: number };
-      if (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ') {
-        // Row mapping ใหม่สำหรับกลุ่ม 2 เดินในอากาศ
-        rowMapping = {
-          30: 9, 40: 10, 60: 12, 80: 13, 120: 15, 160: 17, 180: 18, 200: 18,
-          240: 22, 320: 25, 360: 28, 480: 29, 600: 34, 640: 35, 720: 38, 800: 22
-        };
-      } else {
-        // Row mapping เก่าสำหรับกลุ่ม 5 ฝังใต้ดิน
-        rowMapping = {
-          30: 11, 40: 12, 60: 14, 80: 15, 120: 17, 160: 19, 180: 20, 200: 20,
-          240: 24, 320: 27, 360: 30, 480: 31, 600: 36, 640: 37, 720: 40, 800: 24
-        };
-      }
-
+      // Get Row Mapping ตามเงื่อนไข
+      const rowMapping = getMdbToChargerRowMapping(wiringType, conduitType, powerAuthority);
       const rowNum = rowMapping[kw];
+
       if (!rowNum) {
         console.error(`No row mapping found for ${kw} kW`);
         return null;
@@ -1666,12 +1701,160 @@ function MoreDetailCard(props: any) {
       return emptyTotals;
     }
 
+    // คำนวณราคาหลักจาก priceData
+    let materialTotal = parsePrice(priceData.materialPrice);
+    let laborTotal = parsePrice(priceData.laborPrice);
+    let totalPrice = parsePrice(priceData.totalPrice);
+
+    // เพิ่มราคา "เหล็กเท้าแขนสามเหลี่ยมรับท่อ" สำหรับกรณี "ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2"
+    if (props.trWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2' && conduit && (conduit === 'IMC' || conduit === 'RSC')) {
+      const transformerSize = parseInt(props.transformer || '0');
+      const powerAuthority = props.powerAuthority || '';
+      let rowNum = null;
+      const conduitType = conduit;
+
+      // Row mapping สำหรับ IMC (แบบ 9.10) แยกตาม Power Authority
+      let imcRowMapping: { [key: number]: number } = {};
+      if (powerAuthority === 'MEA') {
+        imcRowMapping = {
+          400: 23, 500: 25, 630: 28, 800: 30, 1000: 34, 1250: 38, 1500: 40
+        };
+      } else if (powerAuthority === 'PEA') {
+        imcRowMapping = {
+          100: 13, 160: 15, 250: 21, 315: 22, 400: 23, 500: 25, 630: 28, 800: 30, 1000: 34, 1250: 38, 1500: 40
+        };
+      }
+
+      // Row mapping สำหรับ RSC (แบบ 9.11) แยกตาม Power Authority
+      let rscRowMapping: { [key: number]: number } = {};
+      if (powerAuthority === 'MEA') {
+        rscRowMapping = {
+          400: 23, 500: 25, 630: 28, 800: 30, 1000: 32, 1250: 38, 1500: 40
+        };
+      } else if (powerAuthority === 'PEA') {
+        rscRowMapping = {
+          100: 13, 160: 15, 250: 21, 315: 22, 400: 23, 500: 25, 630: 28, 800: 30, 1000: 32, 1250: 38, 1500: 40
+        };
+      }
+
+      if (conduitType === 'IMC' && trToMdbMapping?.['imc']?.[powerAuthority]?.[transformerSize]) {
+        rowNum = imcRowMapping[transformerSize];
+      } else if (conduitType === 'RSC' && trToMdbMapping?.['rsc']?.[powerAuthority]?.[transformerSize]) {
+        rowNum = rscRowMapping[transformerSize];
+      }
+
+      if (rowNum) {
+        // กำหนด Sheet ตาม conduit type
+        let sheetName = '';
+        if (conduitType === 'IMC') {
+          sheetName = 'แบบ 9.10';
+        } else if (conduitType === 'RSC') {
+          sheetName = 'แบบ 9.11';
+        }
+
+        if (sheetName) {
+          const sheet = getExcelData(sheetName);
+          const row = sheet.find((r: any) => r.__rowNum__ === rowNum);
+
+          if (row) {
+            const multiplier = parsePrice(row.__EMPTY_28 || 1); // ตัวคูณ
+            const materialUnit = parsePrice(row.__EMPTY_29 || 0);
+            const laborUnit = parsePrice(row.__EMPTY_31 || 0);
+            const totalUnit = parsePrice(row.__EMPTY_33 || 0);
+
+            // เพิ่มราคา "เหล็กเท้าแขนสามเหลี่ยมรับท่อ" เข้าไปในราคารวม
+            if (multiplier > 0 && (materialUnit > 0 || laborUnit > 0 || totalUnit > 0)) {
+              materialTotal += materialUnit * multiplier;
+              laborTotal += laborUnit * multiplier;
+              totalPrice += totalUnit * multiplier;
+            }
+          }
+        }
+      }
+    }
+
+    // เพิ่มราคา "เหล็กเท้าแขนสามเหลี่ยมรับ TRAY-LADDER" และ "Support ยึดพื้น TRAY / LADDER" สำหรับกรณี TRAY หรือ LADDER
+    if ((props.trWiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' || props.trWiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา') && inputDistance > 0) {
+      const transformerSize = parseInt(props.transformer || '0');
+      const powerAuthority = props.powerAuthority || '';
+
+      // กำหนด Sheet และ row mapping ตามประเภท
+      let sheetName = '';
+      let rowNum = null;
+
+      if (props.trWiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา') {
+        sheetName = 'แบบ 9.15';
+        // Row mapping สำหรับ TRAY แยกตาม Power Authority
+        if (powerAuthority === 'MEA') {
+          const trayRowMappingMEA: { [key: number]: number } = {
+            400: 16, 500: 17, 630: 18, 800: 22, 1000: 24, 1250: 28, 1500: 30
+          };
+          rowNum = trayRowMappingMEA[transformerSize];
+        } else if (powerAuthority === 'PEA') {
+          const trayRowMappingPEA: { [key: number]: number } = {
+            250: 10, 315: 11, 400: 16, 500: 17, 630: 19, 800: 22, 1000: 24, 1250: 28, 1500: 30
+          };
+          rowNum = trayRowMappingPEA[transformerSize];
+        }
+      } else if (props.trWiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา') {
+        sheetName = 'แบบ 9.16';
+        // Row mapping สำหรับ LADDER แยกตาม Power Authority
+        if (powerAuthority === 'MEA') {
+          const ladderRowMappingMEA: { [key: number]: number } = {
+            400: 16, 500: 17, 630: 18, 800: 22, 1000: 23, 1250: 28, 1500: 29
+          };
+          rowNum = ladderRowMappingMEA[transformerSize];
+        } else if (powerAuthority === 'PEA') {
+          const ladderRowMappingPEA: { [key: number]: number } = {
+            250: 10, 315: 11, 400: 16, 500: 17, 630: 19, 800: 22, 1000: 23, 1250: 28, 1500: 29
+          };
+          rowNum = ladderRowMappingPEA[transformerSize];
+        }
+      }
+
+      if (rowNum && trToMdbMapping?.[props.trWiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' ? 'tray' : 'ladder']?.[powerAuthority]?.[transformerSize]) {
+        const sheet = getExcelData(sheetName);
+        const row = sheet.find((r: any) => r.__rowNum__ === rowNum);
+
+        if (row) {
+          // คำนวณจำนวนชิ้น: inputDistance / 1.2 (ปัดเศษ: <0.5 ปัดลง, >=0.5 ปัดขึ้น)
+          const divided = inputDistance / 1.2;
+          const fractional = divided - Math.floor(divided);
+          const quantity = fractional < 0.5 ? Math.floor(divided) : Math.ceil(divided);
+
+          if (quantity > 0) {
+            // 1. เหล็กเท้าแขนสามเหลี่ยมรับ TRAY-LADDER
+            const bracketMaterialUnit = parsePrice(row.__EMPTY_28 || 0);
+            const bracketLaborUnit = parsePrice(row.__EMPTY_30 || 0);
+            const bracketTotalUnit = parsePrice(row.__EMPTY_32 || 0);
+
+            if (bracketMaterialUnit > 0 || bracketLaborUnit > 0 || bracketTotalUnit > 0) {
+              materialTotal += bracketMaterialUnit * quantity;
+              laborTotal += bracketLaborUnit * quantity;
+              totalPrice += bracketTotalUnit * quantity;
+            }
+
+            // 2. Support ยึดพื้น TRAY / LADDER
+            const supportMaterialUnit = parsePrice(row.__EMPTY_38 || 0);
+            const supportLaborUnit = parsePrice(row.__EMPTY_40 || 0);
+            const supportTotalUnit = parsePrice(row.__EMPTY_42 || 0);
+
+            if (supportMaterialUnit > 0 || supportLaborUnit > 0 || supportTotalUnit > 0) {
+              materialTotal += supportMaterialUnit * quantity;
+              laborTotal += supportLaborUnit * quantity;
+              totalPrice += supportTotalUnit * quantity;
+            }
+          }
+        }
+      }
+    }
+
     return {
-      material: parsePrice(priceData.materialPrice),
-      labor: parsePrice(priceData.laborPrice),
-      total: parsePrice(priceData.totalPrice),
+      material: materialTotal,
+      labor: laborTotal,
+      total: totalPrice,
     };
-  }, [trMdbSelection, trDistance, props.trWiringType, trWiringGroup2, props.powerAuthority, props.transformer, getTrToMdbPrice]);
+  }, [trMdbSelection, trDistance, props.trWiringType, trWiringGroup2, props.powerAuthority, props.transformer, getTrToMdbPrice, trToMdbMapping, getExcelData]);
 
   // ฟังก์ชันดึงข้อมูลตู้ MDB จาก Sheet "ตารางขนาดและราคาตู้ MDB"
   const getMdbCabinetData = React.useMemo(() => {
@@ -2160,29 +2343,153 @@ function MoreDetailCard(props: any) {
         if (rows) {
           const highVoltageSheet = getExcelData('ตารางระบบงานแรงสูง');
           if (highVoltageSheet && highVoltageSheet.length > 0) {
+            // หาชื่อคอลัมน์รหัสโดยค้นหา row ที่มีชื่อ "ตาราง_____ระบบงานแรงสูง:"
+            let codeColumnName = '';
+            let codeRowIndex = -1;
+
+            // ค้นหาในทุก row เพื่อหาคอลัมน์ที่มีชื่อ "ตาราง_____ระบบงานแรงสูง:"
+            for (let i = 0; i < highVoltageSheet.length; i++) {
+              const row = highVoltageSheet[i];
+              const keys = Object.keys(row);
+              for (const key of keys) {
+                // ข้าม key พิเศษ
+                if (key === '__rowNum__' || key.startsWith('__EMPTY')) continue;
+
+                const value = String(row[key] || '');
+                // หาคอลัมน์ที่มีค่าเป็น "ตาราง" และ "ระบบงานแรงสูง" หรือคล้ายๆ กัน
+                if (value.includes('ตาราง') && (value.includes('ระบบงานแรงสูง') || value.includes('ระบบงานแรงสูง:'))) {
+                  codeColumnName = key;
+                  codeRowIndex = i;
+                  console.log('พบคอลัมน์รหัส:', codeColumnName, 'ใน row:', row.__rowNum__, 'ค่า:', value);
+                  break;
+                }
+              }
+              if (codeColumnName) break;
+            }
+
+            // ถ้ายังหาไม่เจอ ให้ลองหาจากชื่อ key ที่มีคำว่า "ตาราง" และ "ระบบ"
+            if (!codeColumnName) {
+              const firstRow = highVoltageSheet[0] || highVoltageSheet.find((r: any) => r.__rowNum__ === 1);
+              if (firstRow) {
+                const keys = Object.keys(firstRow);
+                const foundKey = keys.find(key => {
+                  const keyStr = String(key).toLowerCase();
+                  return keyStr.includes('ตาราง') && (keyStr.includes('ระบบ') || keyStr.includes('แรงสูง'));
+                });
+                if (foundKey) {
+                  codeColumnName = foundKey;
+                  console.log('พบคอลัมน์รหัสจากชื่อ key:', codeColumnName);
+                }
+              }
+            }
+
+            // ถ้ายังหาไม่เจอ ให้ลองดูทุกคอลัมน์ใน row แรกที่ไม่ใช่ __EMPTY
+            if (!codeColumnName) {
+              const firstRow = highVoltageSheet[0] || highVoltageSheet.find((r: any) => r.__rowNum__ === 1);
+              if (firstRow) {
+                const keys = Object.keys(firstRow);
+                // หาคอลัมน์แรกที่ไม่ใช่ __EMPTY และ __rowNum__
+                const foundKey = keys.find(key => {
+                  return key !== '__rowNum__' && !key.startsWith('__EMPTY');
+                });
+                if (foundKey) {
+                  codeColumnName = foundKey;
+                  console.log('ใช้คอลัมน์แรกที่ไม่ใช่ __EMPTY:', codeColumnName);
+                }
+              }
+            }
+
+            // Debug: แสดงข้อมูลเพื่อตรวจสอบ
+            if (!codeColumnName) {
+              console.log('ไม่พบคอลัมน์รหัส, แสดง keys ของ row แรก:', Object.keys(highVoltageSheet[0] || {}));
+            }
+
             const mainRow = highVoltageSheet.find((r: any) => r.__rowNum__ === rows.mainRow);
             const distanceRow = highVoltageSheet.find((r: any) => r.__rowNum__ === rows.distanceRow);
             const detailRow1 = highVoltageSheet.find((r: any) => r.__rowNum__ === rows.detailRows[0]);
             const detailRow2 = highVoltageSheet.find((r: any) => r.__rowNum__ === rows.detailRows[1]);
             const poleRow = highVoltageSheet.find((r: any) => r.__rowNum__ === 23);
 
+            // ฟังก์ชัน helper สำหรับดึงรหัส
+            const getCodeFromRow = (row: any) => {
+              if (!row) return '';
+
+              // ถ้ามี codeColumnName ที่หาได้ ให้ใช้ค่าจากคอลัมน์นั้น
+              if (codeColumnName) {
+                const codeValue = row[codeColumnName];
+                if (codeValue !== undefined && codeValue !== null && codeValue !== '') {
+                  const codeStr = String(codeValue).trim();
+                  // ถ้าค่าไม่ใช่ชื่อคอลัมน์ (ไม่ใช่ "ตาราง_____ระบบงานแรงสูง:") ให้ใช้ค่านี้
+                  if (!codeStr.includes('ตาราง') || !codeStr.includes('ระบบงานแรงสูง')) {
+                    console.log(`ดึงรหัสจาก ${codeColumnName}:`, codeStr);
+                    return codeStr;
+                  }
+                }
+              }
+
+              // ถ้าไม่มี codeColumnName หรือค่าเป็นชื่อคอลัมน์ ให้ลองค้นหาจาก keys ของ row
+              const keys = Object.keys(row);
+
+              // ลองหาคอลัมน์ที่มีคำว่า "ตาราง" และ "ระบบ" หรือ "แรงสูง" ในชื่อคอลัมน์
+              for (const key of keys) {
+                // ข้าม key พิเศษ
+                if (key === '__rowNum__' || key.startsWith('__EMPTY')) continue;
+
+                const value = row[key];
+                if (value !== undefined && value !== null && value !== '') {
+                  const valueStr = String(value).trim();
+                  const keyStr = String(key).toLowerCase();
+
+                  // ถ้าชื่อคอลัมน์มีคำว่า "ตาราง" และ "ระบบ" หรือ "แรงสูง"
+                  if (keyStr.includes('ตาราง') && (keyStr.includes('ระบบ') || keyStr.includes('แรงสูง'))) {
+                    // ถ้าค่าไม่ใช่ชื่อคอลัมน์ (ไม่ใช่ "ตาราง_____ระบบงานแรงสูง:") ให้ใช้ค่านี้
+                    if (!valueStr.includes('ตาราง') || !valueStr.includes('ระบบงานแรงสูง')) {
+                      console.log(`ดึงรหัสจากคอลัมน์ ${key}:`, valueStr);
+                      return valueStr;
+                    }
+                  }
+                }
+              }
+
+              // ถ้ายังหาไม่เจอ ให้ลองดูทุกคอลัมน์ที่ไม่ใช่ __EMPTY และไม่ใช่ชื่อคอลัมน์
+              for (const key of keys) {
+                if (key === '__rowNum__' || key.startsWith('__EMPTY')) continue;
+                const value = row[key];
+                if (value !== undefined && value !== null && value !== '') {
+                  const valueStr = String(value).trim();
+                  // ถ้าค่าไม่ใช่ชื่อคอลัมน์ (ไม่ใช่ "ตาราง_____ระบบงานแรงสูง:") ให้ใช้ค่านี้
+                  if (valueStr && !valueStr.includes('ตาราง') && !valueStr.includes('ระบบงานแรงสูง')) {
+                    console.log(`ดึงรหัสจากคอลัมน์ ${key} (fallback):`, valueStr);
+                    return valueStr;
+                  }
+                }
+              }
+
+              console.log('ไม่พบรหัสใน row:', row.__rowNum__, 'keys:', keys);
+              return '';
+            };
+
             if (mainRow) {
+              const code = getCodeFromRow(mainRow);
+
               products.push({
                 type: 'ระบบแรงสูง',
-                code: mainRow.__EMPTY_7 || '-',
+                code: code || '-',
                 productName: mainRow.__EMPTY || '', // ย้ายข้อมูลจาก type ไปที่ productName
                 materialTotal: parseFloat(mainRow.__EMPTY_4 || 0) || 0,
                 laborTotal: parseFloat(mainRow.__EMPTY_5 || 0) || 0,
                 totalPrice: parseFloat(mainRow.__EMPTY_6 || 0) || 0,
-                quantity: mainRow.__EMPTY_3 || undefined,
+                quantity: '1ชุด', // แสดงเป็น "1ชุด" เสมอสำหรับชุดรับไฟแรงสูง
               });
             }
 
             // แถว 2: detailRow2 (แถว 4 เดิม) - ขีดค่าทุกฟิลด์
             if (detailRow2) {
+              const code2 = getCodeFromRow(detailRow2);
+
               products.push({
                 type: '-', // ขีดค่า
-                code: '-',
+                code: code2 || '-',
                 productName: detailRow2.__EMPTY || '-',
                 materialTotal: 0, // ขีดค่า (แสดงเป็น "-")
                 laborTotal: 0, // ขีดค่า (แสดงเป็น "-")
@@ -2193,9 +2500,11 @@ function MoreDetailCard(props: any) {
 
             // แถว 3: detailRow1 (แถว 2 เดิม) - ขีดค่าทุกฟิลด์
             if (detailRow1) {
+              const code3 = getCodeFromRow(detailRow1);
+
               products.push({
                 type: '-', // ขีดค่า
-                code: '-',
+                code: code3 || '-',
                 productName: detailRow1.__EMPTY || '-',
                 materialTotal: 0, // ขีดค่า (แสดงเป็น "-")
                 laborTotal: 0, // ขีดค่า (แสดงเป็น "-")
@@ -2206,12 +2515,14 @@ function MoreDetailCard(props: any) {
 
             // แถว 4: distanceRow (ชุดสายไฟแรงสูง) - ย้ายมาที่นี่
             if (distanceRow && highVoltageDistance) {
+              const code4 = getCodeFromRow(distanceRow);
+
               const distance = parseFloat(highVoltageDistance) || 0;
               const materialUnit = parseFloat(distanceRow.__EMPTY_4 || 0) || 0;
               const laborUnit = parseFloat(distanceRow.__EMPTY_5 || 0) || 0;
               products.push({
                 type: 'ระบบแรงสูง',
-                code: '-',
+                code: code4 || '-',
                 productName: distanceRow.__EMPTY || '', // ย้ายข้อมูลจาก type ไปที่ productName
                 distance: `${distance} เมตร`,
                 materialTotal: materialUnit * distance,
@@ -2222,6 +2533,8 @@ function MoreDetailCard(props: any) {
             }
 
             if (poleRow && highVoltageDistance) {
+              const code5 = getCodeFromRow(poleRow);
+
               const distance = parseFloat(highVoltageDistance) || 0;
               const poleCount = distance > 30 ? Math.floor((distance - 30) / 30) + 1 : 0;
               if (poleCount > 0) {
@@ -2229,12 +2542,12 @@ function MoreDetailCard(props: any) {
                 const poleLaborPerUnit = parseFloat(poleRow.__EMPTY_5 || 0) || 0;
                 products.push({
                   type: 'ระบบแรงสูง',
-                  code: '-',
+                  code: code5 || '-',
                   productName: poleRow.__EMPTY || '', // ย้ายข้อมูลจาก type ไปที่ productName
                   materialTotal: poleMaterialPerUnit * poleCount,
                   laborTotal: poleLaborPerUnit * poleCount,
                   totalPrice: (parseFloat(poleRow.__EMPTY_6 || 0) || 0) * poleCount,
-                  quantity: `${poleCount}`,
+                  quantity: poleRow.__EMPTY_3 || undefined, // ใช้ __EMPTY_3 จาก row
                 });
               }
             }
@@ -2427,24 +2740,32 @@ function MoreDetailCard(props: any) {
 
               if (props.trWiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา') {
                 sheetName = 'แบบ 9.15';
-                // Row mapping สำหรับ TRAY (ใช้ได้ทั้ง MEA และ PEA สำหรับ transformer size เดียวกัน)
-                const trayRowMapping: { [key: number]: number } = {
-                  // PEA
-                  250: 12, 315: 13,
-                  // MEA และ PEA
-                  400: 18, 500: 19, 630: 20, 800: 24, 1000: 26, 1250: 30, 1500: 32
-                };
-                rowNum = trayRowMapping[transformerSize];
+                // Row mapping สำหรับ TRAY แยกตาม Power Authority
+                if (powerAuthority === 'MEA') {
+                  const trayRowMappingMEA: { [key: number]: number } = {
+                    400: 16, 500: 17, 630: 18, 800: 22, 1000: 24, 1250: 28, 1500: 30
+                  };
+                  rowNum = trayRowMappingMEA[transformerSize];
+                } else if (powerAuthority === 'PEA') {
+                  const trayRowMappingPEA: { [key: number]: number } = {
+                    250: 10, 315: 11, 400: 16, 500: 17, 630: 19, 800: 22, 1000: 24, 1250: 28, 1500: 30
+                  };
+                  rowNum = trayRowMappingPEA[transformerSize];
+                }
               } else if (props.trWiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา') {
                 sheetName = 'แบบ 9.16';
-                // Row mapping สำหรับ LADDER (ใช้ได้ทั้ง MEA และ PEA สำหรับ transformer size เดียวกัน)
-                const ladderRowMapping: { [key: number]: number } = {
-                  // PEA
-                  250: 12, 315: 13,
-                  // MEA และ PEA
-                  400: 18, 500: 19, 630: 20, 800: 24, 1000: 25, 1250: 30, 1500: 31
-                };
-                rowNum = ladderRowMapping[transformerSize];
+                // Row mapping สำหรับ LADDER แยกตาม Power Authority
+                if (powerAuthority === 'MEA') {
+                  const ladderRowMappingMEA: { [key: number]: number } = {
+                    400: 16, 500: 17, 630: 18, 800: 22, 1000: 23, 1250: 28, 1500: 29
+                  };
+                  rowNum = ladderRowMappingMEA[transformerSize];
+                } else if (powerAuthority === 'PEA') {
+                  const ladderRowMappingPEA: { [key: number]: number } = {
+                    250: 10, 315: 11, 400: 16, 500: 17, 630: 19, 800: 22, 1000: 23, 1250: 28, 1500: 29
+                  };
+                  rowNum = ladderRowMappingPEA[transformerSize];
+                }
               }
 
               if (rowNum && trToMdbMapping?.[props.trWiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' ? 'tray' : 'ladder']?.[powerAuthority]?.[transformerSize]) {
@@ -2508,21 +2829,29 @@ function MoreDetailCard(props: any) {
               let rowNum = null;
               const conduitType = conduit;
 
-              // Row mapping สำหรับ IMC (แบบ 9.10)
-              const imcRowMapping: { [key: number]: number } = {
-                // MEA
-                400: 25, 500: 27, 630: 30, 800: 32, 1000: 36, 1250: 40, 1500: 42,
-                // PEA
-                100: 15, 160: 17, 250: 23, 315: 24
-              };
+              // Row mapping สำหรับ IMC (แบบ 9.10) แยกตาม Power Authority
+              let imcRowMapping: { [key: number]: number } = {};
+              if (powerAuthority === 'MEA') {
+                imcRowMapping = {
+                  400: 23, 500: 25, 630: 28, 800: 30, 1000: 34, 1250: 38, 1500: 40
+                };
+              } else if (powerAuthority === 'PEA') {
+                imcRowMapping = {
+                  100: 13, 160: 15, 250: 21, 315: 22, 400: 23, 500: 25, 630: 28, 800: 30, 1000: 34, 1250: 38, 1500: 40
+                };
+              }
 
-              // Row mapping สำหรับ RSC (แบบ 9.11)
-              const rscRowMapping: { [key: number]: number } = {
-                // MEA
-                400: 25, 500: 27, 630: 30, 800: 32, 1000: 36, 1250: 40, 1500: 42,
-                // PEA
-                100: 15, 160: 17, 250: 23, 315: 24
-              };
+              // Row mapping สำหรับ RSC (แบบ 9.11) แยกตาม Power Authority
+              let rscRowMapping: { [key: number]: number } = {};
+              if (powerAuthority === 'MEA') {
+                rscRowMapping = {
+                  400: 23, 500: 25, 630: 28, 800: 30, 1000: 32, 1250: 38, 1500: 40
+                };
+              } else if (powerAuthority === 'PEA') {
+                rscRowMapping = {
+                  100: 13, 160: 15, 250: 21, 315: 22, 400: 23, 500: 25, 630: 28, 800: 30, 1000: 32, 1250: 38, 1500: 40
+                };
+              }
 
               if (conduitType === 'IMC' && trToMdbMapping?.['imc']?.[powerAuthority]?.[transformerSize]) {
                 rowNum = imcRowMapping[transformerSize];
@@ -2679,10 +3008,8 @@ function MoreDetailCard(props: any) {
             const chargerName = props.chargerSummary?.[idx]?.name || '';
             const kwMatch = chargerName.match(/(\d+)\s*kW/i);
             const kw = kwMatch ? parseInt(kwMatch[1]) : 0;
-            const rowMapping: { [key: number]: number } = {
-              30: 11, 40: 12, 60: 14, 80: 15, 120: 17, 160: 19, 180: 20, 200: 20,
-              240: 24, 320: 27, 360: 30, 480: 31, 600: 36, 640: 37, 720: 40, 800: 24
-            };
+            const powerAuthority = props.powerAuthority || 'MEA';
+            const rowMapping = getMdbToChargerRowMapping(props.chargerWiringType, '', powerAuthority);
             const rowNum = rowMapping[kw];
             if (rowNum) {
               const sheet912 = getExcelData('แบบ 9.12');
@@ -4910,8 +5237,11 @@ function MoreDetailCard(props: any) {
                         </CollapsibleTrigger>
                         <CollapsibleContent>
                           <div className="px-4 pb-4 space-y-2 text-sm">
-                            <div><span className="font-medium">รหัส:</span> {mainRow.__EMPTY_7 || '-'}</div>
-                            <div><span className="font-medium">จำนวน:</span> {mainRow.__EMPTY_3 || '-'}</div>
+                            <div><span className="font-medium">รหัส:</span> {(() => {
+                              const code = getCodeFromRow(mainRow);
+                              return code || '-';
+                            })()}</div>
+                            <div><span className="font-medium">จำนวน:</span> 1ชุด</div>
                             <div className="mt-2">
                               <div className="font-medium mb-1">รายละเอียด:</div>
                               <div className="pl-4 space-y-1">
@@ -5740,18 +6070,32 @@ function MoreDetailCard(props: any) {
 
                                       if (props.trWiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา') {
                                         sheetName = 'แบบ 9.15';
-                                        const trayRowMapping: { [key: number]: number } = {
-                                          400: 18, 500: 19, 630: 20, 800: 24, 1000: 26, 1250: 30, 1500: 32,
-                                          250: 12, 315: 13
-                                        };
-                                        rowNum = trayRowMapping[transformerSize];
+                                        // Row mapping สำหรับ TRAY แยกตาม Power Authority
+                                        if (powerAuthority === 'MEA') {
+                                          const trayRowMappingMEA: { [key: number]: number } = {
+                                            400: 16, 500: 17, 630: 18, 800: 22, 1000: 24, 1250: 28, 1500: 30
+                                          };
+                                          rowNum = trayRowMappingMEA[transformerSize];
+                                        } else if (powerAuthority === 'PEA') {
+                                          const trayRowMappingPEA: { [key: number]: number } = {
+                                            250: 10, 315: 11, 400: 16, 500: 17, 630: 19, 800: 22, 1000: 24, 1250: 28, 1500: 30
+                                          };
+                                          rowNum = trayRowMappingPEA[transformerSize];
+                                        }
                                       } else if (props.trWiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา') {
                                         sheetName = 'แบบ 9.16';
-                                        const ladderRowMapping: { [key: number]: number } = {
-                                          400: 18, 500: 19, 630: 20, 800: 24, 1000: 25, 1250: 30, 1500: 31,
-                                          250: 12, 315: 13
-                                        };
-                                        rowNum = ladderRowMapping[transformerSize];
+                                        // Row mapping สำหรับ LADDER แยกตาม Power Authority
+                                        if (powerAuthority === 'MEA') {
+                                          const ladderRowMappingMEA: { [key: number]: number } = {
+                                            400: 16, 500: 17, 630: 18, 800: 22, 1000: 23, 1250: 28, 1500: 29
+                                          };
+                                          rowNum = ladderRowMappingMEA[transformerSize];
+                                        } else if (powerAuthority === 'PEA') {
+                                          const ladderRowMappingPEA: { [key: number]: number } = {
+                                            250: 10, 315: 11, 400: 16, 500: 17, 630: 19, 800: 22, 1000: 23, 1250: 28, 1500: 29
+                                          };
+                                          rowNum = ladderRowMappingPEA[transformerSize];
+                                        }
                                       }
 
                                       if (rowNum && trToMdbMapping?.[props.trWiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' ? 'tray' : 'ladder']?.[powerAuthority]?.[transformerSize]) {
@@ -7028,10 +7372,8 @@ function MoreDetailCard(props: any) {
                                   const chargerName = props.chargerSummary?.[idx]?.name || '';
                                   const kwMatch = chargerName.match(/(\d+)\s*kW/i);
                                   const kw = kwMatch ? parseInt(kwMatch[1]) : 0;
-                                  const rowMapping: { [key: number]: number } = {
-                                    30: 11, 40: 12, 60: 14, 80: 15, 120: 17, 160: 19, 180: 20, 200: 20,
-                                    240: 24, 320: 27, 360: 30, 480: 31, 600: 36, 640: 37, 720: 40, 800: 24
-                                  };
+                                  const powerAuthority = props.powerAuthority || 'MEA';
+                                  const rowMapping = getMdbToChargerRowMapping(props.chargerWiringType, '', powerAuthority);
                                   const rowNum = rowMapping[kw];
                                   if (rowNum) {
                                     const sheet912 = getExcelData('แบบ 9.12');
@@ -7181,10 +7523,8 @@ function MoreDetailCard(props: any) {
                                 const firstChargerName = props.chargerSummary?.[idxs[0]]?.name || '';
                                 const kwMatch = firstChargerName.match(/(\d+)\s*kW/i);
                                 const kw = kwMatch ? parseInt(kwMatch[1]) : 0;
-                                const rowMapping: { [key: number]: number } = {
-                                  30: 11, 40: 12, 60: 14, 80: 15, 120: 17, 160: 19, 180: 20, 200: 20,
-                                  240: 24, 320: 27, 360: 30, 480: 31, 600: 36, 640: 37, 720: 40, 800: 24
-                                };
+                                const powerAuthority = props.powerAuthority || 'MEA';
+                                const rowMapping = getMdbToChargerRowMapping(props.chargerWiringType, '', powerAuthority);
                                 const rowNum = rowMapping[kw];
                                 if (rowNum) {
                                   const sheet912 = getExcelData('แบบ 9.12');
@@ -12050,28 +12390,28 @@ function StationAccessory() {
 
       // MEA
       mapping['imc']['MEA'] = {
-        400: sheet910.find(row => row.__rowNum__ === 25),
-        500: sheet910.find(row => row.__rowNum__ === 27),
-        630: sheet910.find(row => row.__rowNum__ === 30),
-        800: sheet910.find(row => row.__rowNum__ === 32),
-        1000: sheet910.find(row => row.__rowNum__ === 36),
-        1250: sheet910.find(row => row.__rowNum__ === 40),
-        1500: sheet910.find(row => row.__rowNum__ === 42)
+        400: sheet910.find(row => row.__rowNum__ === 23),
+        500: sheet910.find(row => row.__rowNum__ === 25),
+        630: sheet910.find(row => row.__rowNum__ === 28),
+        800: sheet910.find(row => row.__rowNum__ === 30),
+        1000: sheet910.find(row => row.__rowNum__ === 34),
+        1250: sheet910.find(row => row.__rowNum__ === 38),
+        1500: sheet910.find(row => row.__rowNum__ === 40)
       };
 
       // PEA
       mapping['imc']['PEA'] = {
-        100: sheet910.find(row => row.__rowNum__ === 15),
-        160: sheet910.find(row => row.__rowNum__ === 17),
-        250: sheet910.find(row => row.__rowNum__ === 23),
-        315: sheet910.find(row => row.__rowNum__ === 24),
-        400: sheet910.find(row => row.__rowNum__ === 25),
-        500: sheet910.find(row => row.__rowNum__ === 27),
-        630: sheet910.find(row => row.__rowNum__ === 30),
-        800: sheet910.find(row => row.__rowNum__ === 32),
-        1000: sheet910.find(row => row.__rowNum__ === 36),
-        1250: sheet910.find(row => row.__rowNum__ === 40),
-        1500: sheet910.find(row => row.__rowNum__ === 42)
+        100: sheet910.find(row => row.__rowNum__ === 13),
+        160: sheet910.find(row => row.__rowNum__ === 15),
+        250: sheet910.find(row => row.__rowNum__ === 21),
+        315: sheet910.find(row => row.__rowNum__ === 22),
+        400: sheet910.find(row => row.__rowNum__ === 23),
+        500: sheet910.find(row => row.__rowNum__ === 25),
+        630: sheet910.find(row => row.__rowNum__ === 28),
+        800: sheet910.find(row => row.__rowNum__ === 30),
+        1000: sheet910.find(row => row.__rowNum__ === 34),
+        1250: sheet910.find(row => row.__rowNum__ === 38),
+        1500: sheet910.find(row => row.__rowNum__ === 40)
       };
     }
 
@@ -12082,28 +12422,28 @@ function StationAccessory() {
 
       // MEA
       mapping['rsc']['MEA'] = {
-        400: sheet911.find(row => row.__rowNum__ === 25),
-        500: sheet911.find(row => row.__rowNum__ === 27),
-        630: sheet911.find(row => row.__rowNum__ === 30),
-        800: sheet911.find(row => row.__rowNum__ === 32),
-        1000: sheet911.find(row => row.__rowNum__ === 36),
-        1250: sheet911.find(row => row.__rowNum__ === 40),
-        1500: sheet911.find(row => row.__rowNum__ === 42)
+        400: sheet911.find(row => row.__rowNum__ === 23),
+        500: sheet911.find(row => row.__rowNum__ === 25),
+        630: sheet911.find(row => row.__rowNum__ === 28),
+        800: sheet911.find(row => row.__rowNum__ === 30),
+        1000: sheet911.find(row => row.__rowNum__ === 32),
+        1250: sheet911.find(row => row.__rowNum__ === 38),
+        1500: sheet911.find(row => row.__rowNum__ === 40)
       };
 
       // PEA
       mapping['rsc']['PEA'] = {
-        100: sheet911.find(row => row.__rowNum__ === 15),
-        160: sheet911.find(row => row.__rowNum__ === 17),
-        250: sheet911.find(row => row.__rowNum__ === 23),
-        315: sheet911.find(row => row.__rowNum__ === 24),
-        400: sheet911.find(row => row.__rowNum__ === 25),
-        500: sheet911.find(row => row.__rowNum__ === 27),
-        630: sheet911.find(row => row.__rowNum__ === 30),
-        800: sheet911.find(row => row.__rowNum__ === 32),
-        1000: sheet911.find(row => row.__rowNum__ === 36),
-        1250: sheet911.find(row => row.__rowNum__ === 40),
-        1500: sheet911.find(row => row.__rowNum__ === 42)
+        100: sheet911.find(row => row.__rowNum__ === 13),
+        160: sheet911.find(row => row.__rowNum__ === 15),
+        250: sheet911.find(row => row.__rowNum__ === 21),
+        315: sheet911.find(row => row.__rowNum__ === 22),
+        400: sheet911.find(row => row.__rowNum__ === 23),
+        500: sheet911.find(row => row.__rowNum__ === 25),
+        630: sheet911.find(row => row.__rowNum__ === 28),
+        800: sheet911.find(row => row.__rowNum__ === 30),
+        1000: sheet911.find(row => row.__rowNum__ === 32),
+        1250: sheet911.find(row => row.__rowNum__ === 38),
+        1500: sheet911.find(row => row.__rowNum__ === 40)
       };
     }
 
@@ -12146,26 +12486,26 @@ function StationAccessory() {
 
       // MEA
       mapping['tray']['MEA'] = {
-        400: sheet915.find(row => row.__rowNum__ === 18),
-        500: sheet915.find(row => row.__rowNum__ === 19),
-        630: sheet915.find(row => row.__rowNum__ === 20),
-        800: sheet915.find(row => row.__rowNum__ === 24),
-        1000: sheet915.find(row => row.__rowNum__ === 26),
-        1250: sheet915.find(row => row.__rowNum__ === 30),
-        1500: sheet915.find(row => row.__rowNum__ === 32)
+        400: sheet915.find(row => row.__rowNum__ === 16),
+        500: sheet915.find(row => row.__rowNum__ === 17),
+        630: sheet915.find(row => row.__rowNum__ === 18),
+        800: sheet915.find(row => row.__rowNum__ === 22),
+        1000: sheet915.find(row => row.__rowNum__ === 24),
+        1250: sheet915.find(row => row.__rowNum__ === 28),
+        1500: sheet915.find(row => row.__rowNum__ === 30)
       };
 
       // PEA
       mapping['tray']['PEA'] = {
-        250: sheet915.find(row => row.__rowNum__ === 12),
-        315: sheet915.find(row => row.__rowNum__ === 13),
-        400: sheet915.find(row => row.__rowNum__ === 18),
-        500: sheet915.find(row => row.__rowNum__ === 19),
-        630: sheet915.find(row => row.__rowNum__ === 20),
-        800: sheet915.find(row => row.__rowNum__ === 24),
-        1000: sheet915.find(row => row.__rowNum__ === 26),
-        1250: sheet915.find(row => row.__rowNum__ === 30),
-        1500: sheet915.find(row => row.__rowNum__ === 32)
+        250: sheet915.find(row => row.__rowNum__ === 10),
+        315: sheet915.find(row => row.__rowNum__ === 11),
+        400: sheet915.find(row => row.__rowNum__ === 16),
+        500: sheet915.find(row => row.__rowNum__ === 17),
+        630: sheet915.find(row => row.__rowNum__ === 19),
+        800: sheet915.find(row => row.__rowNum__ === 22),
+        1000: sheet915.find(row => row.__rowNum__ === 24),
+        1250: sheet915.find(row => row.__rowNum__ === 28),
+        1500: sheet915.find(row => row.__rowNum__ === 30)
       };
     }
 
@@ -12176,26 +12516,26 @@ function StationAccessory() {
 
       // MEA
       mapping['ladder']['MEA'] = {
-        400: sheet916.find(row => row.__rowNum__ === 18),
-        500: sheet916.find(row => row.__rowNum__ === 19),
-        630: sheet916.find(row => row.__rowNum__ === 20),
-        800: sheet916.find(row => row.__rowNum__ === 24),
-        1000: sheet916.find(row => row.__rowNum__ === 25),
-        1250: sheet916.find(row => row.__rowNum__ === 30),
-        1500: sheet916.find(row => row.__rowNum__ === 31)
+        400: sheet916.find(row => row.__rowNum__ === 16),
+        500: sheet916.find(row => row.__rowNum__ === 17),
+        630: sheet916.find(row => row.__rowNum__ === 18),
+        800: sheet916.find(row => row.__rowNum__ === 22),
+        1000: sheet916.find(row => row.__rowNum__ === 23),
+        1250: sheet916.find(row => row.__rowNum__ === 28),
+        1500: sheet916.find(row => row.__rowNum__ === 29)
       };
 
       // PEA
       mapping['ladder']['PEA'] = {
-        250: sheet916.find(row => row.__rowNum__ === 12),
-        315: sheet916.find(row => row.__rowNum__ === 13),
-        400: sheet916.find(row => row.__rowNum__ === 18),
-        500: sheet916.find(row => row.__rowNum__ === 19),
-        630: sheet916.find(row => row.__rowNum__ === 21),
-        800: sheet916.find(row => row.__rowNum__ === 24),
-        1000: sheet916.find(row => row.__rowNum__ === 25),
-        1250: sheet916.find(row => row.__rowNum__ === 30),
-        1500: sheet916.find(row => row.__rowNum__ === 31)
+        250: sheet916.find(row => row.__rowNum__ === 10),
+        315: sheet916.find(row => row.__rowNum__ === 11),
+        400: sheet916.find(row => row.__rowNum__ === 16),
+        500: sheet916.find(row => row.__rowNum__ === 17),
+        630: sheet916.find(row => row.__rowNum__ === 19),
+        800: sheet916.find(row => row.__rowNum__ === 22),
+        1000: sheet916.find(row => row.__rowNum__ === 23),
+        1250: sheet916.find(row => row.__rowNum__ === 28),
+        1500: sheet916.find(row => row.__rowNum__ === 29)
       };
     }
 
