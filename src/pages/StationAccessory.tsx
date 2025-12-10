@@ -5170,6 +5170,69 @@ function MoreDetailCard(props: any) {
                   );
                 }
 
+                // หาชื่อคอลัมน์รหัสโดยค้นหา row ที่มีชื่อ "ตาราง_____ระบบงานแรงสูง:"
+                let codeColumnName = '';
+                for (let i = 0; i < highVoltageSheet.length; i++) {
+                  const row = highVoltageSheet[i];
+                  const keys = Object.keys(row);
+                  for (const key of keys) {
+                    if (key === '__rowNum__' || key.startsWith('__EMPTY')) continue;
+                    const value = String(row[key] || '');
+                    if (value.includes('ตาราง') && (value.includes('ระบบงานแรงสูง') || value.includes('ระบบงานแรงสูง:'))) {
+                      codeColumnName = key;
+                      break;
+                    }
+                  }
+                  if (codeColumnName) break;
+                }
+
+                // ถ้ายังหาไม่เจอ ให้ลองหาจากชื่อ key
+                if (!codeColumnName) {
+                  const firstRow = highVoltageSheet[0] || highVoltageSheet.find((r: any) => r.__rowNum__ === 1);
+                  if (firstRow) {
+                    const keys = Object.keys(firstRow);
+                    const foundKey = keys.find(key => {
+                      const keyStr = String(key).toLowerCase();
+                      return keyStr.includes('ตาราง') && (keyStr.includes('ระบบ') || keyStr.includes('แรงสูง'));
+                    });
+                    if (foundKey) {
+                      codeColumnName = foundKey;
+                    }
+                  }
+                }
+
+                // ฟังก์ชัน helper สำหรับดึงรหัส
+                const getCodeFromRow = (row: any) => {
+                  if (!row) return '';
+
+                  if (codeColumnName) {
+                    const codeValue = row[codeColumnName];
+                    if (codeValue !== undefined && codeValue !== null && codeValue !== '') {
+                      const codeStr = String(codeValue).trim();
+                      if (!codeStr.includes('ตาราง') || !codeStr.includes('ระบบงานแรงสูง')) {
+                        return codeStr;
+                      }
+                    }
+                  }
+
+                  const keys = Object.keys(row);
+                  for (const key of keys) {
+                    if (key === '__rowNum__' || key.startsWith('__EMPTY')) continue;
+                    const value = row[key];
+                    if (value !== undefined && value !== null && value !== '') {
+                      const valueStr = String(value).trim();
+                      const keyStr = String(key).toLowerCase();
+                      if (keyStr.includes('ตาราง') && (keyStr.includes('ระบบ') || keyStr.includes('แรงสูง'))) {
+                        if (!valueStr.includes('ตาราง') || !valueStr.includes('ระบบงานแรงสูง')) {
+                          return valueStr;
+                        }
+                      }
+                    }
+                  }
+
+                  return '';
+                };
+
                 // คำนวณราคาสำหรับ main row
                 const mainQuantity = parseFloat(mainRow.__EMPTY_3 || 0) || 0;
                 const mainMaterialPrice = parseFloat(mainRow.__EMPTY_4 || 0) || 0;
