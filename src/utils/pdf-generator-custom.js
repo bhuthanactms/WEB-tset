@@ -257,15 +257,15 @@ export function createCostPDF(jsonData) {
           fontStyle: 'bold',
           halign: 'center',
           font: 'Sarabun',
-          cellPadding: { top: 2, right: 1, bottom: 2, left: 1 },
-          minCellHeight: 5,
+          cellPadding: { top: 1, right: 0.5, bottom: 1, left: 0.5 },
+          minCellHeight: 4,
           lineWidth: 0.1,
           lineColor: [0, 0, 0],
         },
         styles: {
           fontSize: 6,
-          cellPadding: { top: 2, right: 1, bottom: 2, left: 1 },
-          minCellHeight: 5,
+          cellPadding: { top: 1, right: 0.5, bottom: 1, left: 0.5 },
+          minCellHeight: 4,
           font: 'Sarabun',
           fillColor: [255, 255, 255],
           textColor: [0, 0, 0],
@@ -299,15 +299,15 @@ export function createCostPDF(jsonData) {
           fontStyle: 'bold',
           halign: 'center',
           font: 'Sarabun',
-          cellPadding: { top: 2, right: 1, bottom: 2, left: 1 },
-          minCellHeight: 5,
+          cellPadding: { top: 1, right: 0.5, bottom: 1, left: 0.5 },
+          minCellHeight: 4,
           lineWidth: 0.1,
           lineColor: [0, 0, 0],
         },
         styles: {
           fontSize: 6,
-          cellPadding: { top: 2, right: 1, bottom: 2, left: 1 },
-          minCellHeight: 5,
+          cellPadding: { top: 1, right: 0.5, bottom: 1, left: 0.5 },
+          minCellHeight: 4,
           font: 'Sarabun',
           fillColor: [255, 255, 255],
           textColor: [0, 0, 0],
@@ -327,7 +327,7 @@ export function createCostPDF(jsonData) {
         willDrawCell: (data) => {
           // แถวสุดท้าย (ต้นทุนรวมเบื้องต้น) - เพิ่ม font size 1 และทำตัวหนา
           if (data.row.index === rightTableData.length - 1) {
-            doc.setFontSize(7); // เพิ่มจาก 6 เป็น 7 (เพิ่ม 1 size)
+            doc.setFontSize(7); // ลดจาก 8 เป็น 7 (ลด 1 size)
             doc.setFont('Sarabun', 'bold');
           }
         },
@@ -389,15 +389,15 @@ export function createCostPDF(jsonData) {
           fontStyle: 'bold',
           halign: 'center',
           font: 'Sarabun',
-          cellPadding: { top: 2, right: 1, bottom: 2, left: 1 },
-          minCellHeight: 5,
+          cellPadding: { top: 1, right: 0.5, bottom: 1, left: 0.5 },
+          minCellHeight: 4,
           lineWidth: 0.1,
           lineColor: [0, 0, 0],
         },
         styles: {
           fontSize: 6,
-          cellPadding: { top: 2, right: 1, bottom: 2, left: 1 },
-          minCellHeight: 5,
+          cellPadding: { top: 1, right: 0.5, bottom: 1, left: 0.5 },
+          minCellHeight: 4,
           font: 'Sarabun',
           fillColor: [255, 255, 255],
           textColor: [0, 0, 0],
@@ -504,12 +504,12 @@ export function createCostPDF(jsonData) {
         footStyles: {
           fillColor: [255, 255, 255],
           textColor: [0, 0, 0],
-          fontSize: 7,
+          fontSize: 8,
           fontStyle: 'bold',
           halign: 'right',
           font: 'Sarabun',
-          cellPadding: { top: 2, right: 1, bottom: 2, left: 1 },
-          minCellHeight: 5,
+          cellPadding: { top: 1, right: 0.5, bottom: 1, left: 0.5 },
+          minCellHeight: 4,
           lineWidth: 0.1,
           lineColor: [0, 0, 0],
         },
@@ -718,24 +718,23 @@ export function createCostPDF(jsonData) {
     doc.setFontSize(10); // เพิ่ม 3 size จาก 7
     rightY += lineHeight;
 
+    // เสนอราคารวม (ย้ายไปอยู่ด้านล่างค่าCom ในคอลัมน์ขวา)
+    doc.setFont('Sarabun', 'bold');
+    doc.setFontSize(12); // เพิ่ม 3 size จาก 9
+    const finalOfferText = `เสนอราคารวม = `;
+    const finalOfferValue = formatCurrency(summary.final_offer_price || 0);
+    doc.text(finalOfferText, rightX, rightY);
+    const finalOfferValueX = rightX + doc.getTextWidth(finalOfferText);
+    doc.text(finalOfferValue, finalOfferValueX, rightY);
+    drawDashedUnderline(finalOfferValueX, rightY, finalOfferValue, 12);
+
     // Draw vertical line separator
     const separatorX = leftX + leftColumnWidth + 5;
     doc.setLineWidth(0.5);
     doc.setDrawColor(0, 0, 0);
     doc.line(separatorX, startY - 5, separatorX, Math.max(leftY, rightY) + 5);
 
-    // เสนอราคารวม (ย้ายไปฝั่งซ้าย)
-    const finalY = Math.max(leftY, rightY) + 10;
-    doc.setFont('Sarabun', 'bold');
-    doc.setFontSize(12); // เพิ่ม 3 size จาก 9
-    const finalOfferText = `เสนอราคารวม = `;
-    const finalOfferValue = formatCurrency(summary.final_offer_price || 0);
-    doc.text(finalOfferText, leftX, finalY);
-    const finalOfferValueX = leftX + doc.getTextWidth(finalOfferText);
-    doc.text(finalOfferValue, finalOfferValueX, finalY);
-    drawDashedUnderline(finalOfferValueX, finalY, finalOfferValue, 12);
-
-    currentY = finalY + 15;
+    currentY = Math.max(leftY, rightY) + 15;
   }
 
   // Add signature section

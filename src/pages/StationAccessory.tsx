@@ -4511,7 +4511,7 @@ function MoreDetailCard(props: any) {
 
               <Zap className="h-5 w-5" />
 
-              Transformer Size <span className="text-xs ">(ขนาดหม้อแปลง)</span>
+              Transformer <span className="text-xs ">(ขนาดหม้อแปลง)</span>
 
             </div>
 
@@ -5481,7 +5481,7 @@ function MoreDetailCard(props: any) {
           <CardTitle className="flex items-center justify-between text-indigo-800">
             <div className="flex items-center gap-2">
               <MapPin className="h-5 w-5" />
-              สถานที่การติดตั้ง
+              สถานที่การติดตั้ง (Disconnecter)
             </div>
             <div className="flex items-center gap-3">
               <div
@@ -5835,7 +5835,7 @@ function MoreDetailCard(props: any) {
 
                 <Wrench className="h-5 w-5" />
 
-                TR to MDB Configuration <span className="text-xs ">(การตั้งค่า TR ไป MDB)</span>
+                TR to MDB Configuration <span className="text-xs ">(การเดินสายจาก TR ไป MDB)</span>
 
               </div>
 
@@ -7204,7 +7204,7 @@ function MoreDetailCard(props: any) {
 
               <Wrench className="h-5 w-5" />
 
-              MDB to Charger Configuration <span className="text-xs ">(การตั้งค่า MDB ไป Charger)</span>
+              MDB to Charger Configuration <span className="text-xs ">(การเดินสายจาก MDB ไป Charger)</span>
 
             </div>
 
@@ -8212,12 +8212,19 @@ function MoreDetailCard(props: any) {
                                         <span className="font-semibold">
                                           {(bumperPolePricing?.quantity ?? bumperPoleQuantity).toLocaleString('th-TH')} <span className="text-sm">ชิ้น</span>
                                         </span>
-                                        <div className="ml-4">
-                                          {openItems['bumper-poles'] ? (
-                                            <ChevronUp className="h-4 w-4 text-green-600" />
-                                          ) : (
-                                            <ChevronDown className="h-4 w-4 text-green-600" />
+                                        <div className="flex items-center gap-3">
+                                          {bumperPolePricing && (
+                                            <span className="font-semibold text-green-700">
+                                              {bumperPolePricing.total.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท
+                                            </span>
                                           )}
+                                          <div>
+                                            {openItems['bumper-poles'] ? (
+                                              <ChevronUp className="h-4 w-4 text-green-600" />
+                                            ) : (
+                                              <ChevronDown className="h-4 w-4 text-green-600" />
+                                            )}
+                                          </div>
                                         </div>
                                       </div>
                                     </CollapsibleTrigger>
@@ -8308,12 +8315,19 @@ function MoreDetailCard(props: any) {
                                         <span className="font-semibold">
                                           {(wheelStopPricing?.quantity ?? wheelStopQuantity).toLocaleString('th-TH')} <span className="text-sm">ชิ้น</span>
                                         </span>
-                                        <div className="ml-4">
-                                          {openItems['wheel-stops'] ? (
-                                            <ChevronUp className="h-4 w-4 text-green-600" />
-                                          ) : (
-                                            <ChevronDown className="h-4 w-4 text-green-600" />
+                                        <div className="flex items-center gap-3">
+                                          {wheelStopPricing && (
+                                            <span className="font-semibold text-green-700">
+                                              {wheelStopPricing.total.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท
+                                            </span>
                                           )}
+                                          <div>
+                                            {openItems['wheel-stops'] ? (
+                                              <ChevronUp className="h-4 w-4 text-green-600" />
+                                            ) : (
+                                              <ChevronDown className="h-4 w-4 text-green-600" />
+                                            )}
+                                          </div>
                                         </div>
                                       </div>
                                     </CollapsibleTrigger>
@@ -8392,12 +8406,19 @@ function MoreDetailCard(props: any) {
                                         <span className="font-semibold text-red-600">
                                           {(fireExtinguisherPricing?.quantity ?? fireExtinguisherQuantity).toLocaleString('th-TH')} <span className="text-sm">ชิ้น</span>
                                         </span>
-                                        <div className="ml-4">
-                                          {openItems['fire-extinguisher'] ? (
-                                            <ChevronUp className="h-4 w-4 text-red-600" />
-                                          ) : (
-                                            <ChevronDown className="h-4 w-4 text-red-600" />
+                                        <div className="flex items-center gap-3">
+                                          {fireExtinguisherPricing && (
+                                            <span className="font-semibold text-red-700">
+                                              {fireExtinguisherPricing.total.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท
+                                            </span>
                                           )}
+                                          <div>
+                                            {openItems['fire-extinguisher'] ? (
+                                              <ChevronUp className="h-4 w-4 text-red-600" />
+                                            ) : (
+                                              <ChevronDown className="h-4 w-4 text-red-600" />
+                                            )}
+                                          </div>
                                         </div>
                                       </div>
                                     </CollapsibleTrigger>
@@ -8475,12 +8496,19 @@ function MoreDetailCard(props: any) {
                                       <span className="font-semibold text-purple-600">
                                         {(signagePricing?.quantity ?? signageQuantity).toLocaleString('th-TH')} <span className="text-sm">ชิ้น</span>
                                       </span>
-                                      <div className="ml-4">
-                                        {openItems['signage'] ? (
-                                          <ChevronUp className="h-4 w-4 text-purple-600" />
-                                        ) : (
-                                          <ChevronDown className="h-4 w-4 text-purple-600" />
+                                      <div className="flex items-center gap-3">
+                                        {signagePricing && (
+                                          <span className="font-semibold text-purple-700">
+                                            {signagePricing.total.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท
+                                          </span>
                                         )}
+                                        <div>
+                                          {openItems['signage'] ? (
+                                            <ChevronUp className="h-4 w-4 text-purple-600" />
+                                          ) : (
+                                            <ChevronDown className="h-4 w-4 text-purple-600" />
+                                          )}
+                                        </div>
                                       </div>
                                     </div>
                                   </CollapsibleTrigger>
@@ -9174,12 +9202,22 @@ function MoreDetailCard(props: any) {
                                   <CollapsibleTrigger className="w-full p-3 text-left hover:bg-gray-100 transition-colors rounded-lg">
                                     <div className="flex items-center justify-between">
                                       <span className="font-semibold">1 <span className="text-sm">ชิ้น</span></span>
-                                      <div className="ml-4">
-                                        {openItems['mdb-concrete-base'] ? (
-                                          <ChevronUp className="h-4 w-4 text-gray-600" />
-                                        ) : (
-                                          <ChevronDown className="h-4 w-4 text-gray-600" />
-                                        )}
+                                      <div className="flex items-center gap-3">
+                                        {(() => {
+                                          const pricing = getConcretePricing(3, 1);
+                                          return pricing ? (
+                                            <span className="font-semibold text-gray-700">
+                                              {pricing.total.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท
+                                            </span>
+                                          ) : null;
+                                        })()}
+                                        <div>
+                                          {openItems['mdb-concrete-base'] ? (
+                                            <ChevronUp className="h-4 w-4 text-gray-600" />
+                                          ) : (
+                                            <ChevronDown className="h-4 w-4 text-gray-600" />
+                                          )}
+                                        </div>
                                       </div>
                                     </div>
                                   </CollapsibleTrigger>
@@ -9268,12 +9306,22 @@ function MoreDetailCard(props: any) {
                                       <span className="font-semibold">
                                         {featureChargersCount} <span className="text-sm">ชิ้น</span>
                                       </span>
-                                      <div className="ml-4">
-                                        {openItems['charger-concrete-base'] ? (
-                                          <ChevronUp className="h-4 w-4 text-green-600" />
-                                        ) : (
-                                          <ChevronDown className="h-4 w-4 text-green-600" />
-                                        )}
+                                      <div className="flex items-center gap-3">
+                                        {(() => {
+                                          const pricing = getConcretePricing(4, featureChargersCount);
+                                          return pricing ? (
+                                            <span className="font-semibold text-green-700">
+                                              {pricing.total.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท
+                                            </span>
+                                          ) : null;
+                                        })()}
+                                        <div>
+                                          {openItems['charger-concrete-base'] ? (
+                                            <ChevronUp className="h-4 w-4 text-green-600" />
+                                          ) : (
+                                            <ChevronDown className="h-4 w-4 text-green-600" />
+                                          )}
+                                        </div>
                                       </div>
                                     </div>
                                   </CollapsibleTrigger>
@@ -9362,12 +9410,22 @@ function MoreDetailCard(props: any) {
                                       <span className="font-semibold">
                                         {parkingSlotsCount} <span className="text-sm">ชิ้น</span>
                                       </span>
-                                      <div className="ml-4">
-                                        {openItems['parking-concrete-floor'] ? (
-                                          <ChevronUp className="h-4 w-4 text-green-600" />
-                                        ) : (
-                                          <ChevronDown className="h-4 w-4 text-green-600" />
-                                        )}
+                                      <div className="flex items-center gap-3">
+                                        {(() => {
+                                          const pricing = getConcretePricing(5, parkingSlotsCount);
+                                          return pricing ? (
+                                            <span className="font-semibold text-green-700">
+                                              {pricing.total.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท
+                                            </span>
+                                          ) : null;
+                                        })()}
+                                        <div>
+                                          {openItems['parking-concrete-floor'] ? (
+                                            <ChevronUp className="h-4 w-4 text-green-600" />
+                                          ) : (
+                                            <ChevronDown className="h-4 w-4 text-green-600" />
+                                          )}
+                                        </div>
                                       </div>
                                     </div>
                                   </CollapsibleTrigger>
@@ -9456,12 +9514,22 @@ function MoreDetailCard(props: any) {
                                       <span className="font-semibold">
                                         {featureChargersCount} <span className="text-sm">ชิ้น</span>
                                       </span>
-                                      <div className="ml-4">
-                                        {openItems['general-concrete-floor'] ? (
-                                          <ChevronUp className="h-4 w-4 text-green-600" />
-                                        ) : (
-                                          <ChevronDown className="h-4 w-4 text-green-600" />
-                                        )}
+                                      <div className="flex items-center gap-3">
+                                        {(() => {
+                                          const pricing = getConcretePricing(6, featureChargersCount);
+                                          return pricing ? (
+                                            <span className="font-semibold text-green-700">
+                                              {pricing.total.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท
+                                            </span>
+                                          ) : null;
+                                        })()}
+                                        <div>
+                                          {openItems['general-concrete-floor'] ? (
+                                            <ChevronUp className="h-4 w-4 text-green-600" />
+                                          ) : (
+                                            <ChevronDown className="h-4 w-4 text-green-600" />
+                                          )}
+                                        </div>
                                       </div>
                                     </div>
                                   </CollapsibleTrigger>
@@ -9621,12 +9689,23 @@ function MoreDetailCard(props: any) {
                                       <span className="text-xs text-gray-600 whitespace-nowrap">เมตร</span>
                                     </div>
                                   </div>
-                                  <div className="ml-2">
-                                    {openItems['excavation-30cm'] ? (
-                                      <ChevronUp className="h-4 w-4 text-gray-600" />
-                                    ) : (
-                                      <ChevronDown className="h-4 w-4 text-gray-600" />
-                                    )}
+                                  <div className="flex items-center gap-3">
+                                    {excavation30cm && (() => {
+                                      const quantity = parsePositiveNumber(excavation30cm);
+                                      const pricing = getExcavationPricing(3, quantity);
+                                      return pricing ? (
+                                        <span className="font-semibold text-gray-700">
+                                          {pricing.total.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท
+                                        </span>
+                                      ) : null;
+                                    })()}
+                                    <div>
+                                      {openItems['excavation-30cm'] ? (
+                                        <ChevronUp className="h-4 w-4 text-gray-600" />
+                                      ) : (
+                                        <ChevronDown className="h-4 w-4 text-gray-600" />
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                               </CollapsibleTrigger>
@@ -9674,12 +9753,23 @@ function MoreDetailCard(props: any) {
                                       <span className="text-xs text-gray-600 whitespace-nowrap">เมตร</span>
                                     </div>
                                   </div>
-                                  <div className="ml-2">
-                                    {openItems['excavation-60cm'] ? (
-                                      <ChevronUp className="h-4 w-4 text-gray-600" />
-                                    ) : (
-                                      <ChevronDown className="h-4 w-4 text-gray-600" />
-                                    )}
+                                  <div className="flex items-center gap-3">
+                                    {excavation60cm && (() => {
+                                      const quantity = parsePositiveNumber(excavation60cm);
+                                      const pricing = getExcavationPricing(4, quantity);
+                                      return pricing ? (
+                                        <span className="font-semibold text-gray-700">
+                                          {pricing.total.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท
+                                        </span>
+                                      ) : null;
+                                    })()}
+                                    <div>
+                                      {openItems['excavation-60cm'] ? (
+                                        <ChevronUp className="h-4 w-4 text-gray-600" />
+                                      ) : (
+                                        <ChevronDown className="h-4 w-4 text-gray-600" />
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                               </CollapsibleTrigger>
@@ -9704,217 +9794,264 @@ function MoreDetailCard(props: any) {
                             </div>
                           </Collapsible>
 
-                          {/* 3. สกัดพื้นปูนหนา 10 ซม. */}
-                          <Collapsible
-                            open={openItems['excavation-10cm']}
-                            onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'excavation-10cm': open }))}
-                          >
-                            <div className="bg-white rounded-lg border border-gray-200">
-                              <CollapsibleTrigger className="w-full p-3 text-left hover:bg-gray-50 transition-colors rounded-lg">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-3 flex-1">
-                                    <span className="text-sm font-medium">สกัดพื้นปูนหนา 10 ซม.</span>
-                                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                                      <Input
-                                        type="number"
-                                        placeholder="กรอกตารางเมตร"
-                                        value={excavation10cm}
-                                        onChange={(e) => setExcavation10cm(e.target.value)}
-                                        className="w-24 h-8 text-sm"
-                                        min="0"
-                                        step="0.01"
-                                      />
-                                      <span className="text-xs text-gray-600 whitespace-nowrap">ตารางเมตร</span>
+                          {/* Grid 2 คอลัมน์สำหรับหัวข้อย่อย */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {/* บรรทัดแรก - ซ้าย: สกัดพื้นปูนหนา 10 ซม. */}
+                            <Collapsible
+                              open={openItems['excavation-10cm']}
+                              onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'excavation-10cm': open }))}
+                            >
+                              <div className="bg-white rounded-lg border border-gray-200">
+                                <CollapsibleTrigger className="w-full p-3 text-left hover:bg-gray-50 transition-colors rounded-lg">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3 flex-1">
+                                      <span className="text-sm font-medium">สกัดพื้นปูนหนา 10 ซม.</span>
+                                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                        <Input
+                                          type="number"
+                                          placeholder="กรอกตารางเมตร"
+                                          value={excavation10cm}
+                                          onChange={(e) => setExcavation10cm(e.target.value)}
+                                          className="w-24 h-8 text-sm"
+                                          min="0"
+                                          step="0.01"
+                                        />
+                                        <span className="text-xs text-gray-600 whitespace-nowrap">ตารางเมตร</span>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                      {excavation10cm && (() => {
+                                        const quantity = parsePositiveNumber(excavation10cm);
+                                        const pricing = getExcavationPricing(5, quantity);
+                                        return pricing ? (
+                                          <span className="font-semibold text-gray-700">
+                                            {pricing.total.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท
+                                          </span>
+                                        ) : null;
+                                      })()}
+                                      <div>
+                                        {openItems['excavation-10cm'] ? (
+                                          <ChevronUp className="h-4 w-4 text-gray-600" />
+                                        ) : (
+                                          <ChevronDown className="h-4 w-4 text-gray-600" />
+                                        )}
+                                      </div>
                                     </div>
                                   </div>
-                                  <div className="ml-2">
-                                    {openItems['excavation-10cm'] ? (
-                                      <ChevronUp className="h-4 w-4 text-gray-600" />
-                                    ) : (
-                                      <ChevronDown className="h-4 w-4 text-gray-600" />
-                                    )}
+                                </CollapsibleTrigger>
+                                <CollapsibleContent>
+                                  <div className="px-3 pb-3">
+                                    {excavation10cm && (() => {
+                                      const quantity = parsePositiveNumber(excavation10cm);
+                                      const pricing = getExcavationPricing(5, quantity);
+                                      if (pricing) {
+                                        return (
+                                          <div className="mt-2 space-y-1 text-xs">
+                                            <div><span className="font-medium">ค่าของ:</span> {pricing.materialTotal.toLocaleString('th-TH')} บาท</div>
+                                            <div><span className="font-medium">ค่าแรง:</span> {pricing.laborTotal.toLocaleString('th-TH')} บาท</div>
+                                            <div><span className="font-medium">รวม:</span> {pricing.total.toLocaleString('th-TH')} บาท</div>
+                                          </div>
+                                        );
+                                      }
+                                      return null;
+                                    })()}
                                   </div>
-                                </div>
-                              </CollapsibleTrigger>
-                              <CollapsibleContent>
-                                <div className="px-3 pb-3">
-                                  {excavation10cm && (() => {
-                                    const quantity = parsePositiveNumber(excavation10cm);
-                                    const pricing = getExcavationPricing(5, quantity);
-                                    if (pricing) {
-                                      return (
-                                        <div className="mt-2 space-y-1 text-xs">
-                                          <div><span className="font-medium">ค่าของ:</span> {pricing.materialTotal.toLocaleString('th-TH')} บาท</div>
-                                          <div><span className="font-medium">ค่าแรง:</span> {pricing.laborTotal.toLocaleString('th-TH')} บาท</div>
-                                          <div><span className="font-medium">รวม:</span> {pricing.total.toLocaleString('th-TH')} บาท</div>
-                                        </div>
-                                      );
-                                    }
-                                    return null;
-                                  })()}
-                                </div>
-                              </CollapsibleContent>
-                            </div>
-                          </Collapsible>
+                                </CollapsibleContent>
+                              </div>
+                            </Collapsible>
 
-                          {/* 4. สกัดพื้นปูนหนา 20 ซม. */}
-                          <Collapsible
-                            open={openItems['excavation-20cm']}
-                            onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'excavation-20cm': open }))}
-                          >
-                            <div className="bg-white rounded-lg border border-gray-200">
-                              <CollapsibleTrigger className="w-full p-3 text-left hover:bg-gray-50 transition-colors rounded-lg">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-3 flex-1">
-                                    <span className="text-sm font-medium">สกัดพื้นปูนหนา 20 ซม.</span>
-                                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                                      <Input
-                                        type="number"
-                                        placeholder="กรอกตารางเมตร"
-                                        value={excavation20cm}
-                                        onChange={(e) => setExcavation20cm(e.target.value)}
-                                        className="w-24 h-8 text-sm"
-                                        min="0"
-                                        step="0.01"
-                                      />
-                                      <span className="text-xs text-gray-600 whitespace-nowrap">ตารางเมตร</span>
+                            {/* บรรทัดแรก - ขวา: สกัดพื้นปูนหนา 20 ซม. */}
+                            <Collapsible
+                              open={openItems['excavation-20cm']}
+                              onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'excavation-20cm': open }))}
+                            >
+                              <div className="bg-white rounded-lg border border-gray-200">
+                                <CollapsibleTrigger className="w-full p-3 text-left hover:bg-gray-50 transition-colors rounded-lg">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3 flex-1">
+                                      <span className="text-sm font-medium">สกัดพื้นปูนหนา 20 ซม.</span>
+                                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                        <Input
+                                          type="number"
+                                          placeholder="กรอกตารางเมตร"
+                                          value={excavation20cm}
+                                          onChange={(e) => setExcavation20cm(e.target.value)}
+                                          className="w-24 h-8 text-sm"
+                                          min="0"
+                                          step="0.01"
+                                        />
+                                        <span className="text-xs text-gray-600 whitespace-nowrap">ตารางเมตร</span>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                      {excavation20cm && (() => {
+                                        const quantity = parsePositiveNumber(excavation20cm);
+                                        const pricing = getExcavationPricing(6, quantity);
+                                        return pricing ? (
+                                          <span className="font-semibold text-gray-700">
+                                            {pricing.total.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท
+                                          </span>
+                                        ) : null;
+                                      })()}
+                                      <div>
+                                        {openItems['excavation-20cm'] ? (
+                                          <ChevronUp className="h-4 w-4 text-gray-600" />
+                                        ) : (
+                                          <ChevronDown className="h-4 w-4 text-gray-600" />
+                                        )}
+                                      </div>
                                     </div>
                                   </div>
-                                  <div className="ml-2">
-                                    {openItems['excavation-20cm'] ? (
-                                      <ChevronUp className="h-4 w-4 text-gray-600" />
-                                    ) : (
-                                      <ChevronDown className="h-4 w-4 text-gray-600" />
-                                    )}
+                                </CollapsibleTrigger>
+                                <CollapsibleContent>
+                                  <div className="px-3 pb-3">
+                                    {excavation20cm && (() => {
+                                      const quantity = parsePositiveNumber(excavation20cm);
+                                      const pricing = getExcavationPricing(6, quantity);
+                                      if (pricing) {
+                                        return (
+                                          <div className="mt-2 space-y-1 text-xs">
+                                            <div><span className="font-medium">ค่าของ:</span> {pricing.materialTotal.toLocaleString('th-TH')} บาท</div>
+                                            <div><span className="font-medium">ค่าแรง:</span> {pricing.laborTotal.toLocaleString('th-TH')} บาท</div>
+                                            <div><span className="font-medium">รวม:</span> {pricing.total.toLocaleString('th-TH')} บาท</div>
+                                          </div>
+                                        );
+                                      }
+                                      return null;
+                                    })()}
                                   </div>
-                                </div>
-                              </CollapsibleTrigger>
-                              <CollapsibleContent>
-                                <div className="px-3 pb-3">
-                                  {excavation20cm && (() => {
-                                    const quantity = parsePositiveNumber(excavation20cm);
-                                    const pricing = getExcavationPricing(6, quantity);
-                                    if (pricing) {
-                                      return (
-                                        <div className="mt-2 space-y-1 text-xs">
-                                          <div><span className="font-medium">ค่าของ:</span> {pricing.materialTotal.toLocaleString('th-TH')} บาท</div>
-                                          <div><span className="font-medium">ค่าแรง:</span> {pricing.laborTotal.toLocaleString('th-TH')} บาท</div>
-                                          <div><span className="font-medium">รวม:</span> {pricing.total.toLocaleString('th-TH')} บาท</div>
-                                        </div>
-                                      );
-                                    }
-                                    return null;
-                                  })()}
-                                </div>
-                              </CollapsibleContent>
-                            </div>
-                          </Collapsible>
+                                </CollapsibleContent>
+                              </div>
+                            </Collapsible>
 
-                          {/* 5. สกัดพื้นปูนหนา 30 ซม. */}
-                          <Collapsible
-                            open={openItems['excavation-30cm-floor']}
-                            onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'excavation-30cm-floor': open }))}
-                          >
-                            <div className="bg-white rounded-lg border border-gray-200">
-                              <CollapsibleTrigger className="w-full p-3 text-left hover:bg-gray-50 transition-colors rounded-lg">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-3 flex-1">
-                                    <span className="text-sm font-medium">สกัดพื้นปูนหนา 30 ซม.</span>
-                                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                                      <Input
-                                        type="number"
-                                        placeholder="กรอกตารางเมตร"
-                                        value={excavation30cmFloor}
-                                        onChange={(e) => setExcavation30cmFloor(e.target.value)}
-                                        className="w-24 h-8 text-sm"
-                                        min="0"
-                                        step="0.01"
-                                      />
-                                      <span className="text-xs text-gray-600 whitespace-nowrap">ตารางเมตร</span>
+                            {/* บรรทัดที่สอง - ซ้าย: สกัดพื้นปูนหนา 30 ซม. */}
+                            <Collapsible
+                              open={openItems['excavation-30cm-floor']}
+                              onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'excavation-30cm-floor': open }))}
+                            >
+                              <div className="bg-white rounded-lg border border-gray-200">
+                                <CollapsibleTrigger className="w-full p-3 text-left hover:bg-gray-50 transition-colors rounded-lg">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3 flex-1">
+                                      <span className="text-sm font-medium">สกัดพื้นปูนหนา 30 ซม.</span>
+                                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                        <Input
+                                          type="number"
+                                          placeholder="กรอกตารางเมตร"
+                                          value={excavation30cmFloor}
+                                          onChange={(e) => setExcavation30cmFloor(e.target.value)}
+                                          className="w-24 h-8 text-sm"
+                                          min="0"
+                                          step="0.01"
+                                        />
+                                        <span className="text-xs text-gray-600 whitespace-nowrap">ตารางเมตร</span>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                      {excavation30cmFloor && (() => {
+                                        const quantity = parsePositiveNumber(excavation30cmFloor);
+                                        const pricing = getExcavationPricing(7, quantity);
+                                        return pricing ? (
+                                          <span className="font-semibold text-gray-700">
+                                            {pricing.total.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท
+                                          </span>
+                                        ) : null;
+                                      })()}
+                                      <div>
+                                        {openItems['excavation-30cm-floor'] ? (
+                                          <ChevronUp className="h-4 w-4 text-gray-600" />
+                                        ) : (
+                                          <ChevronDown className="h-4 w-4 text-gray-600" />
+                                        )}
+                                      </div>
                                     </div>
                                   </div>
-                                  <div className="ml-2">
-                                    {openItems['excavation-30cm-floor'] ? (
-                                      <ChevronUp className="h-4 w-4 text-gray-600" />
-                                    ) : (
-                                      <ChevronDown className="h-4 w-4 text-gray-600" />
-                                    )}
+                                </CollapsibleTrigger>
+                                <CollapsibleContent>
+                                  <div className="px-3 pb-3">
+                                    {excavation30cmFloor && (() => {
+                                      const quantity = parsePositiveNumber(excavation30cmFloor);
+                                      const pricing = getExcavationPricing(7, quantity);
+                                      if (pricing) {
+                                        return (
+                                          <div className="mt-2 space-y-1 text-xs">
+                                            <div><span className="font-medium">ค่าของ:</span> {pricing.materialTotal.toLocaleString('th-TH')} บาท</div>
+                                            <div><span className="font-medium">ค่าแรง:</span> {pricing.laborTotal.toLocaleString('th-TH')} บาท</div>
+                                            <div><span className="font-medium">รวม:</span> {pricing.total.toLocaleString('th-TH')} บาท</div>
+                                          </div>
+                                        );
+                                      }
+                                      return null;
+                                    })()}
                                   </div>
-                                </div>
-                              </CollapsibleTrigger>
-                              <CollapsibleContent>
-                                <div className="px-3 pb-3">
-                                  {excavation30cmFloor && (() => {
-                                    const quantity = parsePositiveNumber(excavation30cmFloor);
-                                    const pricing = getExcavationPricing(7, quantity);
-                                    if (pricing) {
-                                      return (
-                                        <div className="mt-2 space-y-1 text-xs">
-                                          <div><span className="font-medium">ค่าของ:</span> {pricing.materialTotal.toLocaleString('th-TH')} บาท</div>
-                                          <div><span className="font-medium">ค่าแรง:</span> {pricing.laborTotal.toLocaleString('th-TH')} บาท</div>
-                                          <div><span className="font-medium">รวม:</span> {pricing.total.toLocaleString('th-TH')} บาท</div>
-                                        </div>
-                                      );
-                                    }
-                                    return null;
-                                  })()}
-                                </div>
-                              </CollapsibleContent>
-                            </div>
-                          </Collapsible>
+                                </CollapsibleContent>
+                              </div>
+                            </Collapsible>
 
-                          {/* 6. ขุดดินออกเพื่อปรับระดับ */}
-                          <Collapsible
-                            open={openItems['excavation-level']}
-                            onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'excavation-level': open }))}
-                          >
-                            <div className="bg-white rounded-lg border border-gray-200">
-                              <CollapsibleTrigger className="w-full p-3 text-left hover:bg-gray-50 transition-colors rounded-lg">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-3 flex-1">
-                                    <span className="text-sm font-medium">ขุดดินออกเพื่อปรับระดับ</span>
-                                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                                      <Input
-                                        type="number"
-                                        placeholder="กรอกลูกบาศก์เมตร"
-                                        value={excavationLevel}
-                                        onChange={(e) => setExcavationLevel(e.target.value)}
-                                        className="w-24 h-8 text-sm"
-                                        min="0"
-                                        step="0.01"
-                                      />
-                                      <span className="text-xs text-gray-600 whitespace-nowrap">ลูกบาศก์เมตร</span>
+                            {/* บรรทัดที่สอง - ขวา: ขุดดินออกเพื่อปรับระดับ */}
+                            <Collapsible
+                              open={openItems['excavation-level']}
+                              onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'excavation-level': open }))}
+                            >
+                              <div className="bg-white rounded-lg border border-gray-200">
+                                <CollapsibleTrigger className="w-full p-3 text-left hover:bg-gray-50 transition-colors rounded-lg">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3 flex-1">
+                                      <span className="text-sm font-medium">ขุดดินออกเพื่อปรับระดับ</span>
+                                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                        <Input
+                                          type="number"
+                                          placeholder="กรอกลูกบาศก์เมตร"
+                                          value={excavationLevel}
+                                          onChange={(e) => setExcavationLevel(e.target.value)}
+                                          className="w-24 h-8 text-sm"
+                                          min="0"
+                                          step="0.01"
+                                        />
+                                        <span className="text-xs text-gray-600 whitespace-nowrap">ลูกบาศก์เมตร</span>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                      {excavationLevel && (() => {
+                                        const quantity = parsePositiveNumber(excavationLevel);
+                                        const pricing = getExcavationPricing(8, quantity);
+                                        return pricing ? (
+                                          <span className="font-semibold text-gray-700">
+                                            {pricing.total.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท
+                                          </span>
+                                        ) : null;
+                                      })()}
+                                      <div>
+                                        {openItems['excavation-level'] ? (
+                                          <ChevronUp className="h-4 w-4 text-gray-600" />
+                                        ) : (
+                                          <ChevronDown className="h-4 w-4 text-gray-600" />
+                                        )}
+                                      </div>
                                     </div>
                                   </div>
-                                  <div className="ml-2">
-                                    {openItems['excavation-level'] ? (
-                                      <ChevronUp className="h-4 w-4 text-gray-600" />
-                                    ) : (
-                                      <ChevronDown className="h-4 w-4 text-gray-600" />
-                                    )}
+                                </CollapsibleTrigger>
+                                <CollapsibleContent>
+                                  <div className="px-3 pb-3">
+                                    {excavationLevel && (() => {
+                                      const quantity = parsePositiveNumber(excavationLevel);
+                                      const pricing = getExcavationPricing(8, quantity);
+                                      if (pricing) {
+                                        return (
+                                          <div className="mt-2 space-y-1 text-xs">
+                                            <div><span className="font-medium">ค่าของ:</span> {pricing.materialTotal.toLocaleString('th-TH')} บาท</div>
+                                            <div><span className="font-medium">ค่าแรง:</span> {pricing.laborTotal.toLocaleString('th-TH')} บาท</div>
+                                            <div><span className="font-medium">รวม:</span> {pricing.total.toLocaleString('th-TH')} บาท</div>
+                                          </div>
+                                        );
+                                      }
+                                      return null;
+                                    })()}
                                   </div>
-                                </div>
-                              </CollapsibleTrigger>
-                              <CollapsibleContent>
-                                <div className="px-3 pb-3">
-                                  {excavationLevel && (() => {
-                                    const quantity = parsePositiveNumber(excavationLevel);
-                                    const pricing = getExcavationPricing(8, quantity);
-                                    if (pricing) {
-                                      return (
-                                        <div className="mt-2 space-y-1 text-xs">
-                                          <div><span className="font-medium">ค่าของ:</span> {pricing.materialTotal.toLocaleString('th-TH')} บาท</div>
-                                          <div><span className="font-medium">ค่าแรง:</span> {pricing.laborTotal.toLocaleString('th-TH')} บาท</div>
-                                          <div><span className="font-medium">รวม:</span> {pricing.total.toLocaleString('th-TH')} บาท</div>
-                                        </div>
-                                      );
-                                    }
-                                    return null;
-                                  })()}
-                                </div>
-                              </CollapsibleContent>
-                            </div>
-                          </Collapsible>
+                                </CollapsibleContent>
+                              </div>
+                            </Collapsible>
+                          </div>
 
                           {/* 7. เติมดินหรือทรายเพื่อปรับระดับ */}
                           <Collapsible
@@ -9939,12 +10076,23 @@ function MoreDetailCard(props: any) {
                                       <span className="text-xs text-gray-600 whitespace-nowrap">ลูกบาศก์เมตร</span>
                                     </div>
                                   </div>
-                                  <div className="ml-2">
-                                    {openItems['excavation-fill'] ? (
-                                      <ChevronUp className="h-4 w-4 text-gray-600" />
-                                    ) : (
-                                      <ChevronDown className="h-4 w-4 text-gray-600" />
-                                    )}
+                                  <div className="flex items-center gap-3">
+                                    {excavationFill && (() => {
+                                      const quantity = parsePositiveNumber(excavationFill);
+                                      const pricing = getExcavationPricing(9, quantity);
+                                      return pricing ? (
+                                        <span className="font-semibold text-gray-700">
+                                          {pricing.total.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท
+                                        </span>
+                                      ) : null;
+                                    })()}
+                                    <div>
+                                      {openItems['excavation-fill'] ? (
+                                        <ChevronUp className="h-4 w-4 text-gray-600" />
+                                      ) : (
+                                        <ChevronDown className="h-4 w-4 text-gray-600" />
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                               </CollapsibleTrigger>
@@ -10124,12 +10272,19 @@ function MoreDetailCard(props: any) {
                                         <span className="font-semibold">
                                           {parkingSlotsCount} <span className="text-sm">ช่องจอด</span>
                                         </span>
-                                        <div className="ml-4">
-                                          {openItems['side-line-marking'] ? (
-                                            <ChevronUp className="h-4 w-4 text-green-600" />
-                                          ) : (
-                                            <ChevronDown className="h-4 w-4 text-green-600" />
+                                        <div className="flex items-center gap-3">
+                                          {stationEquipmentPriceMapping['side-line-marking'] && (
+                                            <span className="font-semibold text-green-700">
+                                              {(stationEquipmentPriceMapping['side-line-marking'].totalPrice * parkingSlotsCount).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท
+                                            </span>
                                           )}
+                                          <div>
+                                            {openItems['side-line-marking'] ? (
+                                              <ChevronUp className="h-4 w-4 text-green-600" />
+                                            ) : (
+                                              <ChevronDown className="h-4 w-4 text-green-600" />
+                                            )}
+                                          </div>
                                         </div>
                                       </div>
                                     </CollapsibleTrigger>
@@ -10195,12 +10350,19 @@ function MoreDetailCard(props: any) {
                                         <span className="font-semibold">
                                           {parkingSlotsCount} <span className="text-sm">ช่องจอด</span>
                                         </span>
-                                        <div className="ml-4">
-                                          {openItems['center-pattern-original'] ? (
-                                            <ChevronUp className="h-4 w-4 text-green-600" />
-                                          ) : (
-                                            <ChevronDown className="h-4 w-4 text-green-600" />
+                                        <div className="flex items-center gap-3">
+                                          {stationEquipmentPriceMapping['center-pattern-original'] && (
+                                            <span className="font-semibold text-green-700">
+                                              {(stationEquipmentPriceMapping['center-pattern-original'].totalPrice * parkingSlotsCount).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท
+                                            </span>
                                           )}
+                                          <div>
+                                            {openItems['center-pattern-original'] ? (
+                                              <ChevronUp className="h-4 w-4 text-green-600" />
+                                            ) : (
+                                              <ChevronDown className="h-4 w-4 text-green-600" />
+                                            )}
+                                          </div>
                                         </div>
                                       </div>
                                     </CollapsibleTrigger>
@@ -10266,12 +10428,19 @@ function MoreDetailCard(props: any) {
                                         <span className="font-semibold text-purple-600">
                                           {parkingSlotsCount} <span className="text-sm">ช่องจอด</span>
                                         </span>
-                                        <div className="ml-4">
-                                          {openItems['center-pattern-new'] ? (
-                                            <ChevronUp className="h-4 w-4 text-purple-600" />
-                                          ) : (
-                                            <ChevronDown className="h-4 w-4 text-purple-600" />
+                                        <div className="flex items-center gap-3">
+                                          {stationEquipmentPriceMapping['center-pattern-new'] && (
+                                            <span className="font-semibold text-purple-700">
+                                              {(stationEquipmentPriceMapping['center-pattern-new'].totalPrice * parkingSlotsCount).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท
+                                            </span>
                                           )}
+                                          <div>
+                                            {openItems['center-pattern-new'] ? (
+                                              <ChevronUp className="h-4 w-4 text-purple-600" />
+                                            ) : (
+                                              <ChevronDown className="h-4 w-4 text-purple-600" />
+                                            )}
+                                          </div>
                                         </div>
                                       </div>
                                     </CollapsibleTrigger>
