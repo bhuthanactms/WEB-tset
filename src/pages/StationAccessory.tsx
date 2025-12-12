@@ -587,7 +587,7 @@ function MoreDetailCard(props: any) {
     const calculateAll = async () => {
       for (let i = 0; i < chargersCount; i++) {
         const inputDistance = parseFloat(chargerLineDistances[i] || '0');
-        const distance = inputDistance + 2.5; // ระยะที่กรอก + 2.5 สำหรับการคำนวณ
+        const distance = inputDistance + 3; // ระยะที่กรอก + 3 สำหรับการคำนวณ
         const conduitType = chargerConduitChoices[i] || '';
         const chargerName = props.chargerSummary?.[i]?.name || '';
 
@@ -598,7 +598,7 @@ function MoreDetailCard(props: any) {
 
         if (hasRequiredData && hasConduitType) {
           try {
-            const result = await getMdbToChargerConfig(chargerName, props.chargerWiringType, conduitType, distance); // ใช้ distance ที่ +2.5 แล้ว
+            const result = await getMdbToChargerConfig(chargerName, props.chargerWiringType, conduitType, distance); // ใช้ distance ที่ +3 แล้ว
             if (result) {
               setChargerResults(prev => ({
                 ...prev,
@@ -985,10 +985,13 @@ function MoreDetailCard(props: any) {
   const parkingSlotsCount = parseCount(parkingSlots, 1);
   const featureChargersCount = parseCount(props.numberOfChargers, 1);
 
-  const bumperPoleQuantity = featureChargersCount;
+  // 1.1 เสากันชน: จำนวนชิ้น = จำนวนเครื่องชาร์จ × 2
+  const bumperPoleQuantity = featureChargersCount * 2;
   const wheelStopQuantity = parkingSlotsCount;
-  const fireExtinguisherQuantity = featureChargersCount;
-  const signageQuantity = featureChargersCount;
+  // 1.2 ถังดับเพลิง+ตู้: จำนวนชิ้น = จำนวนช่องจอด ÷ 4 (ปัดเศษขึ้น)
+  const fireExtinguisherQuantity = Math.ceil(parkingSlotsCount / 4);
+  // 1.2 ป้ายสูง + วิธีใช้งาน: จำนวนชิ้น = จำนวนช่องจอด ÷ 4 (ปัดเศษขึ้น)
+  const signageQuantity = Math.ceil(parkingSlotsCount / 4);
 
   const bumperPoleRowNum = bumperPoleMaterial === 'steel' ? 7 : 8;
   const wheelStopRowNum = wheelStopMaterial === 'rubber' ? 5 : 6;
@@ -2980,7 +2983,7 @@ function MoreDetailCard(props: any) {
 
         results.forEach((result: any, idx: number) => {
           const inputDistance = parseFloat(chargerLineDistances[idx] || '0') || 0;
-          const distance = inputDistance + 2.5; // ระยะที่กรอก + 2.5 สำหรับการคำนวณ
+          const distance = inputDistance + 3; // ระยะที่กรอก + 3 สำหรับการคำนวณ
           const cable = cables[idx] || cables[0] || '';
           // ลบ "ChargerX: " ออกจาก cable ถ้ามี
           const cableSize = cable.replace(/^Charger\d+:\s*/, '').trim();
@@ -4107,9 +4110,51 @@ function MoreDetailCard(props: any) {
       final_offer_price: finalStationTotals.total
     };
 
+    // สร้างตารางเครื่องชาร์จจาก chargerSummary
+    const chargerTableRows: any[] = [];
+    if (props.chargerSummary && Array.isArray(props.chargerSummary) && props.chargerSummary.length > 0) {
+      // จัดกลุ่มเครื่องชาร์จตาม kW (ดึง kW จากชื่อ เช่น "160 kW" → "160")
+      const chargerGroupMap = new Map<string, number>();
+      props.chargerSummary.forEach((charger: any) => {
+        const chargerName = charger.name || '';
+        if (chargerName) {
+          // ดึง kW จากชื่อเครื่องชาร์จ (เช่น "160 kW" → "160")
+          const kwMatch = chargerName.match(/(\d+)\s*kW/i);
+          const kw = kwMatch ? kwMatch[1] : '';
+
+          if (kw) {
+            // ใช้ key เป็น "Charger XXXkW" (เช่น "Charger 160kW")
+            const chargerKey = `Charger ${kw}kW`;
+            const currentCount = chargerGroupMap.get(chargerKey) || 0;
+            chargerGroupMap.set(chargerKey, currentCount + 1);
+          }
+        }
+      });
+
+      // แปลง Map เป็น array สำหรับตาราง (เรียงตาม kW จากมากไปน้อย)
+      const sortedEntries = Array.from(chargerGroupMap.entries()).sort((a, b) => {
+        // ดึงตัวเลข kW เพื่อเรียงลำดับ
+        const kwA = parseInt(a[0].match(/(\d+)/)?.[1] || '0');
+        const kwB = parseInt(b[0].match(/(\d+)/)?.[1] || '0');
+        return kwB - kwA; // เรียงจากมากไปน้อย
+      });
+
+      sortedEntries.forEach(([chargerKey, count]) => {
+        chargerTableRows.push({
+          productName: chargerKey,
+          quantity: `${count} เครื่อง`
+        });
+      });
+    }
+
     return {
       header,
       tables: [
+        {
+          tablename: "เครื่องชาร์จ",
+          type: "charger",
+          rows: chargerTableRows
+        },
         {
           tablename: "1.ระบบแรงสูง",
           type: "default",
@@ -6000,6 +6045,8 @@ function MoreDetailCard(props: any) {
 
                     />
 
+                    <span className="text-red-600 text-sm ml-2">*ระยะศูนย์กลางหม้อแปลง ถึง ศูนย์กลางMDB*</span>
+
                   </div>
 
                   {props.trWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2' && (
@@ -7476,6 +7523,8 @@ function MoreDetailCard(props: any) {
 
                             />
 
+                            <span className="text-red-600 text-sm ml-2">*ระยะศูนย์กลางMDB ถึง ศูนย์กลางCharger*</span>
+
                           </div>
 
                           {isGroup2Air && (
@@ -7624,6 +7673,8 @@ function MoreDetailCard(props: any) {
                             onChange={(e) => setGroupDistance(e.target.value)}
 
                           />
+
+                          <span className="text-red-600 text-sm ml-2">*ระยะศูนย์กลางMDB ถึง ศูนย์กลางCharger*</span>
 
                         </div>
 

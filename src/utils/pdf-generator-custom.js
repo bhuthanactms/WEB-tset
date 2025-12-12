@@ -189,7 +189,84 @@ export function createCostPDF(jsonData) {
     let continuationStartY = null;
 
     // Handle different table types
-    if (type === 'cost') {
+    if (type === 'charger') {
+      // Charger table type - ตาราง 2 คอลัมน์: รายการสินค้า, จำนวน
+      const chargerColumns = [
+        { header: 'รายการสินค้า', dataKey: 'productName' },
+        { header: 'จำนวน', dataKey: 'quantity' },
+      ];
+
+      const chargerTableData = rows.map(row => [
+        row.productName || '',
+        row.quantity || '0',
+      ]);
+
+      autoTable(doc, {
+        startY: currentY,
+        head: [chargerColumns.map(col => col.header)],
+        body: chargerTableData,
+        theme: 'grid',
+        headStyles: {
+          fillColor: [255, 255, 255],
+          textColor: [0, 0, 0],
+          fontSize: 8, // เพิ่มจาก 7 เป็น 8
+          fontStyle: 'bold',
+          halign: 'center',
+          font: 'Sarabun',
+          cellPadding: { top: 1, right: 0.5, bottom: 1, left: 0.5 }, // ลดการเว้นระยะ
+          minCellHeight: 4, // ลดจาก 5 เป็น 4
+          lineWidth: 0.1,
+          lineColor: [0, 0, 0],
+        },
+        bodyStyles: {
+          fontSize: 8, // เพิ่มจาก 7 เป็น 8
+          fontStyle: 'bold', // ทำตัวหนา
+          font: 'Sarabun',
+          textColor: [0, 0, 0], // สีดำ
+          fillColor: [255, 255, 255], // พื้นหลังขาว
+          cellPadding: { top: 1, right: 0.5, bottom: 1, left: 0.5 }, // ลดการเว้นระยะ
+          minCellHeight: 4, // ลดจาก 5 เป็น 4
+          lineWidth: 0.1,
+          lineColor: [0, 0, 0],
+        },
+        columnStyles: {
+          0: { halign: 'left', cellWidth: 140 }, // รายการสินค้า (ความกว้างรวม 186mm เหมือนตาราง 1.ระบบแรงสูง)
+          1: { halign: 'center', cellWidth: 46 }, // จำนวน
+        },
+        margin: { left: 12, right: 12 }, // ใช้ margin เดียวกับตาราง default (1.ระบบแรงสูง)
+        styles: {
+          font: 'Sarabun',
+          fontSize: 8,
+          textColor: [0, 0, 0], // สีดำ
+        },
+        didDrawPage: function (data) {
+          const currentPageNum = data.pageNumber;
+          if (currentPageNum > tableStartPage) {
+            const marginTop = data.settings.margin.top || 20;
+            const yPos = Math.max(12, marginTop - 15);
+            doc.setFontSize(9);
+            doc.setTextColor(40);
+            doc.setFont('Sarabun', 'bold');
+            const tableNameText = tablename || `Table ${index + 1}`;
+            doc.text(tableNameText, 14, yPos);
+            continuationStartY = yPos + 10;
+          }
+        },
+        willDrawCell: function (data) {
+          if (continuationStartY !== null && data.pageNumber > tableStartPage) {
+            if (data.row.index === 0 && data.column.index === 0) {
+              if (data.cursor && data.cursor.y !== undefined && data.cursor.y < continuationStartY) {
+                data.cursor.y = continuationStartY;
+              }
+            }
+          }
+        },
+      });
+
+      // Update currentY after table
+      const finalY = doc.lastAutoTable.finalY || currentY;
+      currentY = finalY + 5; // Add spacing after table
+    } else if (type === 'cost') {
       // Cost table type - ตารางซ้าย-ขวา ข้างละ 7 แถว (ขยายจาก 6 เป็น 7)
       const costRows = rows.rows || [];
       const summaryMaterial = rows.summary_material || 0;
@@ -232,10 +309,10 @@ export function createCostPDF(jsonData) {
         formatCurrency(summaryTotal)
       ]);
 
-      // คำนวณความกว้างที่ใช้ได้ทั้งหมด (ไม่ให้ล้นกระดาษ)
+      // คำนวณความกว้างที่ใช้ได้ทั้งหมด (ไม่ให้ล้นกระดาษ) - ปรับให้เท่ากับตาราง 1.ระบบแรงสูง
       const pageWidth = 210; // A4 width in mm
-      const leftMargin = 14;
-      const rightMargin = 14;
+      const leftMargin = 12; // ใช้ margin เดียวกับตาราง 1.ระบบแรงสูง
+      const rightMargin = 12;
       const gap = 5; // ระยะห่างระหว่างตาราง
       const availableWidth = pageWidth - leftMargin - rightMargin - gap;
       const tableWidth = availableWidth / 2; // แต่ละตารางได้ความกว้างเท่ากัน
@@ -410,22 +487,22 @@ export function createCostPDF(jsonData) {
         columnStyles: hasTraining
           ? {
             0: { halign: 'center', cellWidth: 22 },
-            1: { halign: 'right', cellWidth: 28 },
-            2: { halign: 'right', cellWidth: 32 },
-            3: { halign: 'right', cellWidth: 30 }, // ค่าที่พัก + ค่าอาหาร (ลด 2 จาก 32)
-            4: { halign: 'right', cellWidth: 28 }, // งานฝึกอบรม (1 วัน)
-            5: { halign: 'right', cellWidth: 20 }, // ค่าแรง (ลด 2 จาก 22)
-            6: { halign: 'right', cellWidth: 28, fontStyle: 'bold' }, // รวม
+            1: { halign: 'right', cellWidth: 27 },
+            2: { halign: 'right', cellWidth: 31 },
+            3: { halign: 'right', cellWidth: 29 }, // ค่าที่พัก + ค่าอาหาร
+            4: { halign: 'right', cellWidth: 27 }, // งานฝึกอบรม (1 วัน)
+            5: { halign: 'right', cellWidth: 19 }, // ค่าแรง
+            6: { halign: 'right', cellWidth: 31, fontStyle: 'bold' }, // รวม (รวม = 186mm)
           }
           : {
-            0: { halign: 'center', cellWidth: 25 },
-            1: { halign: 'right', cellWidth: 30 },
-            2: { halign: 'right', cellWidth: 35 },
-            3: { halign: 'right', cellWidth: 33 }, // ค่าที่พัก + ค่าอาหาร (ลด 2 จาก 35)
-            4: { halign: 'right', cellWidth: 23 }, // ค่าแรง (ลด 2 จาก 25)
-            5: { halign: 'right', cellWidth: 30, fontStyle: 'bold' }, // รวม
+            0: { halign: 'center', cellWidth: 27 }, // เพิ่มจาก 25
+            1: { halign: 'right', cellWidth: 31 }, // เพิ่มจาก 30
+            2: { halign: 'right', cellWidth: 36 }, // เพิ่มจาก 35
+            3: { halign: 'right', cellWidth: 34 }, // เพิ่มจาก 33
+            4: { halign: 'right', cellWidth: 25 }, // เพิ่มจาก 23
+            5: { halign: 'right', cellWidth: 33, fontStyle: 'bold' }, // เพิ่มจาก 30 (รวม = 186mm)
           },
-        margin: { left: 14, right: 14 },
+        margin: { left: 12, right: 12 }, // ใช้ margin เดียวกับตาราง 1.ระบบแรงสูง
       });
 
     } else {
@@ -442,20 +519,24 @@ export function createCostPDF(jsonData) {
         row.total === '-' ? '-' : formatCurrency(row.total || 0),
       ]);
 
-      // Calculate totals for footer row
-      const sumPartsTotal = rows.reduce((sum, row) => sum + (row.parts_total || 0), 0);
-      const sumWageTotal = rows.reduce((sum, row) => sum + (row.wage_total || 0), 0);
-      const sumTotal = rows.reduce((sum, row) => sum + (row.total || 0), 0);
+      // Calculate totals for footer row (ไม่แสดง Total สำหรับตาราง 1, 2, 3)
+      const shouldShowFooter = !(tablename && (tablename.includes('1.ระบบแรงสูง') || tablename.includes('2.ระบบแรงต่ำ') || tablename.includes('3.อุปกรณ์')));
 
-      // Create footer row with "Total" at position 4 (ระยะ column)
-      const footerRow = ['', '', '', '', 'Total', formatCurrency(sumPartsTotal), formatCurrency(sumWageTotal), formatCurrency(sumTotal)];
+      let footerRow = null;
+      if (shouldShowFooter) {
+        const sumPartsTotal = rows.reduce((sum, row) => sum + (row.parts_total || 0), 0);
+        const sumWageTotal = rows.reduce((sum, row) => sum + (row.wage_total || 0), 0);
+        const sumTotal = rows.reduce((sum, row) => sum + (row.total || 0), 0);
+        // Create footer row with "Total" at position 4 (ระยะ column)
+        footerRow = ['', '', '', '', 'Total', formatCurrency(sumPartsTotal), formatCurrency(sumWageTotal), formatCurrency(sumTotal)];
+      }
 
       autoTable(doc, {
         startY: currentY,
         head: [columns.map(col => col.header)],
         body: tableData,
-        foot: [footerRow],
-        showFoot: 'lastPage', // Show footer only on last page of the table
+        foot: footerRow ? [footerRow] : undefined,
+        showFoot: footerRow ? 'lastPage' : false, // Show footer only on last page of the table if footerRow exists
         didDrawPage: function (data) {
           // Show table name on continuation pages (pages after the first page of this table)
           const currentPageNum = data.pageNumber;
@@ -540,8 +621,13 @@ export function createCostPDF(jsonData) {
       });
     }
 
-    // Update Y position for next table
-    currentY = doc.lastAutoTable.finalY + 8;
+    // Update Y position for next table (เฉพาะถ้า type ไม่ใช่ charger เพราะ charger อัปเดตแล้ว)
+    if (type !== 'charger') {
+      currentY = doc.lastAutoTable.finalY + 8;
+    } else {
+      // สำหรับ charger อัปเดตแล้วข้างบน แค่เพิ่ม spacing
+      currentY = doc.lastAutoTable.finalY + 8;
+    }
 
     // Add new page if needed and there are more tables
     // ปรับ threshold ให้ใช้หน้ากระดาษได้ดีขึ้น (A4 height = 297mm, margin top/bottom = 20mm, usable = ~257mm)
