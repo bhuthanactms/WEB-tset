@@ -1556,11 +1556,25 @@ function MoreDetailCard(props: any) {
       return emptyTotals;
     }
 
-    const mainMaterialPrice = parseFloat(mainRow.__EMPTY_4 || 0) || 0;
-    const mainLaborPrice = parseFloat(mainRow.__EMPTY_5 || 0) || 0;
-    const mainTotalPrice = parseFloat(mainRow.__EMPTY_6 || 0) || 0;
+    const distance = highVoltageDistance ? parseFloat(highVoltageDistance) : 0;
 
-    const distance = parseFloat(highVoltageDistance) || 0;
+    // ตรวจสอบเงื่อนไข: ถ้าระยะของชุดสายไฟแรงสูงไม่เกิน 6 เมตร
+    const isDistanceWithin6Meters = highVoltageDistance && distance > 0 && distance <= 6;
+
+    // เลือกคอลัมน์ที่ใช้ตามเงื่อนไขสำหรับชุดรับไฟแรงสูง
+    let mainMaterialPrice, mainLaborPrice, mainTotalPrice;
+
+    if (isDistanceWithin6Meters) {
+      // กรณีระยะไม่เกิน 6 เมตร: ใช้คอลัมน์ใหม่
+      mainMaterialPrice = parseFloat(mainRow.__EMPTY_12 || 0) || 0;
+      mainLaborPrice = parseFloat(mainRow.__EMPTY_13 || 0) || 0;
+      mainTotalPrice = parseFloat(mainRow.__EMPTY_14 || 0) || 0;
+    } else {
+      // กรณีปกติ: ใช้คอลัมน์เดิม
+      mainMaterialPrice = parseFloat(mainRow.__EMPTY_4 || 0) || 0;
+      mainLaborPrice = parseFloat(mainRow.__EMPTY_5 || 0) || 0;
+      mainTotalPrice = parseFloat(mainRow.__EMPTY_6 || 0) || 0;
+    }
     const distanceMaterialPerUnit = parseFloat(distanceRow.__EMPTY_4 || 0) || 0;
     const distanceLaborPerUnit = parseFloat(distanceRow.__EMPTY_5 || 0) || 0;
     const distanceTotalPerUnit = parseFloat(distanceRow.__EMPTY_6 || 0) || 0;
@@ -2475,45 +2489,109 @@ function MoreDetailCard(props: any) {
             if (mainRow) {
               const code = getCodeFromRow(mainRow);
 
+              // ตรวจสอบเงื่อนไข: ถ้าระยะของชุดสายไฟแรงสูงไม่เกิน 6 เมตร
+              // ต้องตรวจสอบว่า highVoltageDistance มีค่าก่อน
+              const distance = highVoltageDistance ? parseFloat(highVoltageDistance) : 0;
+              const isDistanceWithin6Meters = highVoltageDistance && distance > 0 && distance <= 6;
+
+              console.log('High Voltage Distance Check:', {
+                highVoltageDistance,
+                distance,
+                isDistanceWithin6Meters,
+                mainRowNum: mainRow.__rowNum__
+              });
+
+              // เลือกคอลัมน์ที่ใช้ตามเงื่อนไข
+              let productName, materialTotal, laborTotal, totalPrice, quantity;
+
+              if (isDistanceWithin6Meters) {
+                // กรณีระยะไม่เกิน 6 เมตร: ใช้คอลัมน์ใหม่
+                productName = mainRow.__EMPTY_8 || mainRow.__EMPTY || '';
+                materialTotal = parseFloat(mainRow.__EMPTY_12 || 0) || 0;
+                laborTotal = parseFloat(mainRow.__EMPTY_13 || 0) || 0;
+                totalPrice = parseFloat(mainRow.__EMPTY_14 || 0) || 0;
+                quantity = mainRow.__EMPTY_11 || '1ชุด';
+                console.log('ใช้คอลัมน์ใหม่ (ระยะ <= 6 เมตร):', {
+                  productName,
+                  materialTotal,
+                  laborTotal,
+                  totalPrice,
+                  quantity
+                });
+              } else {
+                // กรณีปกติ: ใช้คอลัมน์เดิม
+                productName = mainRow.__EMPTY || '';
+                materialTotal = parseFloat(mainRow.__EMPTY_4 || 0) || 0;
+                laborTotal = parseFloat(mainRow.__EMPTY_5 || 0) || 0;
+                totalPrice = parseFloat(mainRow.__EMPTY_6 || 0) || 0;
+                quantity = '1ชุด'; // แสดงเป็น "1ชุด" เสมอสำหรับชุดรับไฟแรงสูง
+                console.log('ใช้คอลัมน์เดิม (ระยะ > 6 เมตร หรือไม่มีระยะ):', {
+                  productName,
+                  materialTotal,
+                  laborTotal,
+                  totalPrice,
+                  quantity
+                });
+              }
+
               products.push({
                 type: 'ระบบแรงสูง',
                 code: code || '-',
-                productName: mainRow.__EMPTY || '', // ย้ายข้อมูลจาก type ไปที่ productName
-                materialTotal: parseFloat(mainRow.__EMPTY_4 || 0) || 0,
-                laborTotal: parseFloat(mainRow.__EMPTY_5 || 0) || 0,
-                totalPrice: parseFloat(mainRow.__EMPTY_6 || 0) || 0,
-                quantity: '1ชุด', // แสดงเป็น "1ชุด" เสมอสำหรับชุดรับไฟแรงสูง
+                productName: productName,
+                materialTotal: materialTotal,
+                laborTotal: laborTotal,
+                totalPrice: totalPrice,
+                quantity: quantity,
               });
             }
 
+            // ตรวจสอบเงื่อนไข: ถ้าระยะของชุดสายไฟแรงสูงไม่เกิน 6 เมตร
+            const distanceForDetail = highVoltageDistance ? parseFloat(highVoltageDistance) : 0;
+            const isDistanceWithin6MetersForDetail = highVoltageDistance && distanceForDetail > 0 && distanceForDetail <= 6;
+
             // แถว 2: detailRow2 (แถว 4 เดิม) - ขีดค่าทุกฟิลด์
-            if (detailRow2) {
+            // ถ้าระยะไม่เกิน 6 เมตร ไม่แสดง detailRow2
+            if (detailRow2 && !isDistanceWithin6MetersForDetail) {
               const code2 = getCodeFromRow(detailRow2);
 
-              products.push({
-                type: '-', // ขีดค่า
-                code: code2 || '-',
-                productName: detailRow2.__EMPTY || '-',
-                materialTotal: 0, // ขีดค่า (แสดงเป็น "-")
-                laborTotal: 0, // ขีดค่า (แสดงเป็น "-")
-                totalPrice: 0, // ขีดค่า (แสดงเป็น "-")
-                quantity: detailRow2.__EMPTY_3 || undefined,
-              });
+              // เลือกคอลัมน์ที่ใช้ตามเงื่อนไขสำหรับรายละเอียด
+              const detailRow2ProductName = detailRow2.__EMPTY || '';
+
+              // ไม่แสดงถ้าไม่มีค่า (ว่าง, null, undefined, หรือ '-')
+              if (detailRow2ProductName && detailRow2ProductName !== '-' && detailRow2ProductName.trim() !== '') {
+                products.push({
+                  type: '-', // ขีดค่า
+                  code: code2 || '-',
+                  productName: detailRow2ProductName,
+                  materialTotal: 0, // ขีดค่า (แสดงเป็น "-")
+                  laborTotal: 0, // ขีดค่า (แสดงเป็น "-")
+                  totalPrice: 0, // ขีดค่า (แสดงเป็น "-")
+                  quantity: detailRow2.__EMPTY_3 || undefined,
+                });
+              }
             }
 
             // แถว 3: detailRow1 (แถว 2 เดิม) - ขีดค่าทุกฟิลด์
             if (detailRow1) {
               const code3 = getCodeFromRow(detailRow1);
 
-              products.push({
-                type: '-', // ขีดค่า
-                code: code3 || '-',
-                productName: detailRow1.__EMPTY || '-',
-                materialTotal: 0, // ขีดค่า (แสดงเป็น "-")
-                laborTotal: 0, // ขีดค่า (แสดงเป็น "-")
-                totalPrice: 0, // ขีดค่า (แสดงเป็น "-")
-                quantity: detailRow1.__EMPTY_3 || undefined,
-              });
+              // เลือกคอลัมน์ที่ใช้ตามเงื่อนไขสำหรับรายละเอียด
+              const detailRow1ProductName = isDistanceWithin6MetersForDetail
+                ? (detailRow1.__EMPTY_8 || detailRow1.__EMPTY || '')
+                : (detailRow1.__EMPTY || '');
+
+              // ไม่แสดงถ้าไม่มีค่า (ว่าง, null, undefined, หรือ '-')
+              if (detailRow1ProductName && detailRow1ProductName !== '-' && detailRow1ProductName.trim() !== '') {
+                products.push({
+                  type: '-', // ขีดค่า
+                  code: code3 || '-',
+                  productName: detailRow1ProductName,
+                  materialTotal: 0, // ขีดค่า (แสดงเป็น "-")
+                  laborTotal: 0, // ขีดค่า (แสดงเป็น "-")
+                  totalPrice: 0, // ขีดค่า (แสดงเป็น "-")
+                  quantity: detailRow1.__EMPTY_3 || undefined,
+                });
+              }
             }
 
             // แถว 4: distanceRow (ชุดสายไฟแรงสูง) - ย้ายมาที่นี่
@@ -5278,14 +5356,28 @@ function MoreDetailCard(props: any) {
                   return '';
                 };
 
-                // คำนวณราคาสำหรับ main row
-                const mainQuantity = parseFloat(mainRow.__EMPTY_3 || 0) || 0;
-                const mainMaterialPrice = parseFloat(mainRow.__EMPTY_4 || 0) || 0;
-                const mainLaborPrice = parseFloat(mainRow.__EMPTY_5 || 0) || 0;
-                const mainTotalPrice = parseFloat(mainRow.__EMPTY_6 || 0) || 0;
-
                 // คำนวณราคาสำหรับ distance row (คูณด้วยระยะ)
-                const distance = parseFloat(highVoltageDistance) || 0;
+                const distance = highVoltageDistance ? parseFloat(highVoltageDistance) : 0;
+
+                // ตรวจสอบเงื่อนไข: ถ้าระยะของชุดสายไฟแรงสูงไม่เกิน 6 เมตร
+                const isDistanceWithin6Meters = highVoltageDistance && distance > 0 && distance <= 6;
+
+                // คำนวณราคาสำหรับ main row (ชุดรับไฟแรงสูง)
+                let mainQuantity, mainMaterialPrice, mainLaborPrice, mainTotalPrice;
+
+                if (isDistanceWithin6Meters) {
+                  // กรณีระยะไม่เกิน 6 เมตร: ใช้คอลัมน์ใหม่
+                  mainQuantity = parseFloat(mainRow.__EMPTY_11 || 0) || 0;
+                  mainMaterialPrice = parseFloat(mainRow.__EMPTY_12 || 0) || 0;
+                  mainLaborPrice = parseFloat(mainRow.__EMPTY_13 || 0) || 0;
+                  mainTotalPrice = parseFloat(mainRow.__EMPTY_14 || 0) || 0;
+                } else {
+                  // กรณีปกติ: ใช้คอลัมน์เดิม
+                  mainQuantity = parseFloat(mainRow.__EMPTY_3 || 0) || 0;
+                  mainMaterialPrice = parseFloat(mainRow.__EMPTY_4 || 0) || 0;
+                  mainLaborPrice = parseFloat(mainRow.__EMPTY_5 || 0) || 0;
+                  mainTotalPrice = parseFloat(mainRow.__EMPTY_6 || 0) || 0;
+                }
                 const distanceMaterialPerUnit = parseFloat(distanceRow.__EMPTY_4 || 0) || 0;
                 const distanceLaborPerUnit = parseFloat(distanceRow.__EMPTY_5 || 0) || 0;
                 const distanceTotalPerUnit = parseFloat(distanceRow.__EMPTY_6 || 0) || 0;
@@ -5350,19 +5442,49 @@ function MoreDetailCard(props: any) {
                               return code || '-';
                             })()}</div>
                             <div><span className="font-medium">จำนวน:</span> 1ชุด</div>
-                            <div className="mt-2">
-                              <div className="font-medium mb-1">รายละเอียด:</div>
-                              <div className="pl-4 space-y-1">
-                                <div>
-                                  {detailRow1.__EMPTY || '-'}
-                                  {detailRow1.__EMPTY_3 && ` (จำนวน: ${detailRow1.__EMPTY_3})`}
+                            {(() => {
+                              // ตรวจสอบเงื่อนไข: ถ้าระยะของชุดสายไฟแรงสูงไม่เกิน 6 เมตร
+                              const detailDistance = highVoltageDistance ? parseFloat(highVoltageDistance) : 0;
+                              const isDetailDistanceWithin6Meters = highVoltageDistance && detailDistance > 0 && detailDistance <= 6;
+
+                              const detailRow1Value = isDetailDistanceWithin6Meters
+                                ? (detailRow1.__EMPTY_8 || detailRow1.__EMPTY || '')
+                                : (detailRow1.__EMPTY || '');
+
+                              // ถ้าระยะไม่เกิน 6 เมตร ให้แสดงแค่ detailRow1 เท่านั้น
+                              const detailRow2Value = isDetailDistanceWithin6Meters
+                                ? '' // ไม่แสดง detailRow2 เมื่อระยะไม่เกิน 6 เมตร
+                                : (detailRow2.__EMPTY || '');
+
+                              // ตรวจสอบว่ามีค่าอย่างน้อย 1 รายการ
+                              const hasDetailRow1 = detailRow1Value && detailRow1Value !== '-' && detailRow1Value.trim() !== '';
+                              const hasDetailRow2 = !isDetailDistanceWithin6Meters && detailRow2Value && detailRow2Value !== '-' && detailRow2Value.trim() !== '';
+
+                              // แสดงเฉพาะถ้ามีรายละเอียดอย่างน้อย 1 รายการ
+                              if (!hasDetailRow1 && !hasDetailRow2) {
+                                return null;
+                              }
+
+                              return (
+                                <div className="mt-2">
+                                  <div className="font-medium mb-1">รายละเอียด:</div>
+                                  <div className="pl-4 space-y-1">
+                                    {hasDetailRow1 && (
+                                      <div>
+                                        {detailRow1Value}
+                                        {detailRow1.__EMPTY_3 && ` (จำนวน: ${detailRow1.__EMPTY_3})`}
+                                      </div>
+                                    )}
+                                    {hasDetailRow2 && (
+                                      <div>
+                                        {detailRow2Value}
+                                        {detailRow2.__EMPTY_3 && ` (จำนวน: ${detailRow2.__EMPTY_3})`}
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
-                                <div>
-                                  {detailRow2.__EMPTY || '-'}
-                                  {detailRow2.__EMPTY_3 && ` (จำนวน: ${detailRow2.__EMPTY_3})`}
-                                </div>
-                              </div>
-                            </div>
+                              );
+                            })()}
                             <div><span className="font-medium">ค่าของ:</span> {mainMaterialPrice.toLocaleString('th-TH')} บาท</div>
                             <div><span className="font-medium">ค่าแรง:</span> {mainLaborPrice.toLocaleString('th-TH')} บาท</div>
                             <div><span className="font-medium">รวม:</span> {mainTotalPrice.toLocaleString('th-TH')} บาท</div>
