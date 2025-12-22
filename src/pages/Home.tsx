@@ -266,7 +266,9 @@ export default function Home(): React.JSX.Element {
   // Charger wiring type options
   const chargerWiringTypeOptions = [
     'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ',
-    'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน'
+    'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน',
+    'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา',
+    'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา'
   ]
 
   const fetchExcelData = async () => {
@@ -712,6 +714,12 @@ export default function Home(): React.JSX.Element {
         'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน': [
           '__EMPTY_51', '__EMPTY_52', '__EMPTY_53', '__EMPTY_54', '__EMPTY_55', '__EMPTY_56', '__EMPTY_57', '__EMPTY_58', '__EMPTY_59', '__EMPTY_60', '__EMPTY_61', '__EMPTY_62', '__EMPTY_63'
         ], // __EMPTY_51 to __EMPTY_63
+        'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา': [
+          '__EMPTY_77', '__EMPTY_78', '__EMPTY_79', '__EMPTY_80', '__EMPTY_81', '__EMPTY_82', '__EMPTY_83', '__EMPTY_84', '__EMPTY_85', '__EMPTY_86'
+        ], // __EMPTY_77 to __EMPTY_86
+        'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา': [
+          '__EMPTY_101', '__EMPTY_102', '__EMPTY_103', '__EMPTY_104', '__EMPTY_105', '__EMPTY_106', '__EMPTY_107', '__EMPTY_108', '__EMPTY_109', '__EMPTY_110'
+        ], // __EMPTY_101 to __EMPTY_110
       }
       : {
         'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ': [
@@ -720,6 +728,12 @@ export default function Home(): React.JSX.Element {
         'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน': [
           '__EMPTY_49', '__EMPTY_50', '__EMPTY_51', '__EMPTY_52', '__EMPTY_53', '__EMPTY_54', '__EMPTY_55', '__EMPTY_56', '__EMPTY_57', '__EMPTY_58', '__EMPTY_59', '__EMPTY_60', '__EMPTY_61'
         ], // __EMPTY_49 to __EMPTY_61
+        'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา': [
+          '__EMPTY_75', '__EMPTY_76', '__EMPTY_77', '__EMPTY_78', '__EMPTY_79', '__EMPTY_80', '__EMPTY_81', '__EMPTY_82', '__EMPTY_83', '__EMPTY_84'
+        ], // __EMPTY_75 to __EMPTY_84
+        'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา': [
+          '__EMPTY_99', '__EMPTY_100', '__EMPTY_101', '__EMPTY_102', '__EMPTY_103', '__EMPTY_104', '__EMPTY_105', '__EMPTY_106', '__EMPTY_107', '__EMPTY_108'
+        ], // __EMPTY_99 to __EMPTY_108
       };
 
     const cols = wiringTypeToCols[form.chargerWiringType];
@@ -829,6 +843,66 @@ export default function Home(): React.JSX.Element {
           );
         }
       }
+      if (form.chargerWiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา') {
+        // Field: __EMPTY_92
+        const col = '__EMPTY_92';
+        if (chargerTypeMode === 'any') {
+          return multiChargers
+            .filter(name => name !== '')
+            .map((chargerName, idx) => {
+              const cell = chargerToExcelCell[chargerName];
+              let rowNum: number | undefined;
+              if (cell?.mea) rowNum = parseInt(cell.mea.replace('C', ''));
+              if (!rowNum) return `Charger${idx + 1}: -`;
+              const row = excelData.find(r => r.__rowNum__ === rowNum);
+              if (!row) return `Charger${idx + 1}: -`;
+              const value = row[col];
+              return `Charger${idx + 1}: ${value || '-'} ซม.`;
+            });
+        } else {
+          const cell = chargerToExcelCell[form.charger];
+          let rowNum: number | undefined;
+          if (cell?.mea) rowNum = parseInt(cell.mea.replace('C', ''));
+          if (!rowNum) return [];
+          const row = excelData.find(r => r.__rowNum__ === rowNum);
+          if (!row) return [];
+          const value = row[col];
+          const numChargers = parseInt(form.numberOfChargers) || 1;
+          return Array(numChargers).fill(`Charger1: ${value || '-'} ซม.`).map((v, i) =>
+            `Charger${i + 1}: ${value || '-'} ซม.`
+          );
+        }
+      }
+      if (form.chargerWiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา') {
+        // Field: __EMPTY_116
+        const col = '__EMPTY_116';
+        if (chargerTypeMode === 'any') {
+          return multiChargers
+            .filter(name => name !== '')
+            .map((chargerName, idx) => {
+              const cell = chargerToExcelCell[chargerName];
+              let rowNum: number | undefined;
+              if (cell?.mea) rowNum = parseInt(cell.mea.replace('C', ''));
+              if (!rowNum) return `Charger${idx + 1}: -`;
+              const row = excelData.find(r => r.__rowNum__ === rowNum);
+              if (!row) return `Charger${idx + 1}: -`;
+              const value = row[col];
+              return `Charger${idx + 1}: ${value || '-'} ซม.`;
+            });
+        } else {
+          const cell = chargerToExcelCell[form.charger];
+          let rowNum: number | undefined;
+          if (cell?.mea) rowNum = parseInt(cell.mea.replace('C', ''));
+          if (!rowNum) return [];
+          const row = excelData.find(r => r.__rowNum__ === rowNum);
+          if (!row) return [];
+          const value = row[col];
+          const numChargers = parseInt(form.numberOfChargers) || 1;
+          return Array(numChargers).fill(`Charger1: ${value || '-'} ซม.`).map((v, i) =>
+            `Charger${i + 1}: ${value || '-'} ซม.`
+          );
+        }
+      }
     }
     // เงื่อนไข PEA
     if (form.powerAuthority === 'PEA') {
@@ -889,6 +963,66 @@ export default function Home(): React.JSX.Element {
           const numChargers = parseInt(form.numberOfChargers) || 1;
           return Array(numChargers).fill(`Charger1: ${value} มม.`).map((v, i) =>
             `Charger${i + 1}: ${value} มม.`
+          );
+        }
+      }
+      if (form.chargerWiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา') {
+        // Field: __EMPTY_90
+        const col = '__EMPTY_90';
+        if (chargerTypeMode === 'any') {
+          return multiChargers
+            .filter(name => name !== '')
+            .map((chargerName, idx) => {
+              const cell = chargerToExcelCell[chargerName];
+              let rowNum: number | undefined;
+              if (cell?.pea) rowNum = parseInt(cell.pea.replace('C', ''));
+              if (!rowNum) return `Charger${idx + 1}: -`;
+              const row = excelData.find(r => r.__rowNum__ === rowNum);
+              if (!row) return `Charger${idx + 1}: -`;
+              const value = row[col];
+              return `Charger${idx + 1}: ${value || '-'} ซม.`;
+            });
+        } else {
+          const cell = chargerToExcelCell[form.charger];
+          let rowNum: number | undefined;
+          if (cell?.pea) rowNum = parseInt(cell.pea.replace('C', ''));
+          if (!rowNum) return [];
+          const row = excelData.find(r => r.__rowNum__ === rowNum);
+          if (!row) return [];
+          const value = row[col];
+          const numChargers = parseInt(form.numberOfChargers) || 1;
+          return Array(numChargers).fill(`Charger1: ${value || '-'} ซม.`).map((v, i) =>
+            `Charger${i + 1}: ${value || '-'} ซม.`
+          );
+        }
+      }
+      if (form.chargerWiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา') {
+        // Field: __EMPTY_114
+        const col = '__EMPTY_114';
+        if (chargerTypeMode === 'any') {
+          return multiChargers
+            .filter(name => name !== '')
+            .map((chargerName, idx) => {
+              const cell = chargerToExcelCell[chargerName];
+              let rowNum: number | undefined;
+              if (cell?.pea) rowNum = parseInt(cell.pea.replace('C', ''));
+              if (!rowNum) return `Charger${idx + 1}: -`;
+              const row = excelData.find(r => r.__rowNum__ === rowNum);
+              if (!row) return `Charger${idx + 1}: -`;
+              const value = row[col];
+              return `Charger${idx + 1}: ${value || '-'} ซม.`;
+            });
+        } else {
+          const cell = chargerToExcelCell[form.charger];
+          let rowNum: number | undefined;
+          if (cell?.pea) rowNum = parseInt(cell.pea.replace('C', ''));
+          if (!rowNum) return [];
+          const row = excelData.find(r => r.__rowNum__ === rowNum);
+          if (!row) return [];
+          const value = row[col];
+          const numChargers = parseInt(form.numberOfChargers) || 1;
+          return Array(numChargers).fill(`Charger1: ${value || '-'} ซม.`).map((v, i) =>
+            `Charger${i + 1}: ${value || '-'} ซม.`
           );
         }
       }

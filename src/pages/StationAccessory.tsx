@@ -239,6 +239,32 @@ function MoreDetailCard(props: any) {
           240: 22, 320: 23, 360: 25, 480: 28, 600: 30, 640: 34, 720: 35, 800: 23
         };
       }
+    } else if (wiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา') {
+      // TRAY - แบบ 9.15
+      if (powerAuthority === 'PEA') {
+        return {
+          30: 5, 40: 5, 60: 5, 80: 6, 120: 8, 160: 9, 180: 10, 200: 10,
+          240: 12, 320: 16, 360: 17, 480: 19, 600: 23, 640: 23, 720: 27, 800: 28
+        };
+      } else if (powerAuthority === 'MEA') {
+        return {
+          30: 5, 40: 5, 60: 5, 80: 6, 120: 8, 160: 9, 180: 10, 200: 10,
+          240: 12, 320: 16, 360: 17, 480: 19, 600: 20, 640: 23, 720: 27, 800: 28
+        };
+      }
+    } else if (wiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา') {
+      // LADDER - แบบ 9.16
+      if (powerAuthority === 'PEA') {
+        return {
+          30: 5, 40: 5, 60: 5, 80: 6, 120: 8, 160: 9, 180: 10, 200: 10,
+          240: 12, 320: 16, 360: 17, 480: 19, 600: 20, 640: 23, 720: 27, 800: 28
+        };
+      } else if (powerAuthority === 'MEA') {
+        return {
+          30: 5, 40: 5, 60: 5, 80: 6, 120: 8, 160: 9, 180: 10, 200: 10,
+          240: 12, 320: 16, 360: 17, 480: 19, 600: 20, 640: 23, 720: 27, 800: 28
+        };
+      }
     }
 
     // Default fallback (ไม่ควรเกิดขึ้น)
@@ -429,6 +455,10 @@ function MoreDetailCard(props: any) {
         sheetName = 'แบบ 9.11';
       } else if (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน') {
         sheetName = 'แบบ 9.12';
+      } else if (wiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา') {
+        sheetName = 'แบบ 9.15';
+      } else if (wiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา') {
+        sheetName = 'แบบ 9.16';
       }
 
       if (!sheetName) {
@@ -476,6 +506,18 @@ function MoreDetailCard(props: any) {
         laborCost = parseFloat(row['__EMPTY_14']) * distance;
         totalCost = parseFloat(row['__EMPTY_15']) * distance;
       } else if (sheetName === 'แบบ 9.12') {
+        code = row['__EMPTY'];
+        materialCost = parseFloat(row['__EMPTY_14']) * distance;
+        laborCost = parseFloat(row['__EMPTY_15']) * distance;
+        totalCost = parseFloat(row['__EMPTY_16']) * distance;
+      } else if (sheetName === 'แบบ 9.15') {
+        // TRAY - ใช้คอลัมน์เดียวกับแบบ 9.12
+        code = row['__EMPTY'];
+        materialCost = parseFloat(row['__EMPTY_14']) * distance;
+        laborCost = parseFloat(row['__EMPTY_15']) * distance;
+        totalCost = parseFloat(row['__EMPTY_16']) * distance;
+      } else if (sheetName === 'แบบ 9.16') {
+        // LADDER - ใช้คอลัมน์เดียวกับแบบ 9.12
         code = row['__EMPTY'];
         materialCost = parseFloat(row['__EMPTY_14']) * distance;
         laborCost = parseFloat(row['__EMPTY_15']) * distance;
@@ -591,10 +633,12 @@ function MoreDetailCard(props: any) {
         const conduitType = chargerConduitChoices[i] || '';
         const chargerName = props.chargerSummary?.[i]?.name || '';
 
-        // For underground (กลุ่ม 5 ฝังใต้ดิน), conduitType is not required
+        // For underground (กลุ่ม 5 ฝังใต้ดิน), TRAY, LADDER - conduitType is not required
         const isUnderground = props.chargerWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน';
+        const isTray = props.chargerWiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา';
+        const isLadder = props.chargerWiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา';
         const hasRequiredData = inputDistance > 0 && chargerName && props.chargerWiringType;
-        const hasConduitType = isUnderground || (conduitType && conduitType !== '');
+        const hasConduitType = isUnderground || isTray || isLadder || (conduitType && conduitType !== '');
 
         if (hasRequiredData && hasConduitType) {
           try {
@@ -7887,7 +7931,7 @@ function MoreDetailCard(props: any) {
                                     <span className="text-gray-600 ml-1">
                                       {(() => {
                                         const inputDistance = parseFloat(chargerLineDistances[chargerIndex] || '0') || 0;
-                                        const distance = inputDistance + 2.5; // ระยะที่กรอก + 2.5
+                                        const distance = inputDistance + 3; // ระยะที่กรอก + 3 สำหรับการคำนวณ (ต้องตรงกับการคำนวณ)
                                         return inputDistance > 0 ? `${distance} เมตร (${inputDistance} เมตร)` : '-';
                                       })()}
                                     </span>
