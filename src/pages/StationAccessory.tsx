@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react'
 
-import { Zap, Car, Paintbrush, Shield, Home, Wrench, MapPin, ChevronDown, ChevronUp, Box, Package, Settings, Ruler, Printer } from 'lucide-react'
+import { Zap, Car, Paintbrush, Shield, Home, Wrench, MapPin, ChevronDown, ChevronUp, Box, Package, Settings, Ruler, Printer, Save, FolderOpen, Trash2 } from 'lucide-react'
 
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { getCurrentUser, canAccessStationAccessory, canSaveHistory } from '@/utils/auth'
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
@@ -182,6 +183,569 @@ function MoreDetailCard(props: any) {
   const [jobName, setJobName] = useState('');
   const [location, setLocation] = useState('');
   const [salesPerson, setSalesPerson] = useState('');
+  // customerCode is now managed in StationAccessory component, passed via props
+  const customerCode = props.customerCode || '';
+  const setCustomerCode = props.setCustomerCode || (() => { });
+
+  console.log('🔍 MoreDetailCard - customerCode from props:', customerCode);
+
+  // Save/Load functionality
+  const STORAGE_KEY = 'ev_station_accessory_form_data';
+
+  // Save data to localStorage
+  const saveFormData = () => {
+    const currentCustomerCode = customerCode || props.customerCode || '';
+    console.log('💾 Starting saveFormData...');
+    console.log('📦 Customer Code from state:', customerCode);
+    console.log('📦 Customer Code from props:', props.customerCode);
+    console.log('📦 Current Customer Code:', currentCustomerCode);
+    console.log('📦 Props from state:', Object.keys(props));
+
+    if (!currentCustomerCode.trim()) {
+      alert('⚠️ กรุณากรอกรหัสลูกค้าก่อนบันทึก');
+      return;
+    }
+
+    // สร้างข้อมูล Home จาก props (ที่ส่งมาจาก state จาก Home.tsx) ก่อน
+    // props มีข้อมูลทั้งหมดที่ส่งมาจาก Home.tsx ผ่าน {...state}
+    let homeDataParsed = {
+      customerCode: (customerCode || props.customerCode || '').trim(),
+      form: {
+        powerAuthority: props.powerAuthority || '',
+        charger: props.charger || '',
+        numberOfChargers: props.numberOfChargers || '',
+        trWiringType: props.trWiringType || '',
+        chargerWiringType: props.chargerWiringType || ''
+      },
+      chargerTypeMode: props.chargerTypeMode || 'same',
+      multiChargers: props.multiChargers || [],
+      // เก็บข้อมูลอื่นๆ จาก props (ที่ส่งมาจาก Home.tsx)
+      transformer: props.transformer || '',
+      trWiringSize: props.trWiringSize || '',
+      trWireConduit: props.trWireConduit || '',
+      mdb: props.mdb || '',
+      mdbMainAt: props.mdbMainAt || '',
+      mdbMainAf: props.mdbMainAf || '',
+      mdbSubs: props.mdbSubs || [],
+      mdbLighting: props.mdbLighting || '',
+      mdbCommu: props.mdbCommu || '',
+      chargerSummary: props.chargerSummary || [],
+      chargerWiringCable: props.chargerWiringCable || '',
+      chargerWireConduit: props.chargerWireConduit || '',
+      chargerWiringCableAll: props.chargerWiringCableAll || [],
+      chargerWireConduitAll: props.chargerWireConduitAll || [],
+      chargerDistance: props.chargerDistance || 0,
+      trDistance: props.trDistance || 0,
+      savedAt: new Date().toISOString()
+    };
+
+    console.log('📦 Created homeDataParsed from props:', homeDataParsed);
+
+    // ตรวจสอบว่ามีข้อมูลใน localStorage หรือไม่ (ถ้ามีและรหัสลูกค้าตรงกัน อาจจะใช้ข้อมูลจาก localStorage แทน)
+    const homeDataKey = 'ev_calculator_form_data';
+    const homeData = localStorage.getItem(homeDataKey);
+    if (homeData) {
+      try {
+        const savedHomeData = JSON.parse(homeData);
+        // ถ้ารหัสลูกค้าตรงกันและมีข้อมูลครบถ้วนกว่า ให้ใช้ข้อมูลจาก localStorage
+        if (savedHomeData.customerCode === customerCode.trim() && savedHomeData.form && savedHomeData.form.charger) {
+          console.log('📦 Using saved homeData from localStorage (has charger info)');
+          // รวมข้อมูลจาก localStorage กับ props (ให้ props มีความสำคัญสูงกว่า)
+          homeDataParsed = {
+            ...savedHomeData,
+            // ถ้า props มีข้อมูล ให้ใช้จาก props แทน (เพราะอาจเป็นข้อมูลล่าสุด)
+            transformer: props.transformer || savedHomeData.transformer || '',
+            trWiringSize: props.trWiringSize || savedHomeData.trWiringSize || '',
+            trWireConduit: props.trWireConduit || savedHomeData.trWireConduit || '',
+            mdb: props.mdb || savedHomeData.mdb || '',
+            mdbMainAt: props.mdbMainAt || savedHomeData.mdbMainAt || '',
+            mdbMainAf: props.mdbMainAf || savedHomeData.mdbMainAf || '',
+            mdbSubs: props.mdbSubs || savedHomeData.mdbSubs || [],
+            mdbLighting: props.mdbLighting || savedHomeData.mdbLighting || '',
+            mdbCommu: props.mdbCommu || savedHomeData.mdbCommu || '',
+            chargerSummary: props.chargerSummary || savedHomeData.chargerSummary || [],
+            chargerWiringCable: props.chargerWiringCable || savedHomeData.chargerWiringCable || '',
+            chargerWireConduit: props.chargerWireConduit || savedHomeData.chargerWireConduit || '',
+            chargerWiringCableAll: props.chargerWiringCableAll || savedHomeData.chargerWiringCableAll || [],
+            chargerWireConduitAll: props.chargerWireConduitAll || savedHomeData.chargerWireConduitAll || [],
+            chargerDistance: props.chargerDistance || savedHomeData.chargerDistance || 0,
+            trDistance: props.trDistance || savedHomeData.trDistance || 0,
+            savedAt: new Date().toISOString()
+          };
+        } else {
+          console.log('📦 Using homeDataParsed from props (localStorage data incomplete or different customer)');
+        }
+      } catch (e) {
+        console.error('Error parsing home data:', e);
+        console.log('📦 Using homeDataParsed from props (error parsing localStorage)');
+      }
+    } else {
+      console.log('📦 Using homeDataParsed from props (no localStorage data)');
+    }
+
+    // ข้อมูล StationAccessory - บันทึกทุก state
+    const stationData = {
+      customerCode: (customerCode || props.customerCode || '').trim(),
+      // ข้อมูลพื้นฐาน
+      trDistance,
+      trWiringGroup2,
+      jobName,
+      location,
+      salesPerson,
+      // ข้อมูล Charger
+      chargerLineDistances,
+      chargerConduitChoices,
+      chargerResults,
+      chargerSelection,
+      // ข้อมูล Transformer
+      transformerSelection,
+      transformerType,
+      transformerPrice,
+      lowVoltageRequest,
+      lowVoltageDistance2,
+      lowVoltageDistance3,
+      // ข้อมูล High Voltage
+      highVoltageDistance,
+      highVoltageSystem,
+      // ข้อมูล MDB
+      mccbMainBrand,
+      mccbSubBrand,
+      mdbConfiguration,
+      mdbSelection,
+      trMdbSelection,
+      installationLocation,
+      installationLocationBrand,
+      // ข้อมูล Parking & Roof
+      parkingSlots,
+      floorPainting,
+      roofCoverType,
+      roofCoverWidth,
+      roofCoverLength,
+      roofCoverM2,
+      mdbRoof,
+      mdbRoofType,
+      mdbRoofWidth,
+      mdbRoofLength,
+      mdbRoofM2,
+      chargerRoofType,
+      // ข้อมูล Travel & Training
+      travelType,
+      travelDistance,
+      installationTravelDistance,
+      travelCostResult,
+      installationTravelCost,
+      constructionTravelCost,
+      trainingWork,
+      // ข้อมูล Additional Features
+      additionalSelection,
+      equipmentSelection,
+      communicationSelection,
+      concreteSelection,
+      paintingSelection,
+      // Section 1: อุปกรณ์ประกอบสถานี
+      bumperPoles,
+      wheelStops,
+      fireExtinguisherCabinet,
+      signage,
+      routerType,
+      routerCableDistance,
+      cctvCableDistance,
+      lightingCableDistance,
+      bumperPoleMaterial,
+      wheelStopMaterial,
+      // Section 2: ระบบสื่อสาร
+      wifi4gHub,
+      cctv,
+      lighting,
+      // Section 3: งานปูน
+      mdbConcreteBase,
+      chargerConcreteBase,
+      parkingConcreteFloor,
+      generalConcreteFloor,
+      generalConcreteFloorArea,
+      // Section 4: งานขุดดิน
+      excavationSelection,
+      excavation30cm,
+      excavation60cm,
+      excavation10cm,
+      excavation20cm,
+      excavation30cmFloor,
+      excavationLevel,
+      excavationFill,
+      // Section 5: งานทาสีช่องจอด
+      parkingPaintType,
+      sideLineMarking,
+      centerPattern,
+      centerPatternOriginal,
+      centerPatternNew,
+      // Section 5: งานป้าย
+      signageWorkSelection,
+      signageStationType,
+      // ข้อมูลกำไร% และ CF%
+      profitPercent,
+      cfPercent,
+      savedAt: new Date().toISOString()
+    };
+
+    try {
+      // Save Home data to localStorage (ข้อมูลจาก props/state)
+      const homeDataKey = 'ev_calculator_form_data';
+      localStorage.setItem(homeDataKey, JSON.stringify(homeDataParsed));
+      console.log('💾 Saved Home data to localStorage:', homeDataParsed);
+
+      // Save StationAccessory data
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(stationData));
+      console.log('💾 Saved StationAccessory data to localStorage:', stationData);
+
+      // Save combined data with customer code as key
+      const combinedKey = `ev_combined_data_${(customerCode || props.customerCode || '').trim()}`;
+      const combinedData = {
+        customerCode: (customerCode || props.customerCode || '').trim(),
+        home: homeDataParsed,
+        stationAccessory: stationData,
+        savedAt: new Date().toISOString(),
+        lastUpdated: 'station-accessory'
+      };
+      localStorage.setItem(combinedKey, JSON.stringify(combinedData));
+      console.log('💾 Saved combined data to localStorage:', combinedData);
+
+      // Also save with timestamp for history
+      const historyKey = `${STORAGE_KEY}_${(customerCode || props.customerCode || '').trim()}_${Date.now()}`;
+      localStorage.setItem(historyKey, JSON.stringify(stationData));
+
+      // Also save Home data with timestamp for history
+      const homeHistoryKey = `${homeDataKey}_${(customerCode || props.customerCode || '').trim()}_${Date.now()}`;
+      localStorage.setItem(homeHistoryKey, JSON.stringify(homeDataParsed));
+
+      alert('✅ บันทึกข้อมูลสำเร็จ! (รวมข้อมูลทั้ง 2 หน้า)');
+      console.log('✅ All data saved successfully!');
+    } catch (error) {
+      console.error('❌ Error saving data:', error);
+      alert('❌ เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+    }
+  };
+
+  // Load data from localStorage
+  const loadFormData = () => {
+    const savedData = localStorage.getItem(STORAGE_KEY);
+    if (savedData) {
+      try {
+        const parsed = JSON.parse(savedData);
+        // โหลดข้อมูลพื้นฐาน
+        if (parsed.customerCode) setCustomerCode(parsed.customerCode);
+        if (parsed.trDistance !== undefined) setTrDistance(parsed.trDistance);
+        if (parsed.trWiringGroup2 !== undefined) setTrWiringGroup2(parsed.trWiringGroup2);
+        if (parsed.jobName !== undefined) setJobName(parsed.jobName);
+        if (parsed.location !== undefined) setLocation(parsed.location);
+        if (parsed.salesPerson !== undefined) setSalesPerson(parsed.salesPerson);
+        // โหลดข้อมูล Charger
+        if (parsed.chargerLineDistances) setChargerLineDistances(parsed.chargerLineDistances);
+        if (parsed.chargerConduitChoices) setChargerConduitChoices(parsed.chargerConduitChoices);
+        if (parsed.chargerResults) setChargerResults(parsed.chargerResults);
+        if (parsed.chargerSelection !== undefined) setChargerSelection(parsed.chargerSelection);
+        // โหลดข้อมูล Transformer
+        if (parsed.transformerSelection !== undefined) setTransformerSelection(parsed.transformerSelection);
+        if (parsed.transformerType !== undefined) setTransformerType(parsed.transformerType);
+        if (parsed.transformerPrice) setTransformerPrice(parsed.transformerPrice);
+        if (parsed.lowVoltageRequest !== undefined) setLowVoltageRequest(parsed.lowVoltageRequest);
+        if (parsed.lowVoltageDistance2 !== undefined) setLowVoltageDistance2(parsed.lowVoltageDistance2);
+        if (parsed.lowVoltageDistance3 !== undefined) setLowVoltageDistance3(parsed.lowVoltageDistance3);
+        // โหลดข้อมูล High Voltage
+        if (parsed.highVoltageDistance !== undefined) setHighVoltageDistance(parsed.highVoltageDistance);
+        if (parsed.highVoltageSystem !== undefined) setHighVoltageSystem(parsed.highVoltageSystem);
+        // โหลดข้อมูล MDB
+        if (parsed.mccbMainBrand !== undefined) setMccbMainBrand(parsed.mccbMainBrand);
+        if (parsed.mccbSubBrand !== undefined) setMccbSubBrand(parsed.mccbSubBrand);
+        if (parsed.mdbConfiguration) setMdbConfiguration(parsed.mdbConfiguration);
+        if (parsed.mdbSelection !== undefined) setMdbSelection(parsed.mdbSelection);
+        if (parsed.trMdbSelection !== undefined) setTrMdbSelection(parsed.trMdbSelection);
+        if (parsed.installationLocation !== undefined) setInstallationLocation(parsed.installationLocation);
+        if (parsed.installationLocationBrand !== undefined) setInstallationLocationBrand(parsed.installationLocationBrand);
+        // โหลดข้อมูล Parking & Roof
+        if (parsed.parkingSlots !== undefined) setParkingSlots(parsed.parkingSlots);
+        if (parsed.floorPainting !== undefined) setFloorPainting(parsed.floorPainting);
+        if (parsed.roofCoverType !== undefined) setRoofCoverType(parsed.roofCoverType);
+        if (parsed.roofCoverWidth !== undefined) setRoofCoverWidth(parsed.roofCoverWidth);
+        if (parsed.roofCoverLength !== undefined) setRoofCoverLength(parsed.roofCoverLength);
+        if (parsed.roofCoverM2 !== undefined) setRoofCoverM2(parsed.roofCoverM2);
+        if (parsed.mdbRoof !== undefined) setMdbRoof(parsed.mdbRoof);
+        if (parsed.mdbRoofType !== undefined) setMdbRoofType(parsed.mdbRoofType);
+        if (parsed.mdbRoofWidth !== undefined) setMdbRoofWidth(parsed.mdbRoofWidth);
+        if (parsed.mdbRoofLength !== undefined) setMdbRoofLength(parsed.mdbRoofLength);
+        if (parsed.mdbRoofM2 !== undefined) setMdbRoofM2(parsed.mdbRoofM2);
+        if (parsed.chargerRoofType !== undefined) setChargerRoofType(parsed.chargerRoofType);
+        // โหลดข้อมูล Travel & Training
+        if (parsed.travelType !== undefined) setTravelType(parsed.travelType);
+        if (parsed.travelDistance !== undefined) setTravelDistance(parsed.travelDistance);
+        if (parsed.installationTravelDistance !== undefined) setInstallationTravelDistance(parsed.installationTravelDistance);
+        if (parsed.travelCostResult !== undefined) setTravelCostResult(parsed.travelCostResult);
+        if (parsed.installationTravelCost !== undefined) setInstallationTravelCost(parsed.installationTravelCost);
+        if (parsed.constructionTravelCost !== undefined) setConstructionTravelCost(parsed.constructionTravelCost);
+        if (parsed.trainingWork !== undefined) setTrainingWork(parsed.trainingWork);
+        // โหลดข้อมูล Additional Features
+        if (parsed.additionalSelection !== undefined) setAdditionalSelection(parsed.additionalSelection);
+        if (parsed.equipmentSelection !== undefined) setEquipmentSelection(parsed.equipmentSelection);
+        if (parsed.communicationSelection !== undefined) setCommunicationSelection(parsed.communicationSelection);
+        if (parsed.concreteSelection !== undefined) setConcreteSelection(parsed.concreteSelection);
+        if (parsed.paintingSelection !== undefined) setPaintingSelection(parsed.paintingSelection);
+        // Section 1: อุปกรณ์ประกอบสถานี
+        if (parsed.bumperPoles !== undefined) setBumperPoles(parsed.bumperPoles);
+        if (parsed.wheelStops !== undefined) setWheelStops(parsed.wheelStops);
+        if (parsed.fireExtinguisherCabinet !== undefined) setFireExtinguisherCabinet(parsed.fireExtinguisherCabinet);
+        if (parsed.signage !== undefined) setSignage(parsed.signage);
+        if (parsed.routerType !== undefined) setRouterType(parsed.routerType);
+        if (parsed.routerCableDistance !== undefined) setRouterCableDistance(parsed.routerCableDistance);
+        if (parsed.cctvCableDistance !== undefined) setCctvCableDistance(parsed.cctvCableDistance);
+        if (parsed.lightingCableDistance !== undefined) setLightingCableDistance(parsed.lightingCableDistance);
+        if (parsed.bumperPoleMaterial !== undefined) setBumperPoleMaterial(parsed.bumperPoleMaterial);
+        if (parsed.wheelStopMaterial !== undefined) setWheelStopMaterial(parsed.wheelStopMaterial);
+        // Section 2: ระบบสื่อสาร
+        if (parsed.wifi4gHub !== undefined) setWifi4gHub(parsed.wifi4gHub);
+        if (parsed.cctv !== undefined) setCctv(parsed.cctv);
+        if (parsed.lighting !== undefined) setLighting(parsed.lighting);
+        // Section 3: งานปูน
+        if (parsed.mdbConcreteBase !== undefined) setMdbConcreteBase(parsed.mdbConcreteBase);
+        if (parsed.chargerConcreteBase !== undefined) setChargerConcreteBase(parsed.chargerConcreteBase);
+        if (parsed.parkingConcreteFloor !== undefined) setParkingConcreteFloor(parsed.parkingConcreteFloor);
+        if (parsed.generalConcreteFloor !== undefined) setGeneralConcreteFloor(parsed.generalConcreteFloor);
+        if (parsed.generalConcreteFloorArea !== undefined) setGeneralConcreteFloorArea(parsed.generalConcreteFloorArea);
+        // Section 4: งานขุดดิน
+        if (parsed.excavationSelection !== undefined) setExcavationSelection(parsed.excavationSelection);
+        if (parsed.excavation30cm !== undefined) setExcavation30cm(parsed.excavation30cm);
+        if (parsed.excavation60cm !== undefined) setExcavation60cm(parsed.excavation60cm);
+        if (parsed.excavation10cm !== undefined) setExcavation10cm(parsed.excavation10cm);
+        if (parsed.excavation20cm !== undefined) setExcavation20cm(parsed.excavation20cm);
+        if (parsed.excavation30cmFloor !== undefined) setExcavation30cmFloor(parsed.excavation30cmFloor);
+        if (parsed.excavationLevel !== undefined) setExcavationLevel(parsed.excavationLevel);
+        if (parsed.excavationFill !== undefined) setExcavationFill(parsed.excavationFill);
+        // Section 5: งานทาสีช่องจอด
+        if (parsed.parkingPaintType !== undefined) setParkingPaintType(parsed.parkingPaintType);
+        if (parsed.sideLineMarking !== undefined) setSideLineMarking(parsed.sideLineMarking);
+        if (parsed.centerPattern !== undefined) setCenterPattern(parsed.centerPattern);
+        if (parsed.centerPatternOriginal !== undefined) setCenterPatternOriginal(parsed.centerPatternOriginal);
+        if (parsed.centerPatternNew !== undefined) setCenterPatternNew(parsed.centerPatternNew);
+        // Section 5: งานป้าย
+        if (parsed.signageWorkSelection !== undefined) setSignageWorkSelection(parsed.signageWorkSelection);
+        if (parsed.signageStationType !== undefined) setSignageStationType(parsed.signageStationType);
+        alert('✅ โหลดข้อมูลสำเร็จ!');
+        console.log('📂 Loaded data from localStorage:', parsed);
+      } catch (error) {
+        console.error('❌ Error loading data:', error);
+        alert('❌ เกิดข้อผิดพลาดในการโหลดข้อมูล');
+      }
+    } else {
+      alert('⚠️ ไม่พบข้อมูลที่บันทึกไว้');
+    }
+  };
+
+  // Clear saved data
+  const clearSavedData = () => {
+    if (confirm('คุณต้องการลบข้อมูลที่บันทึกไว้หรือไม่?')) {
+      localStorage.removeItem(STORAGE_KEY);
+      alert('✅ ลบข้อมูลสำเร็จ!');
+    }
+  };
+
+  // Load saved data on mount
+  useEffect(() => {
+    console.log('🔍 MoreDetailCard mount - Loading saved data...');
+    const savedData = localStorage.getItem(STORAGE_KEY);
+    if (savedData) {
+      try {
+        const parsed = JSON.parse(savedData);
+        console.log('📂 Found saved data:', parsed);
+
+        // โหลดข้อมูลพื้นฐาน
+        if (parsed.customerCode) {
+          setCustomerCode(parsed.customerCode);
+          console.log('✅ Loaded customerCode:', parsed.customerCode);
+        }
+        if (parsed.trDistance !== undefined) setTrDistance(parsed.trDistance);
+        if (parsed.trWiringGroup2 !== undefined) setTrWiringGroup2(parsed.trWiringGroup2);
+        if (parsed.jobName !== undefined) setJobName(parsed.jobName);
+        if (parsed.location !== undefined) setLocation(parsed.location);
+        if (parsed.salesPerson !== undefined) setSalesPerson(parsed.salesPerson);
+        // โหลดข้อมูล Charger
+        if (parsed.chargerLineDistances) setChargerLineDistances(parsed.chargerLineDistances);
+        if (parsed.chargerConduitChoices) setChargerConduitChoices(parsed.chargerConduitChoices);
+        if (parsed.chargerResults) setChargerResults(parsed.chargerResults);
+        if (parsed.chargerSelection !== undefined) setChargerSelection(parsed.chargerSelection);
+        // โหลดข้อมูล Transformer
+        if (parsed.transformerSelection !== undefined) setTransformerSelection(parsed.transformerSelection);
+        if (parsed.transformerType !== undefined) setTransformerType(parsed.transformerType);
+        if (parsed.transformerPrice) setTransformerPrice(parsed.transformerPrice);
+        if (parsed.lowVoltageRequest !== undefined) setLowVoltageRequest(parsed.lowVoltageRequest);
+        if (parsed.lowVoltageDistance2 !== undefined) setLowVoltageDistance2(parsed.lowVoltageDistance2);
+        if (parsed.lowVoltageDistance3 !== undefined) setLowVoltageDistance3(parsed.lowVoltageDistance3);
+        // โหลดข้อมูล High Voltage
+        if (parsed.highVoltageDistance !== undefined) setHighVoltageDistance(parsed.highVoltageDistance);
+        if (parsed.highVoltageSystem !== undefined) setHighVoltageSystem(parsed.highVoltageSystem);
+        // โหลดข้อมูล MDB
+        if (parsed.mccbMainBrand !== undefined) setMccbMainBrand(parsed.mccbMainBrand);
+        if (parsed.mccbSubBrand !== undefined) setMccbSubBrand(parsed.mccbSubBrand);
+        if (parsed.mdbConfiguration) setMdbConfiguration(parsed.mdbConfiguration);
+        if (parsed.mdbSelection !== undefined) setMdbSelection(parsed.mdbSelection);
+        if (parsed.trMdbSelection !== undefined) setTrMdbSelection(parsed.trMdbSelection);
+        if (parsed.installationLocation !== undefined) setInstallationLocation(parsed.installationLocation);
+        if (parsed.installationLocationBrand !== undefined) setInstallationLocationBrand(parsed.installationLocationBrand);
+        // โหลดข้อมูล Parking & Roof
+        if (parsed.parkingSlots !== undefined) setParkingSlots(parsed.parkingSlots);
+        if (parsed.floorPainting !== undefined) setFloorPainting(parsed.floorPainting);
+        if (parsed.roofCoverType !== undefined) setRoofCoverType(parsed.roofCoverType);
+        if (parsed.roofCoverWidth !== undefined) setRoofCoverWidth(parsed.roofCoverWidth);
+        if (parsed.roofCoverLength !== undefined) setRoofCoverLength(parsed.roofCoverLength);
+        if (parsed.roofCoverM2 !== undefined) setRoofCoverM2(parsed.roofCoverM2);
+        if (parsed.mdbRoof !== undefined) setMdbRoof(parsed.mdbRoof);
+        if (parsed.mdbRoofType !== undefined) setMdbRoofType(parsed.mdbRoofType);
+        if (parsed.mdbRoofWidth !== undefined) setMdbRoofWidth(parsed.mdbRoofWidth);
+        if (parsed.mdbRoofLength !== undefined) setMdbRoofLength(parsed.mdbRoofLength);
+        if (parsed.mdbRoofM2 !== undefined) setMdbRoofM2(parsed.mdbRoofM2);
+        if (parsed.chargerRoofType !== undefined) setChargerRoofType(parsed.chargerRoofType);
+        // โหลดข้อมูล Travel & Training
+        if (parsed.travelType !== undefined) setTravelType(parsed.travelType);
+        if (parsed.travelDistance !== undefined) setTravelDistance(parsed.travelDistance);
+        if (parsed.installationTravelDistance !== undefined) setInstallationTravelDistance(parsed.installationTravelDistance);
+        if (parsed.travelCostResult !== undefined) setTravelCostResult(parsed.travelCostResult);
+        if (parsed.installationTravelCost !== undefined) setInstallationTravelCost(parsed.installationTravelCost);
+        if (parsed.constructionTravelCost !== undefined) setConstructionTravelCost(parsed.constructionTravelCost);
+        if (parsed.trainingWork !== undefined) setTrainingWork(parsed.trainingWork);
+        // โหลดข้อมูล Additional Features
+        if (parsed.additionalSelection !== undefined) setAdditionalSelection(parsed.additionalSelection);
+        if (parsed.equipmentSelection !== undefined) setEquipmentSelection(parsed.equipmentSelection);
+        if (parsed.communicationSelection !== undefined) setCommunicationSelection(parsed.communicationSelection);
+        if (parsed.concreteSelection !== undefined) setConcreteSelection(parsed.concreteSelection);
+        if (parsed.paintingSelection !== undefined) setPaintingSelection(parsed.paintingSelection);
+        // Section 1: อุปกรณ์ประกอบสถานี
+        if (parsed.bumperPoles !== undefined) setBumperPoles(parsed.bumperPoles);
+        if (parsed.wheelStops !== undefined) setWheelStops(parsed.wheelStops);
+        if (parsed.fireExtinguisherCabinet !== undefined) setFireExtinguisherCabinet(parsed.fireExtinguisherCabinet);
+        if (parsed.signage !== undefined) setSignage(parsed.signage);
+        if (parsed.routerType !== undefined) setRouterType(parsed.routerType);
+        if (parsed.routerCableDistance !== undefined) setRouterCableDistance(parsed.routerCableDistance);
+        if (parsed.cctvCableDistance !== undefined) setCctvCableDistance(parsed.cctvCableDistance);
+        if (parsed.lightingCableDistance !== undefined) setLightingCableDistance(parsed.lightingCableDistance);
+        if (parsed.bumperPoleMaterial !== undefined) setBumperPoleMaterial(parsed.bumperPoleMaterial);
+        if (parsed.wheelStopMaterial !== undefined) setWheelStopMaterial(parsed.wheelStopMaterial);
+        // Section 2: ระบบสื่อสาร
+        if (parsed.wifi4gHub !== undefined) setWifi4gHub(parsed.wifi4gHub);
+        if (parsed.cctv !== undefined) setCctv(parsed.cctv);
+        if (parsed.lighting !== undefined) setLighting(parsed.lighting);
+        // Section 3: งานปูน
+        if (parsed.mdbConcreteBase !== undefined) setMdbConcreteBase(parsed.mdbConcreteBase);
+        if (parsed.chargerConcreteBase !== undefined) setChargerConcreteBase(parsed.chargerConcreteBase);
+        if (parsed.parkingConcreteFloor !== undefined) setParkingConcreteFloor(parsed.parkingConcreteFloor);
+        if (parsed.generalConcreteFloor !== undefined) setGeneralConcreteFloor(parsed.generalConcreteFloor);
+        if (parsed.generalConcreteFloorArea !== undefined) setGeneralConcreteFloorArea(parsed.generalConcreteFloorArea);
+        // Section 4: งานขุดดิน
+        if (parsed.excavationSelection !== undefined) setExcavationSelection(parsed.excavationSelection);
+        if (parsed.excavation30cm !== undefined) setExcavation30cm(parsed.excavation30cm);
+        if (parsed.excavation60cm !== undefined) setExcavation60cm(parsed.excavation60cm);
+        if (parsed.excavation10cm !== undefined) setExcavation10cm(parsed.excavation10cm);
+        if (parsed.excavation20cm !== undefined) setExcavation20cm(parsed.excavation20cm);
+        if (parsed.excavation30cmFloor !== undefined) setExcavation30cmFloor(parsed.excavation30cmFloor);
+        if (parsed.excavationLevel !== undefined) setExcavationLevel(parsed.excavationLevel);
+        if (parsed.excavationFill !== undefined) setExcavationFill(parsed.excavationFill);
+        // Section 5: งานทาสีช่องจอด
+        if (parsed.parkingPaintType !== undefined) setParkingPaintType(parsed.parkingPaintType);
+        if (parsed.sideLineMarking !== undefined) setSideLineMarking(parsed.sideLineMarking);
+        if (parsed.centerPattern !== undefined) setCenterPattern(parsed.centerPattern);
+        if (parsed.centerPatternOriginal !== undefined) setCenterPatternOriginal(parsed.centerPatternOriginal);
+        if (parsed.centerPatternNew !== undefined) setCenterPatternNew(parsed.centerPatternNew);
+        // Section 5: งานป้าย
+        if (parsed.signageWorkSelection !== undefined) setSignageWorkSelection(parsed.signageWorkSelection);
+        if (parsed.signageStationType !== undefined) setSignageStationType(parsed.signageStationType);
+        // โหลดข้อมูลกำไร% และ CF%
+        if (parsed.profitPercent !== undefined) setProfitPercent(parsed.profitPercent);
+        if (parsed.cfPercent !== undefined) setCfPercent(parsed.cfPercent);
+
+        console.log('✅ Loaded all saved data from localStorage');
+        console.log('🔍 Debug - Loaded values:', {
+          highVoltageSystem: parsed.highVoltageSystem,
+          transformerType: parsed.transformerType,
+          highVoltageDistance: parsed.highVoltageDistance,
+          concreteSelection: parsed.concreteSelection,
+          mdbConcreteBase: parsed.mdbConcreteBase,
+          chargerConcreteBase: parsed.chargerConcreteBase,
+          parkingConcreteFloor: parsed.parkingConcreteFloor,
+          generalConcreteFloor: parsed.generalConcreteFloor,
+          parkingSlots: parsed.parkingSlots,
+          travelCostResult: parsed.travelCostResult,
+          travelType: parsed.travelType,
+          travelDistance: parsed.travelDistance
+        });
+
+        // Force re-render to trigger useMemo recalculation
+        // Use setTimeout to ensure all state updates are complete
+        setTimeout(() => {
+          // Recalculate travel cost after loading data
+          if (parsed.travelType === 'construction' && parsed.travelDistance) {
+            console.log('🔄 Recalculating travel cost (construction)');
+            calculateTravelCost();
+          } else if (parsed.travelType === 'installation') {
+            console.log('🔄 Recalculating travel cost (installation)');
+            calculateInstallationTravelCost();
+          }
+
+          // Force state update to trigger useMemo recalculation for highVoltageTotals and concreteTotals
+          // This ensures that useMemo dependencies are re-evaluated after loading
+          // Always update state even if value is the same to trigger useMemo recalculation
+          if (parsed.highVoltageSystem !== undefined) {
+            console.log('🔄 Setting highVoltageSystem:', parsed.highVoltageSystem);
+            setHighVoltageSystem(parsed.highVoltageSystem);
+          }
+          if (parsed.transformerType !== undefined) {
+            console.log('🔄 Setting transformerType:', parsed.transformerType);
+            setTransformerType(parsed.transformerType);
+          }
+          if (parsed.highVoltageDistance !== undefined) {
+            console.log('🔄 Setting highVoltageDistance:', parsed.highVoltageDistance);
+            setHighVoltageDistance(parsed.highVoltageDistance);
+          }
+          if (parsed.concreteSelection !== undefined) {
+            console.log('🔄 Setting concreteSelection:', parsed.concreteSelection);
+            setConcreteSelection(parsed.concreteSelection);
+          }
+          // Force update concrete work states to trigger concreteTotals recalculation
+          if (parsed.mdbConcreteBase !== undefined) {
+            console.log('🔄 Setting mdbConcreteBase:', parsed.mdbConcreteBase);
+            setMdbConcreteBase(parsed.mdbConcreteBase);
+          }
+          if (parsed.chargerConcreteBase !== undefined) {
+            console.log('🔄 Setting chargerConcreteBase:', parsed.chargerConcreteBase);
+            setChargerConcreteBase(parsed.chargerConcreteBase);
+          }
+          if (parsed.parkingConcreteFloor !== undefined) {
+            console.log('🔄 Setting parkingConcreteFloor:', parsed.parkingConcreteFloor);
+            setParkingConcreteFloor(parsed.parkingConcreteFloor);
+          }
+          if (parsed.generalConcreteFloor !== undefined) {
+            console.log('🔄 Setting generalConcreteFloor:', parsed.generalConcreteFloor);
+            setGeneralConcreteFloor(parsed.generalConcreteFloor);
+          }
+          if (parsed.parkingSlots !== undefined) {
+            console.log('🔄 Setting parkingSlots:', parsed.parkingSlots);
+            setParkingSlots(parsed.parkingSlots);
+          }
+          if (parsed.travelCostResult !== undefined) {
+            console.log('🔄 Setting travelCostResult:', parsed.travelCostResult);
+            setTravelCostResult(parsed.travelCostResult);
+          }
+        }, 300);
+      } catch (error) {
+        console.error('❌ Error loading saved data:', error);
+      }
+    } else {
+      console.log('⚠️ No saved data found in localStorage');
+    }
+  }, []); // Run once on mount
+
+  // Send saveFormData handler to parent component
+  useEffect(() => {
+    if (props.onSaveFormDataReady) {
+      props.onSaveFormDataReady(saveFormData);
+    }
+  }, [saveFormData, props.onSaveFormDataReady]);
+
 
 
 
@@ -1232,7 +1796,7 @@ function MoreDetailCard(props: any) {
     }
 
     return totals;
-  }, [concreteSelection, mdbConcreteBase, chargerConcreteBase, parkingConcreteFloor, generalConcreteFloor, featureChargersCount, parkingSlotsCount]);
+  }, [concreteSelection, mdbConcreteBase, chargerConcreteBase, parkingConcreteFloor, generalConcreteFloor, featureChargersCount, parkingSlotsCount, concreteSheet]);
 
   const paintingTotals = (() => {
     const totals = { material: 0, labor: 0, total: 0 };
@@ -1647,7 +2211,7 @@ function MoreDetailCard(props: any) {
       labor: mainLaborPrice + distanceLaborPrice + poleLaborPrice,
       total: mainTotalPrice + distanceTotalPrice + poleTotalPrice,
     };
-  }, [props.powerAuthority, props.transformer, lowVoltageRequest, highVoltageSystem, transformerType, highVoltageDistance]);
+  }, [props.powerAuthority, props.transformer, props.excelData, lowVoltageRequest, highVoltageSystem, transformerType, highVoltageDistance]);
 
   const installationTotals = React.useMemo(() => {
     const emptyTotals = { material: 0, labor: 0, total: 0 };
@@ -4531,9 +5095,25 @@ function MoreDetailCard(props: any) {
 
 
 
-  // รีเซ็ต lowVoltageRequest เมื่อเงื่อนไขเปลี่ยน
+  // ตั้งค่า lowVoltageRequest อัตโนมัติตาม Transformer Size
   React.useEffect(() => {
-    if (!(props.powerAuthority === 'MEA' && parseInt(props.transformer) <= 400)) {
+    if (props.powerAuthority === 'MEA') {
+      // กรณี Transformer Size: มิเตอร์แรงต่ำ 400 A - ตั้งเป็น 'low-voltage'
+      if (props.transformer === 'มิเตอร์แรงต่ำ 400 A') {
+        setLowVoltageRequest('low-voltage');
+      }
+      // กรณี Transformer Size: 400 kVA - ตั้งเป็น 'use-transformer'
+      else if (parseInt(props.transformer) === 400) {
+        setLowVoltageRequest('use-transformer');
+      }
+      // กรณีอื่นๆ ที่ไม่ใช่เงื่อนไขพิเศษ - รีเซ็ต
+      else if (!(parseInt(props.transformer) < 400)) {
+        setLowVoltageRequest('');
+        setLowVoltageDistance2('');
+        setLowVoltageDistance3('');
+      }
+    } else {
+      // ถ้าไม่ใช่ MEA ให้รีเซ็ต
       setLowVoltageRequest('');
       setLowVoltageDistance2('');
       setLowVoltageDistance3('');
@@ -4596,6 +5176,7 @@ function MoreDetailCard(props: any) {
 
     <div className="w-full max-w-6xl mx-auto">
 
+
       {/* Basic Information Card */}
 
       <Card className="shadow-xl border-0 overflow-hidden mb-6">
@@ -4642,7 +5223,16 @@ function MoreDetailCard(props: any) {
 
               <span className="font-medium ">Transformer Size:</span>
 
-              <span className="font-semibold ">{props.transformer} <span className="text-sm ">kVA</span></span>
+              <span className="font-semibold ">
+                {props.transformer === 'มิเตอร์แรงต่ำ 400 A'
+                  ? 'ขอแรงต่ำ ที่ทำกับ 400 kVA'
+                  : (
+                    <>
+                      {props.transformer} <span className="text-sm ">kVA</span>
+                    </>
+                  )
+                }
+              </span>
 
             </div>
 
@@ -4766,14 +5356,62 @@ function MoreDetailCard(props: any) {
 
                     <span className="font-medium ">Transformer Size:</span>
 
-                    <span className="font-semibold ">{props.transformer} <span className="text-sm ">kVA</span></span>
+                    <span className="font-semibold ">
+                      {props.transformer === 'มิเตอร์แรงต่ำ 400 A'
+                        ? 'ขอแรงต่ำ ที่ทำกับ 400 kVA'
+                        : (
+                          <>
+                            {props.transformer} <span className="text-sm ">kVA</span>
+                          </>
+                        )
+                      }
+                    </span>
 
                   </div>
 
                 </div>
 
-                {/* ตรวจสอบเงื่อนไข MEA และ Transformer Size <= 400 */}
-                {props.powerAuthority === 'MEA' && parseInt(props.transformer) <= 400 && (
+                {/* ตรวจสอบเงื่อนไข MEA และ Transformer Size */}
+                {/* กรณี Transformer Size: มิเตอร์แรงต่ำ 400 A - แสดงแค่ "ขอแรงต่ำ" */}
+                {props.powerAuthority === 'MEA' && props.transformer === 'มิเตอร์แรงต่ำ 400 A' && (
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">
+                      ประเภทการติดตั้ง
+                    </Label>
+                    <div className="p-3 rounded-lg border bg-blue-100 border-blue-300">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="low-voltage-request-auto"
+                          checked={true}
+                          disabled
+                          className="border-blue-400 data-[state=checked]:bg-blue-500"
+                        />
+                        <Label htmlFor="low-voltage-request-auto" className="font-medium text-sm">ขอแรงต่ำ</Label>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {/* กรณี Transformer Size: 400 kVA - แสดงแค่ "ใช้หม้อแปลง" */}
+                {props.powerAuthority === 'MEA' && parseInt(props.transformer) === 400 && props.transformer !== 'มิเตอร์แรงต่ำ 400 A' && (
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">
+                      ประเภทการติดตั้ง
+                    </Label>
+                    <div className="p-3 rounded-lg border bg-green-100 border-green-300">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="use-transformer-auto"
+                          checked={true}
+                          disabled
+                          className="border-green-400 data-[state=checked]:bg-green-500"
+                        />
+                        <Label htmlFor="use-transformer-auto" className="font-medium text-sm">ใช้หม้อแปลง</Label>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {/* กรณี Transformer Size: < 400 kVA (แต่ไม่ใช่ 400 kVA และไม่ใช่ มิเตอร์แรงต่ำ 400 A) - แสดงตัวเลือกทั้ง 2 แบบ */}
+                {props.powerAuthority === 'MEA' && parseInt(props.transformer) < 400 && props.transformer !== 'มิเตอร์แรงต่ำ 400 A' && (
                   <div className="space-y-3">
                     <Label className="text-sm font-medium">
                       เลือกประเภทการติดตั้ง
@@ -4808,7 +5446,7 @@ function MoreDetailCard(props: any) {
                 )}
 
                 {/* แสดงข้อมูลขอแรงต่ำ */}
-                {props.powerAuthority === 'MEA' && parseInt(props.transformer) <= 400 && lowVoltageRequest === 'low-voltage' && (() => {
+                {props.powerAuthority === 'MEA' && (parseInt(props.transformer) <= 400 || props.transformer === 'มิเตอร์แรงต่ำ 400 A') && lowVoltageRequest === 'low-voltage' && (() => {
                   const lowVoltageSheet = getExcelData('ตารางระบบงานแรงสูง');
                   const row2 = lowVoltageSheet.find((row: any) => row.__rowNum__ === 2);
                   const row3 = lowVoltageSheet.find((row: any) => row.__rowNum__ === 3);
@@ -4971,7 +5609,7 @@ function MoreDetailCard(props: any) {
                 })()}
 
                 {/* แสดงตัวเลือก Transformer Type - แสดงเฉพาะเมื่อเลือกใช้หม้อแปลง หรือไม่ใช่เงื่อนไขพิเศษ */}
-                {(!(props.powerAuthority === 'MEA' && parseInt(props.transformer) <= 400) || lowVoltageRequest === 'use-transformer') && (
+                {(!(props.powerAuthority === 'MEA' && (parseInt(props.transformer) <= 400 || props.transformer === 'มิเตอร์แรงต่ำ 400 A')) || lowVoltageRequest === 'use-transformer') && (
                   <div className="space-y-3">
 
                     <Label className="text-sm font-medium ">
@@ -12456,8 +13094,153 @@ function MoreDetailCard(props: any) {
 function StationAccessory() {
 
   const { state } = useLocation()
+  const navigate = useNavigate()
 
   // state จะมีค่าที่ส่งมาจาก Home
+
+  // Customer code state - ต้องอยู่ที่นี่เพื่อใช้ใน return statement
+  const [customerCode, setCustomerCode] = useState<string>('');
+
+  // State for Home data (ข้อมูลจาก Home.tsx)
+  const [homeData, setHomeData] = useState<any>(null);
+
+  // Save form data handler - will be set by MoreDetailCard
+  const [saveFormDataHandler, setSaveFormDataHandler] = useState<(() => void) | null>(null);
+
+  // Check access permission
+  useEffect(() => {
+    const user = getCurrentUser();
+    if (!canAccessStationAccessory(user)) {
+      alert('⚠️ No Permission\nคุณไม่มีสิทธิ์เข้าถึงหน้านี้');
+      navigate('/', { replace: true });
+      return;
+    }
+  }, [navigate]);
+
+  // Load customer code and Home data from state or localStorage
+  useEffect(() => {
+    // Load from localStorage first
+    const savedStationData = localStorage.getItem('ev_station_accessory_form_data');
+    const savedHomeData = localStorage.getItem('ev_calculator_form_data');
+    const combinedDataKey = localStorage.key(0)?.startsWith('ev_combined_data_')
+      ? Array.from({ length: localStorage.length }, (_, i) => {
+        const key = localStorage.key(i);
+        return key && key.startsWith('ev_combined_data_') ? key : null;
+      }).filter(Boolean)[0]
+      : null;
+
+    // Try to load combined data first
+    if (combinedDataKey) {
+      try {
+        const combinedData = JSON.parse(localStorage.getItem(combinedDataKey) || '{}');
+        if (combinedData.customerCode) setCustomerCode(combinedData.customerCode);
+        if (combinedData.home) {
+          setHomeData(combinedData.home);
+          console.log('✅ Loaded combined home data:', combinedData.home);
+        }
+      } catch (error) {
+        console.error('Error loading combined data:', error);
+      }
+    }
+
+    // Load from separate keys if combined data not found
+    if (savedStationData) {
+      try {
+        const parsed = JSON.parse(savedStationData);
+        if (parsed.customerCode) setCustomerCode(parsed.customerCode);
+      } catch (error) {
+        console.error('Error loading customer code:', error);
+      }
+    }
+
+    if (savedHomeData) {
+      try {
+        const parsed = JSON.parse(savedHomeData);
+        if (parsed.customerCode === customerCode || !customerCode) {
+          setHomeData(parsed);
+          console.log('✅ Loaded home data from localStorage:', parsed);
+        }
+      } catch (error) {
+        console.error('Error loading home data:', error);
+      }
+    }
+
+    // Check if data is passed from navigation (priority)
+    if (state && (state as any).customerCode) {
+      setCustomerCode((state as any).customerCode);
+    }
+    if (state && (state as any).loadData) {
+      const loadData = (state as any).loadData;
+      console.log('📦 Loading from navigation state.loadData:', loadData);
+      if (loadData.customerCode) setCustomerCode(loadData.customerCode);
+      if (loadData.home) setHomeData(loadData.home);
+      // ถ้า loadData เป็น stationData ให้โหลดไปยัง localStorage เพื่อให้ MoreDetailCard โหลดได้
+      if (loadData.trDistance !== undefined || loadData.jobName || loadData.concreteSelection !== undefined || loadData.travelCostResult !== undefined || loadData.highVoltageSystem !== undefined || loadData.transformerType !== undefined || loadData.parkingSlots !== undefined) {
+        console.log('📦 Detected stationData in loadData, saving to localStorage');
+        localStorage.setItem('ev_station_accessory_form_data', JSON.stringify(loadData));
+        // Trigger reload ของ MoreDetailCard โดยการ force update
+        setTimeout(() => {
+          window.dispatchEvent(new Event('storage'));
+        }, 100);
+      }
+    }
+
+    // If state has Home data directly (spread from homeData), use it
+    if (state) {
+      const stateObj = state as any;
+      // ตรวจสอบว่ามีข้อมูล Home data ที่ spread มา (ไม่ใช่ loadData)
+      if ((stateObj.powerAuthority || stateObj.charger || stateObj.transformer) && !stateObj.loadData) {
+        setHomeData(stateObj);
+        console.log('✅ Using Home data from navigation state (spread):', stateObj);
+      }
+      // ถ้ามี homeData ใน state โดยตรง
+      if (stateObj.homeData) {
+        setHomeData(stateObj.homeData);
+        console.log('✅ Using Home data from state.homeData:', stateObj.homeData);
+      }
+    }
+  }, [state]);
+
+  // Prepare Home data props for MoreDetailCard
+  const homeProps = useMemo(() => {
+    if (!homeData) return {};
+
+    // ถ้า homeData มี form ให้แปลงเป็น props format
+    if (homeData.form) {
+      return {
+        powerAuthority: homeData.form.powerAuthority || '',
+        charger: homeData.form.charger || '',
+        numberOfChargers: homeData.form.numberOfChargers || '',
+        trWiringType: homeData.form.trWiringType || '',
+        chargerWiringType: homeData.form.chargerWiringType || '',
+        chargerTypeMode: homeData.chargerTypeMode || 'same',
+        multiChargers: homeData.multiChargers || [],
+        // ใช้ transformer ถ้ามี ถ้าไม่มีให้ใช้ transformerSize (สำหรับข้อมูลเก่า)
+        transformer: homeData.transformer || homeData.transformerSize || '',
+        trWiringSize: homeData.trWiringSize || '',
+        trWireConduit: homeData.trWireConduit || '',
+        mdb: homeData.mdb || '',
+        mdbMainAt: homeData.mdbMainAt || '',
+        mdbMainAf: homeData.mdbMainAf || '',
+        mdbSubs: homeData.mdbSubs || [],
+        mdbLighting: homeData.mdbLighting || '',
+        mdbCommu: homeData.mdbCommu || '',
+        chargerSummary: homeData.chargerSummary || homeData.chargerDetails || [],
+        chargerWiringCable: homeData.chargerWiringCable || '',
+        chargerWireConduit: homeData.chargerWireConduit || '',
+        chargerWiringCableAll: homeData.chargerWiringCableAll || [],
+        chargerWireConduitAll: homeData.chargerWireConduitAll || [],
+        chargerDistance: homeData.chargerDistance || 0,
+        trDistance: homeData.trDistance || 0
+      };
+    }
+
+    // ถ้า homeData เป็น props format อยู่แล้ว ใช้เลย แต่เพิ่ม fallback สำหรับ transformer
+    return {
+      ...homeData,
+      transformer: homeData.transformer || homeData.transformerSize || ''
+    };
+  }, [homeData]);
 
 
 
@@ -13421,11 +14204,21 @@ function StationAccessory() {
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="p-3 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-full">
-              <Zap className="h-8 w-8 text-white" />
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex-1"></div>
+            <div className="flex items-center justify-center gap-3 flex-1">
+              <div className="p-3 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-full">
+                <Zap className="h-8 w-8 text-white" />
+              </div>
+              <h1 className="text-4xl font-bold ">EV Station Calculator</h1>
             </div>
-            <h1 className="text-4xl font-bold ">EV Station Calculator</h1>
+            <div className="flex-1 flex justify-end">
+              {customerCode && (
+                <div className="bg-blue-100 text-blue-800 px-4 py-2 rounded-lg font-semibold">
+                  รหัสลูกค้า: {customerCode}
+                </div>
+              )}
+            </div>
           </div>
           <p className="text-lg ">
             Detailed configuration and additional features for electric vehicle charging stations
@@ -13434,6 +14227,9 @@ function StationAccessory() {
 
         <MoreDetailCard
           {...state}
+          {...homeProps}
+          customerCode={customerCode}
+          setCustomerCode={setCustomerCode}
           stationEquipmentPriceMapping={stationEquipmentPriceMapping}
           roofCostMapping={roofCostMapping}
           getParkingRoofData={getParkingRoofData}
@@ -13445,55 +14241,69 @@ function StationAccessory() {
           findExcelDataByValue={findExcelDataByValue}
           getTransformerPrice={getTransformerPrice}
           getMDBConfiguration={getMDBConfiguration}
+          onSaveFormDataReady={(handler: () => void) => setSaveFormDataHandler(() => handler)}
         />
+
+        {/* ปุ่ม Save และ Print ด้านล่างสุด */}
+        <div className="flex justify-center gap-4 mt-8 mb-6">
+          {saveFormDataHandler && (
+            <Button
+              onClick={saveFormDataHandler}
+              className="shadow-lg hover:shadow-xl transition-all duration-200 bg-green-600 hover:bg-green-700 text-white rounded-lg px-6 py-3 flex items-center gap-2"
+              size="lg"
+            >
+              <Save className="h-5 w-5" />
+              <span>บันทึก</span>
+            </Button>
+          )}
+          <Button
+            onClick={() => {
+              try {
+                // ตรวจสอบว่า window.getStationPDFData มีอยู่หรือไม่
+                if (typeof window !== 'undefined' && !(window as any).getStationPDFData) {
+                  console.error('window.getStationPDFData is not available');
+                  alert('ระบบยังไม่พร้อม กรุณารอสักครู่แล้วลองใหม่อีกครั้ง');
+                  return;
+                }
+
+                // ดึงข้อมูลล่าสุดจาก StationAccessory component
+                const pdfData = getJsonData();
+                console.log('PDF Data:', pdfData); // Debug log
+
+                if (!pdfData) {
+                  console.error('PDF Data is null or undefined');
+                  alert('ไม่สามารถดึงข้อมูล PDF ได้ กรุณาลองใหม่อีกครั้ง');
+                  return;
+                }
+
+                // ตรวจสอบโครงสร้างข้อมูล
+                if (!pdfData.header || !pdfData.tables || !Array.isArray(pdfData.tables)) {
+                  console.error('Invalid PDF data structure:', pdfData);
+                  alert('ข้อมูล PDF ไม่ถูกต้อง กรุณาตรวจสอบข้อมูล');
+                  return;
+                }
+
+                // สร้าง PDF (ฟังก์ชันจะเรียก doc.save() เอง)
+                const pdfDoc = createCostPDF(pdfData);
+                if (!pdfDoc) {
+                  console.error('Failed to create PDF');
+                  alert('ไม่สามารถสร้าง PDF ได้ กรุณาตรวจสอบข้อมูล');
+                }
+              } catch (error) {
+                console.error('Error generating PDF:', error);
+                const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                alert('เกิดข้อผิดพลาดในการสร้าง PDF: ' + errorMessage);
+              }
+            }}
+            className="shadow-lg hover:shadow-xl transition-all duration-200 bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-6 py-3 flex items-center gap-2"
+            size="lg"
+          >
+            <Printer className="h-5 w-5" />
+            <span>Print</span>
+          </Button>
+        </div>
       </div>
 
-      {/* ปุ่ม Print มุมล่างขวา */}
-      <Button
-        onClick={() => {
-          try {
-            // ตรวจสอบว่า window.getStationPDFData มีอยู่หรือไม่
-            if (typeof window !== 'undefined' && !(window as any).getStationPDFData) {
-              console.error('window.getStationPDFData is not available');
-              alert('ระบบยังไม่พร้อม กรุณารอสักครู่แล้วลองใหม่อีกครั้ง');
-              return;
-            }
-
-            // ดึงข้อมูลล่าสุดจาก StationAccessory component
-            const pdfData = getJsonData();
-            console.log('PDF Data:', pdfData); // Debug log
-
-            if (!pdfData) {
-              console.error('PDF Data is null or undefined');
-              alert('ไม่สามารถดึงข้อมูล PDF ได้ กรุณาลองใหม่อีกครั้ง');
-              return;
-            }
-
-            // ตรวจสอบโครงสร้างข้อมูล
-            if (!pdfData.header || !pdfData.tables || !Array.isArray(pdfData.tables)) {
-              console.error('Invalid PDF data structure:', pdfData);
-              alert('ข้อมูล PDF ไม่ถูกต้อง กรุณาตรวจสอบข้อมูล');
-              return;
-            }
-
-            // สร้าง PDF (ฟังก์ชันจะเรียก doc.save() เอง)
-            const pdfDoc = createCostPDF(pdfData);
-            if (!pdfDoc) {
-              console.error('Failed to create PDF');
-              alert('ไม่สามารถสร้าง PDF ได้ กรุณาตรวจสอบข้อมูล');
-            }
-          } catch (error) {
-            console.error('Error generating PDF:', error);
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            alert('เกิดข้อผิดพลาดในการสร้าง PDF: ' + errorMessage);
-          }
-        }}
-        className="fixed bottom-6 right-6 z-50 shadow-lg hover:shadow-xl transition-all duration-200 bg-blue-600 hover:bg-blue-700 text-white rounded-full p-4 h-auto w-auto"
-        size="lg"
-      >
-        <Printer className="h-5 w-5 mr-2" />
-        <span className="hidden sm:inline">Print</span>
-      </Button>
     </div>
   )
 }

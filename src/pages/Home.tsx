@@ -8,13 +8,15 @@ import React, { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Calculator, Zap, Battery, Settings, Cable } from 'lucide-react'
+import { Calculator, Zap, Battery, Settings, Cable, Save, FolderOpen, Trash2 } from 'lucide-react'
 import axios from 'axios'
 import * as XLSX from 'xlsx'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { getCurrentUser, canAccessStationAccessory, canSaveHistory } from '@/utils/auth'
 
 /** Form state interface */
 interface CalculatorForm {
@@ -51,7 +53,441 @@ export default function Home(): React.JSX.Element {
 
   const [results, setResults] = useState<CalculatorResults | null>(null)
   const [excelData, setExcelData] = useState<any[]>([]);
-  const navigate = useNavigate();
+  const [customerCode, setCustomerCode] = useState<string>('');
+  const navigate = useNavigate()
+  const location = useLocation()
+
+  // Save/Load functionality
+  const STORAGE_KEY = 'ev_calculator_form_data';
+
+  // Load saved data on mount
+  useEffect(() => {
+    console.log('🔄 Home useEffect triggered, location:', location.pathname)
+    // ตรวจสอบว่ามี flag ที่บอกว่าให้ reset form หรือไม่ (จากปุ่ม Home)
+    const resetFormOnLoad = sessionStorage.getItem('reset_form_on_load');
+    console.log('🔍 resetFormOnLoad flag:', resetFormOnLoad)
+    if (resetFormOnLoad) {
+      console.log('🔄 Resetting form...')
+      // ลบข้อมูลปัจจุบันใน localStorage (แต่ไม่ลบประวัติการบันทึก)
+      localStorage.removeItem(STORAGE_KEY);
+      // ลบ flag ที่บอกว่าโหลดจากประวัติ
+      sessionStorage.removeItem('loaded_from_history');
+      // Reset form state
+      setForm({
+        powerAuthority: '' as any,
+        charger: '',
+        numberOfChargers: '',
+        trWiringType: '',
+        chargerWiringType: ''
+      });
+      setResults(null);
+      setCustomerCode('');
+      setChargerTypeMode('same');
+      setMultiChargers([]);
+      // ล้าง flag
+      sessionStorage.removeItem('reset_form_on_load');
+      console.log('✅ Form reset - เคลียร์ข้อมูลทั้งหมดแล้ว (ประวัติการบันทึกยังคงอยู่)');
+      return;
+    }
+
+    // ตรวจสอบว่ามี flag ที่บอกว่าโหลดจากประวัติหรือไม่
+    const loadedFromHistory = sessionStorage.getItem('loaded_from_history');
+
+    // Check if data is passed from navigation (priority)
+    // ใช้ location.state จาก useLocation hook แทน window.history.state
+    const locationState = location.state || (window.history.state && window.history.state.usr) || {};
+    console.log('🔍 locationState:', locationState);
+    console.log('🔍 location.state:', location.state);
+    console.log('🔍 loadedFromHistory flag:', loadedFromHistory);
+
+    if (locationState.loadData) {
+      const loadData = locationState.loadData;
+      console.log('📦 Loading data from navigation state:', loadData);
+      // ตั้ง flag ว่าโหลดจากประวัติ
+      sessionStorage.setItem('loaded_from_history', 'true');
+
+      // โหลดข้อมูลทั้งหมด
+      if (loadData.form) {
+        setForm(loadData.form);
+        console.log('✅ Set form:', loadData.form);
+      }
+      if (loadData.chargerTypeMode) {
+        setChargerTypeMode(loadData.chargerTypeMode);
+        console.log('✅ Set chargerTypeMode:', loadData.chargerTypeMode);
+      }
+      if (loadData.multiChargers) {
+        setMultiChargers(loadData.multiChargers);
+        console.log('✅ Set multiChargers:', loadData.multiChargers);
+      }
+      if (loadData.customerCode) {
+        setCustomerCode(loadData.customerCode);
+        console.log('✅ Set customerCode:', loadData.customerCode);
+      }
+
+      // โหลด results ถ้ามี
+      if (loadData.results) {
+        setResults(loadData.results);
+        console.log('✅ Loaded results from navigation state:', loadData.results);
+      } else {
+        // ถ้าไม่มี results แต่มีข้อมูลครบถ้วน ให้คำนวณอัตโนมัติ
+        if (loadData.form && loadData.form.powerAuthority &&
+          ((loadData.form.charger && loadData.form.numberOfChargers) ||
+            (loadData.chargerTypeMode === 'any' && loadData.multiChargers && loadData.multiChargers.length > 0))) {
+          // เรียก calculateResults อัตโนมัติหลังจาก state อัพเดท
+          setTimeout(() => {
+            calculateResults();
+            console.log('✅ Auto-calculated results after loading from navigation');
+          }, 300);
+        }
+      }
+      // ล้าง flag หลังจากโหลดเสร็จแล้ว
+      sessionStorage.removeItem('loaded_from_history');
+    } else if (loadedFromHistory) {
+      // ถ้ามี flag แต่ไม่มี navigation state ให้โหลดจาก localStorage
+      console.log('📦 Loading from localStorage (loaded_from_history flag set)');
+      const savedData = localStorage.getItem(STORAGE_KEY);
+      if (savedData) {
+        try {
+          const parsed = JSON.parse(savedData);
+          if (parsed.form) {
+            setForm(parsed.form);
+            console.log('✅ Set form from localStorage:', parsed.form);
+          }
+          if (parsed.chargerTypeMode) {
+            setChargerTypeMode(parsed.chargerTypeMode);
+            console.log('✅ Set chargerTypeMode from localStorage:', parsed.chargerTypeMode);
+          }
+          if (parsed.multiChargers) {
+            setMultiChargers(parsed.multiChargers);
+            console.log('✅ Set multiChargers from localStorage:', parsed.multiChargers);
+          }
+          if (parsed.customerCode) {
+            setCustomerCode(parsed.customerCode);
+            console.log('✅ Set customerCode from localStorage:', parsed.customerCode);
+          }
+          // โหลด results ถ้ามี
+          if (parsed.results) {
+            setResults(parsed.results);
+            console.log('✅ Loaded results from localStorage:', parsed.results);
+          } else {
+            // ถ้าไม่มี results แต่มีข้อมูลครบถ้วน ให้คำนวณอัตโนมัติ
+            if (parsed.form && parsed.form.powerAuthority &&
+              ((parsed.form.charger && parsed.form.numberOfChargers) ||
+                (parsed.chargerTypeMode === 'any' && parsed.multiChargers && parsed.multiChargers.length > 0))) {
+              setTimeout(() => {
+                calculateResults();
+                console.log('✅ Auto-calculated results after loading from localStorage');
+              }, 300);
+            }
+          }
+          console.log('✅ Loaded saved data from localStorage');
+          // ล้าง flag หลังจากโหลดเสร็จแล้ว
+          sessionStorage.removeItem('loaded_from_history');
+        } catch (error) {
+          console.error('❌ Error loading saved data:', error);
+          sessionStorage.removeItem('loaded_from_history');
+        }
+      } else {
+        // ถ้าไม่มีข้อมูลใน localStorage ให้ล้าง flag
+        sessionStorage.removeItem('loaded_from_history');
+      }
+    } else {
+      // โหลดจาก localStorage เฉพาะเมื่อไม่ได้โหลดจากประวัติ
+      const savedData = localStorage.getItem(STORAGE_KEY);
+      if (savedData) {
+        try {
+          const parsed = JSON.parse(savedData);
+          if (parsed.form) setForm(parsed.form);
+          if (parsed.chargerTypeMode) setChargerTypeMode(parsed.chargerTypeMode);
+          if (parsed.multiChargers) setMultiChargers(parsed.multiChargers);
+          if (parsed.customerCode) setCustomerCode(parsed.customerCode);
+          // โหลด results ถ้ามี
+          if (parsed.results) {
+            setResults(parsed.results);
+            console.log('✅ Loaded results from saved data:', parsed.results);
+          }
+          console.log('✅ Loaded saved data from localStorage');
+        } catch (error) {
+          console.error('❌ Error loading saved data:', error);
+        }
+      }
+    }
+  }, [location.pathname, location.state]);
+
+  // Auto-calculate results when form data is loaded and excel data is ready
+  useEffect(() => {
+    // ถ้ามีข้อมูลครบถ้วนและยังไม่มี results และ excel data พร้อมแล้ว ให้คำนวณอัตโนมัติ
+    if (form.powerAuthority && excelData.length > 0 && !results) {
+      const hasEnoughData = chargerTypeMode === 'any'
+        ? (multiChargers && multiChargers.length > 0 && multiChargers.some((c: string) => c !== ''))
+        : (form.charger && form.numberOfChargers);
+
+      if (hasEnoughData) {
+        // รอให้ state อัพเดทเสร็จก่อน
+        const timer = setTimeout(() => {
+          calculateResults();
+          console.log('✅ Auto-calculated results after form data loaded');
+        }, 300);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [form.powerAuthority, form.charger, form.numberOfChargers, chargerTypeMode, multiChargers, excelData.length, results]);
+
+  // Save data to localStorage
+  const saveFormData = () => {
+    if (!customerCode.trim()) {
+      alert('⚠️ กรุณากรอกรหัสลูกค้าก่อนบันทึก');
+      return;
+    }
+
+    // คำนวณผลลัพธ์ก่อนบันทึก (ถ้ายังไม่ได้กด calculate)
+    let calculatedResults = results;
+    if (!calculatedResults) {
+      // คำนวณผลลัพธ์เบื้องต้น
+      let inOfCharger = 0;
+      let kWAllCharger = 0;
+      let totalPower = 0;
+
+      if (chargerTypeMode === 'any') {
+        const multi = getMultiChargersIn();
+        kWAllCharger = multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
+          return sum + extractPowerValue(chargerName);
+        }, 0);
+        inOfCharger = multi.length === 1 ? multi[0].in : 0;
+        totalPower = kWAllCharger;
+      } else {
+        const powerPerStation = extractPowerValue(form.charger);
+        const numberOfChargers = parseInt(form.numberOfChargers) || 1;
+        const inOfChargerExcel = getInFromExcel('inOfCharger');
+        inOfCharger = typeof inOfChargerExcel === 'number' ? inOfChargerExcel : 0;
+        kWAllCharger = powerPerStation * numberOfChargers;
+        totalPower = numberOfChargers * powerPerStation;
+      }
+
+      calculatedResults = {
+        totalPower,
+        transformerSize: 0, // จะคำนวณจาก getTRSizeFromExcel
+        inOfCharger,
+        kWAllCharger
+      };
+    }
+
+    // คำนวณข้อมูลเพิ่มเติมสำหรับการบันทึก (ถ้ามีข้อมูลครบถ้วน)
+    const kWAllChargerValue = chargerTypeMode === 'any'
+      ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
+        return sum + extractPowerValue(chargerName);
+      }, 0)
+      : calculatedResults?.kWAllCharger || 0;
+
+    const transformerSize = form.powerAuthority && kWAllChargerValue > 0
+      ? getTRSizeFromExcel(kWAllChargerValue)
+      : '';
+
+    // คำนวณ transformer (ค่าที่แสดงใน UI) - เหมือนกับที่ส่งไปหน้า StationAccessory
+    const transformer = form.powerAuthority && kWAllChargerValue > 0
+      ? (() => {
+        // ถ้าเป็น Row 32 (≤ 280 kW) ให้ส่ง "มิเตอร์แรงต่ำ 400 A"
+        if (isRow32(kWAllChargerValue)) {
+          return 'มิเตอร์แรงต่ำ 400 A';
+        }
+        // ถ้าไม่ใช่ ให้ส่งค่าจาก getTRSizeFromExcel
+        return getTRSizeFromExcel(kWAllChargerValue);
+      })()
+      : '';
+
+    // คำนวณข้อมูลเพิ่มเติม (ต้องมี form.trWiringType และ form.powerAuthority)
+    const trWiringSize = form.trWiringType && form.powerAuthority
+      ? (getTRWiringSizeCVs()[0] || '')
+      : '';
+
+    const trWireConduit = form.trWiringType && form.powerAuthority
+      ? (getTRWireConduit() || '')
+      : '';
+
+    const trWiringRowNum = form.trWiringType && form.powerAuthority
+      ? getTRWiringSizeCVsRowNumber()
+      : undefined;
+
+    const mdb = trWiringRowNum ? (() => {
+      const trRow = excelData.find(r => r.__rowNum__ === trWiringRowNum);
+      const mccbMain = trRow ? trRow.__EMPTY_7 : '-';
+      return mccbMain ? `${mccbMain} A` : '-';
+    })() : '';
+
+    const mdbMainAt = trWiringRowNum ? (() => {
+      const trRow = excelData.find(r => r.__rowNum__ === trWiringRowNum);
+      const mccbMain = trRow ? trRow.__EMPTY_7 : '';
+      return mccbMain ? `${mccbMain} A` : '';
+    })() : '';
+
+    const mdbMainAf = form.powerAuthority ? (() => {
+      let trRowNum: number | undefined = undefined;
+      if (form.powerAuthority === 'MEA') {
+        const steps = [
+          { max: 280, row: 32 },
+          { max: 320, row: 33 },
+          { max: 400, row: 34 },
+          { max: 504, row: 35 },
+          { max: 640, row: 36 },
+          { max: 800, row: 37 },
+          { max: 1000, row: 38 },
+          { max: 1200, row: 39 },
+          { max: 1600, row: 40 },
+          { max: 2000, row: 41 },
+        ];
+        const found = steps.find(s => kWAllChargerValue <= s.max);
+        trRowNum = found?.row;
+      } else if (form.powerAuthority === 'PEA') {
+        const steps = [
+          { max: 80, row: 76 },
+          { max: 128, row: 77 },
+          { max: 200, row: 78 },
+          { max: 252, row: 79 },
+          { max: 320, row: 80 },
+          { max: 400, row: 81 },
+          { max: 504, row: 82 },
+          { max: 640, row: 83 },
+          { max: 800, row: 84 },
+          { max: 1000, row: 85 },
+          { max: 1200, row: 86 },
+          { max: 1600, row: 87 },
+          { max: 2000, row: 88 },
+        ];
+        const found = steps.find(s => kWAllChargerValue <= s.max);
+        trRowNum = found?.row;
+      }
+      const trRow = excelData.find(r => r.__rowNum__ === trRowNum);
+      const main2 = trRow ? trRow.__EMPTY_10 : '';
+      return main2 ? `${main2} A` : '';
+    })() : '';
+
+    const chargerWiringCable = form.chargerWiringType && form.powerAuthority
+      ? (Array.isArray(getChargerWiringCable()) ? getChargerWiringCable()[0] : getChargerWiringCable())
+      : '';
+
+    const chargerWireConduit = form.chargerWiringType && form.powerAuthority
+      ? (Array.isArray(getChargerWireConduit()) ? (getChargerWireConduit()?.[0] ?? '') : (getChargerWireConduit() ?? ''))
+      : '';
+
+    const dataToSave = {
+      customerCode: customerCode.trim(),
+      form,
+      chargerTypeMode,
+      multiChargers,
+      results: calculatedResults,
+      transformerSize: transformerSize,
+      transformer: transformer, // เพิ่ม transformer (ค่าที่แสดงใน UI)
+      // ข้อมูลเพิ่มเติมจากการคำนวณ
+      trWiringSize: trWiringSize,
+      trWireConduit: trWireConduit,
+      mdb: mdb,
+      mdbMainAt: mdbMainAt,
+      mdbMainAf: mdbMainAf,
+      chargerWiringCable: chargerWiringCable,
+      chargerWireConduit: chargerWireConduit,
+      savedAt: new Date().toISOString()
+    };
+    try {
+      // Save Home data
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+
+      // Check if StationAccessory data exists for this customer
+      const stationKey = 'ev_station_accessory_form_data';
+      const stationData = localStorage.getItem(stationKey);
+      let stationDataParsed = null;
+      if (stationData) {
+        try {
+          stationDataParsed = JSON.parse(stationData);
+          // Only use if same customer code
+          if (stationDataParsed.customerCode !== customerCode.trim()) {
+            stationDataParsed = null;
+          }
+        } catch (e) {
+          console.error('Error parsing station data:', e);
+        }
+      }
+
+      // Save combined data with customer code as key
+      const combinedKey = `ev_combined_data_${customerCode.trim()}`;
+      const combinedData = {
+        customerCode: customerCode.trim(),
+        home: dataToSave,
+        stationAccessory: stationDataParsed,
+        savedAt: new Date().toISOString(),
+        lastUpdated: 'home'
+      };
+      localStorage.setItem(combinedKey, JSON.stringify(combinedData));
+
+      // Also save with timestamp for history
+      const key = `${STORAGE_KEY}_${customerCode.trim()}_${Date.now()}`;
+      localStorage.setItem(key, JSON.stringify(dataToSave));
+
+      alert('✅ บันทึกข้อมูลสำเร็จ!' + (stationDataParsed ? ' (รวมข้อมูลทั้ง 2 หน้า)' : ''));
+      console.log('💾 Saved combined data:', combinedData);
+    } catch (error) {
+      console.error('❌ Error saving data:', error);
+      alert('❌ เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+    }
+  };
+
+  // Load data from localStorage
+  const loadFormData = () => {
+    const savedData = localStorage.getItem(STORAGE_KEY);
+    if (savedData) {
+      try {
+        const parsed = JSON.parse(savedData);
+        if (parsed.form) setForm(parsed.form);
+        if (parsed.chargerTypeMode) setChargerTypeMode(parsed.chargerTypeMode);
+        if (parsed.multiChargers) setMultiChargers(parsed.multiChargers);
+        if (parsed.customerCode) setCustomerCode(parsed.customerCode);
+        // โหลด results ถ้ามี
+        if (parsed.results) {
+          setResults(parsed.results);
+          console.log('✅ Loaded results from localStorage:', parsed.results);
+        } else {
+          // ถ้าไม่มี results แต่มีข้อมูลครบถ้วน ให้คำนวณอัตโนมัติ
+          if (parsed.form && parsed.form.powerAuthority &&
+            ((parsed.form.charger && parsed.form.numberOfChargers) ||
+              (parsed.chargerTypeMode === 'any' && parsed.multiChargers && parsed.multiChargers.length > 0))) {
+            // เรียก calculateResults อัตโนมัติหลังจาก state อัพเดท
+            setTimeout(() => {
+              calculateResults();
+              console.log('✅ Auto-calculated results after loading data');
+            }, 100);
+          }
+        }
+        alert('✅ โหลดข้อมูลสำเร็จ!');
+        console.log('📂 Loaded data from localStorage:', parsed);
+      } catch (error) {
+        console.error('❌ Error loading data:', error);
+        alert('❌ เกิดข้อผิดพลาดในการโหลดข้อมูล');
+      }
+    } else {
+      alert('⚠️ ไม่พบข้อมูลที่บันทึกไว้');
+    }
+  };
+
+  // Clear saved data - ลบเฉพาะข้อมูลปัจจุบัน ไม่ลบประวัติ
+  const clearSavedData = () => {
+    if (confirm('คุณต้องการลบข้อมูลปัจจุบันที่แสดงอยู่หรือไม่?\n(ประวัติการบันทึกจะยังคงอยู่)')) {
+      // ลบแค่ข้อมูลปัจจุบัน (key หลัก) ไม่ลบประวัติ
+      localStorage.removeItem(STORAGE_KEY);
+      sessionStorage.removeItem('loaded_from_history');
+      // ล้าง form state ด้วย
+      setForm({
+        powerAuthority: '' as any,
+        charger: '',
+        numberOfChargers: '',
+        trWiringType: '',
+        chargerWiringType: ''
+      });
+      setResults(null);
+      setCustomerCode('');
+      setChargerTypeMode('same');
+      setMultiChargers([]);
+      alert('✅ ลบข้อมูลปัจจุบันสำเร็จ! (ประวัติการบันทึกยังคงอยู่)');
+    }
+  };
 
   /** Handle form input changes */
   const handleInputChange = (field: keyof CalculatorForm, value: string) => {
@@ -133,10 +569,16 @@ export default function Home(): React.JSX.Element {
     return undefined;
   };
 
+  // ฟังก์ชันตรวจสอบว่าเป็น Row 32 (≤ 280 kW) หรือไม่
+  const isRow32 = (kWAllCharger: number): boolean => {
+    return form.powerAuthority === 'MEA' && kWAllCharger <= 280;
+  };
+
   // ฟังก์ชันเลือก TR size ตาม Power Authority และผลรวม kW All charger
   const getTRSizeFromExcel = (kWAllCharger: number) => {
     if (form.powerAuthority === 'MEA') {
       const steps = [
+        { max: 280, row: 32 },
         { max: 320, row: 33 },
         { max: 400, row: 34 },
         { max: 504, row: 35 },
@@ -243,6 +685,13 @@ export default function Home(): React.JSX.Element {
       chargerWiringType: ''
     });
     setResults(null);
+    setCustomerCode('');
+    setChargerTypeMode('same');
+    setMultiChargers([]);
+    // ล้างแค่ sessionStorage (ไม่ลบข้อมูลที่บันทึกไว้ใน localStorage)
+    sessionStorage.removeItem('loaded_from_history');
+    // ไม่ลบข้อมูลที่บันทึกไว้ใน localStorage (เก็บไว้ถาวร)
+    console.log('✅ Form reset (ข้อมูลที่บันทึกไว้ยังคงอยู่)');
   }
 
   // Charger options
@@ -319,7 +768,7 @@ export default function Home(): React.JSX.Element {
 
       // Debug: ดูข้อมูล Transformer rows
       console.log('MEA Transformer rows (33-41):');
-      for (let i = 33; i <= 41; i++) {
+      for (let i = 32; i <= 41; i++) {
         const row = excelData.find(r => r.__rowNum__ === i);
         if (row) {
           console.log(`Row ${i}:`, row);
@@ -422,6 +871,7 @@ export default function Home(): React.JSX.Element {
     let trRowNum: number | undefined = undefined;
     if (form.powerAuthority === 'MEA') {
       const steps = [
+        { max: 400, row: 32 },
         { max: 444.1, row: 33 },
         { max: 555.1, row: 34 },
         { max: 699.4, row: 35 },
@@ -581,6 +1031,7 @@ export default function Home(): React.JSX.Element {
     let trRowNum: number | undefined = undefined;
     if (form.powerAuthority === 'MEA') {
       const steps = [
+        { max: 280, row: 32 },
         { max: 320, row: 33 },
         { max: 400, row: 34 },
         { max: 504, row: 35 },
@@ -657,6 +1108,7 @@ export default function Home(): React.JSX.Element {
 
     if (form.powerAuthority === 'MEA') {
       const steps = [
+        { max: 280, row: 32 },
         { max: 320, row: 33 },
         { max: 400, row: 34 },
         { max: 504, row: 35 },
@@ -1067,6 +1519,21 @@ export default function Home(): React.JSX.Element {
               </CardHeader>
               <CardContent className="p-6">
                 <div className="space-y-6">
+                  {/* Customer Code */}
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium text-gray-700">
+                      รหัสลูกค้า <span className="text-xs text-gray-400">(Customer Code)</span>
+                    </Label>
+                    <Input
+                      value={customerCode}
+                      onChange={(e) => setCustomerCode(e.target.value)}
+                      placeholder="กรอกรหัสลูกค้า"
+                      className="h-12"
+                    />
+                  </div>
+
+                  <Separator />
+
                   {/* Power Authority */}
                   <div className="space-y-3">
                     <Label className="text-sm font-medium text-gray-700">
@@ -1247,30 +1714,63 @@ export default function Home(): React.JSX.Element {
                       Reset
                     </Button>
                   </div>
+
                 </div>
               </CardContent>
             </Card>
 
             {/* Button ถอดต้นทุน - อยู่ด้านล่าง Station Configuration */}
             <button
-              onClick={() => {
-                console.log('=== Navigate to StationAccessory ===');
-                console.log('Form:', form);
-                console.log('Charger Type Mode:', chargerTypeMode);
-                console.log('Multi Chargers:', multiChargers);
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
 
-                // ส่งข้อมูลที่ต้องการไปหน้า StationAccessory
-                navigate('/station-accessory', {
-                  state: {
+                try {
+                  // ตรวจสอบสิทธิ์การเข้าถึง
+                  const user = getCurrentUser();
+                  console.log('🔍 Current User:', user);
+                  console.log('🔍 Can Access:', canAccessStationAccessory(user));
+                  if (!canAccessStationAccessory(user)) {
+                    alert('⚠️ No Permission\nคุณไม่มีสิทธิ์เข้าถึงหน้านี้');
+                    return;
+                  }
+
+                  console.log('=== Navigate to StationAccessory ===');
+                  console.log('Form:', form);
+                  console.log('Charger Type Mode:', chargerTypeMode);
+                  console.log('Multi Chargers:', multiChargers);
+
+                  // Save current form data before navigation
+                  const currentData = {
+                    customerCode: customerCode,
+                    form,
+                    chargerTypeMode,
+                    multiChargers
+                  };
+                  localStorage.setItem('ev_calculator_form_data', JSON.stringify(currentData));
+
+                  // ส่งข้อมูลที่ต้องการไปหน้า StationAccessory
+                  const navigationState = {
+                    customerCode: customerCode,
                     powerAuthority: form.powerAuthority,
                     numberOfChargers: form.numberOfChargers,
-                    transformer: getTRSizeFromExcel(
-                      chargerTypeMode === 'any'
+                    chargerTypeMode: chargerTypeMode,
+                    multiChargers: multiChargers,
+                    charger: chargerTypeMode === 'any' ? '' : form.charger,
+                    transformer: (() => {
+                      const kWAllChargerValue = chargerTypeMode === 'any'
                         ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
                           return sum + extractPowerValue(chargerName);
                         }, 0)
-                        : results?.kWAllCharger || 0
-                    ),
+                        : results?.kWAllCharger || 0;
+                      // ถ้าเป็น Row 32 (≤ 280 kW) ให้ส่ง "มิเตอร์แรงต่ำ 400 A"
+                      if (isRow32(kWAllChargerValue)) {
+                        return 'มิเตอร์แรงต่ำ 400 A';
+                      }
+                      // ถ้าไม่ใช่ ให้ส่งค่าจาก getTRSizeFromExcel
+                      return getTRSizeFromExcel(kWAllChargerValue);
+                    })(),
                     trWiringType: form.trWiringType,
                     trWiringSize: getTRWiringSizeCVs()[0] || '',
                     trWireConduit: getTRWireConduit() || '',
@@ -1298,6 +1798,7 @@ export default function Home(): React.JSX.Element {
                       let trRowNum: number | undefined = undefined;
                       if (form.powerAuthority === 'MEA') {
                         const steps = [
+                          { max: 280, row: 32 },
                           { max: 320, row: 33 },
                           { max: 400, row: 34 },
                           { max: 504, row: 35 },
@@ -1542,8 +2043,21 @@ export default function Home(): React.JSX.Element {
                         }));
                       }
                     })()
-                  }
-                });
+                  };
+
+                  console.log('✅ Navigation state prepared:', navigationState);
+
+                  // Navigate with state
+                  navigate('/station-accessory', {
+                    state: navigationState,
+                    replace: false
+                  });
+
+                  console.log('✅ Navigation called');
+                } catch (error) {
+                  console.error('❌ Error navigating to StationAccessory:', error);
+                  alert('เกิดข้อผิดพลาดในการเปลี่ยนหน้า: ' + (error instanceof Error ? error.message : String(error)));
+                }
               }}
               className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded shadow-lg mt-6"
             >
@@ -1585,14 +2099,22 @@ export default function Home(): React.JSX.Element {
                       <span className="text-sm font-medium text-green-800">Transformer Size</span>
                     </div>
                     <div className="text-2xl font-bold text-green-900 flex items-center">
-                      {getTRSizeFromExcel(
-                        chargerTypeMode === 'any'
+                      {(() => {
+                        const kWAllChargerValue = chargerTypeMode === 'any'
                           ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
                             return sum + extractPowerValue(chargerName);
                           }, 0)
-                          : results?.kWAllCharger || 0
-                      )}
-                      <span className="text-2xl font-bold text-green-900 ml-1">kVA</span>
+                          : results?.kWAllCharger || 0;
+                        if (isRow32(kWAllChargerValue)) {
+                          return 'มิเตอร์แรงต่ำ 400 A';
+                        }
+                        return (
+                          <>
+                            {getTRSizeFromExcel(kWAllChargerValue)}
+                            <span className="text-2xl font-bold text-green-900 ml-1">kVA</span>
+                          </>
+                        );
+                      })()}
                     </div>
                   </CardContent>
                 </Card>
@@ -1750,14 +2272,22 @@ export default function Home(): React.JSX.Element {
                       <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                         <span className="font-medium text-gray-700">Transformer:</span>
                         <span className="font-semibold text-gray-900 text-base flex items-center">
-                          {getTRSizeFromExcel(
-                            chargerTypeMode === 'any'
+                          {(() => {
+                            const kWAllChargerValue = chargerTypeMode === 'any'
                               ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
                                 return sum + extractPowerValue(chargerName);
                               }, 0)
-                              : results?.kWAllCharger || 0
-                          )}
-                          <span className="text-base text-gray-900 ml-1">kVA</span>
+                              : results?.kWAllCharger || 0;
+                            if (isRow32(kWAllChargerValue)) {
+                              return 'มิเตอร์แรงต่ำ 400 A';
+                            }
+                            return (
+                              <>
+                                {getTRSizeFromExcel(kWAllChargerValue)}
+                                <span className="text-base text-gray-900 ml-1">kVA</span>
+                              </>
+                            );
+                          })()}
                         </span>
                       </div>
                       {/* TR Wiring Type */}
@@ -2126,6 +2656,15 @@ export default function Home(): React.JSX.Element {
           </div>
         </div>
       </div>
+
+      {/* Floating Save Button */}
+      <Button
+        onClick={saveFormData}
+        className="fixed bottom-6 right-6 bg-green-600 hover:bg-green-700 text-white shadow-lg rounded-full h-14 w-14 flex items-center justify-center z-50 transition-all hover:scale-110"
+        title="บันทึกข้อมูล"
+      >
+        <Save className="h-6 w-6" />
+      </Button>
     </div>
   )
 }
