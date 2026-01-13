@@ -191,9 +191,21 @@ function MoreDetailCard(props: any) {
 
   // Save/Load functionality
   const STORAGE_KEY = 'ev_station_accessory_form_data';
+  // ใช้ window.location เพื่อหา base URL อัตโนมัติ (ใช้ hostname เดียวกัน แต่ port 8000 สำหรับ API)
+  const getApiBaseUrl = () => {
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname;
+      const protocol = window.location.protocol;
+      // ใช้ port 8000 สำหรับ API server (หรือใช้ port เดียวกับที่เปิดเว็บถ้าเป็น 8000)
+      const apiPort = window.location.port === '8000' ? '8000' : '8000';
+      return `${protocol}//${hostname}:${apiPort}/api`;
+    }
+    return 'http://localhost:8000/api';
+  };
+  const API_BASE_URL = getApiBaseUrl();
 
-  // Save data to localStorage
-  const saveFormData = () => {
+  // Save data to localStorage and server
+  const saveFormData = async () => {
     const currentCustomerCode = customerCode || props.customerCode || '';
     console.log('💾 Starting saveFormData...');
     console.log('📦 Customer Code from state:', customerCode);
@@ -417,7 +429,30 @@ function MoreDetailCard(props: any) {
       const homeHistoryKey = `${homeDataKey}_${(customerCode || props.customerCode || '').trim()}_${Date.now()}`;
       localStorage.setItem(homeHistoryKey, JSON.stringify(homeDataParsed));
 
-      alert('✅ บันทึกข้อมูลสำเร็จ! (รวมข้อมูลทั้ง 2 หน้า)');
+      // บันทึกลงเซิร์ฟเวอร์
+      try {
+        console.log('🌐 Attempting to save data to server...');
+        const response = await axios.post(`${API_BASE_URL}/save-data`, combinedData, {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.data.success) {
+          console.log('✅ Data saved to server successfully:', response.data);
+          alert('✅ บันทึกข้อมูลสำเร็จ! (บันทึกทั้งในเครื่องและเซิร์ฟเวอร์)');
+        } else {
+          console.warn('⚠️ Server returned error:', response.data.error);
+          alert('⚠️ บันทึกข้อมูลในเครื่องสำเร็จ แต่บันทึกลงเซิร์ฟเวอร์ไม่สำเร็จ: ' + (response.data.error || 'Unknown error'));
+        }
+      } catch (serverError: any) {
+        console.error('❌ Error saving to server:', serverError);
+        // แสดง error แต่ไม่บล็อกการใช้งาน (เพราะบันทึก localStorage สำเร็จแล้ว)
+        const errorMessage = serverError.response?.data?.error || serverError.message || 'Unknown error';
+        console.warn('⚠️ Failed to save to server, but data is saved locally. Error:', errorMessage);
+        alert('✅ บันทึกข้อมูลในเครื่องสำเร็จ แต่ไม่สามารถบันทึกลงเซิร์ฟเวอร์ได้\nกรุณาตรวจสอบว่าเซิร์ฟเวอร์ทำงานอยู่\n(ข้อมูลยังสามารถใช้ได้ในเครื่องนี้)');
+      }
+
       console.log('✅ All data saved successfully!');
     } catch (error) {
       console.error('❌ Error saving data:', error);
@@ -425,112 +460,155 @@ function MoreDetailCard(props: any) {
     }
   };
 
-  // Load data from localStorage
-  const loadFormData = () => {
+  // Helper function to load parsed data into state
+  const loadParsedDataIntoState = (parsed: any) => {
+    // โหลดข้อมูลพื้นฐาน
+    if (parsed.customerCode) setCustomerCode(parsed.customerCode);
+    if (parsed.trDistance !== undefined) setTrDistance(parsed.trDistance);
+    if (parsed.trWiringGroup2 !== undefined) setTrWiringGroup2(parsed.trWiringGroup2);
+    if (parsed.jobName !== undefined) setJobName(parsed.jobName);
+    if (parsed.location !== undefined) setLocation(parsed.location);
+    if (parsed.salesPerson !== undefined) setSalesPerson(parsed.salesPerson);
+    // โหลดข้อมูล Charger
+    if (parsed.chargerLineDistances) setChargerLineDistances(parsed.chargerLineDistances);
+    if (parsed.chargerConduitChoices) setChargerConduitChoices(parsed.chargerConduitChoices);
+    if (parsed.chargerResults) setChargerResults(parsed.chargerResults);
+    if (parsed.chargerSelection !== undefined) setChargerSelection(parsed.chargerSelection);
+    // โหลดข้อมูล Transformer
+    if (parsed.transformerSelection !== undefined) setTransformerSelection(parsed.transformerSelection);
+    if (parsed.transformerType !== undefined) setTransformerType(parsed.transformerType);
+    if (parsed.transformerPrice) setTransformerPrice(parsed.transformerPrice);
+    if (parsed.lowVoltageRequest !== undefined) setLowVoltageRequest(parsed.lowVoltageRequest);
+    if (parsed.lowVoltageDistance2 !== undefined) setLowVoltageDistance2(parsed.lowVoltageDistance2);
+    if (parsed.lowVoltageDistance3 !== undefined) setLowVoltageDistance3(parsed.lowVoltageDistance3);
+    // โหลดข้อมูล High Voltage
+    if (parsed.highVoltageDistance !== undefined) setHighVoltageDistance(parsed.highVoltageDistance);
+    if (parsed.highVoltageSystem !== undefined) setHighVoltageSystem(parsed.highVoltageSystem);
+    // โหลดข้อมูล MDB
+    if (parsed.mccbMainBrand !== undefined) setMccbMainBrand(parsed.mccbMainBrand);
+    if (parsed.mccbSubBrand !== undefined) setMccbSubBrand(parsed.mccbSubBrand);
+    if (parsed.mdbConfiguration) setMdbConfiguration(parsed.mdbConfiguration);
+    if (parsed.mdbSelection !== undefined) setMdbSelection(parsed.mdbSelection);
+    if (parsed.trMdbSelection !== undefined) setTrMdbSelection(parsed.trMdbSelection);
+    if (parsed.installationLocation !== undefined) setInstallationLocation(parsed.installationLocation);
+    if (parsed.installationLocationBrand !== undefined) setInstallationLocationBrand(parsed.installationLocationBrand);
+    // โหลดข้อมูล Parking & Roof
+    if (parsed.parkingSlots !== undefined) setParkingSlots(parsed.parkingSlots);
+    if (parsed.floorPainting !== undefined) setFloorPainting(parsed.floorPainting);
+    if (parsed.roofCoverType !== undefined) setRoofCoverType(parsed.roofCoverType);
+    if (parsed.roofCoverWidth !== undefined) setRoofCoverWidth(parsed.roofCoverWidth);
+    if (parsed.roofCoverLength !== undefined) setRoofCoverLength(parsed.roofCoverLength);
+    if (parsed.roofCoverM2 !== undefined) setRoofCoverM2(parsed.roofCoverM2);
+    if (parsed.mdbRoof !== undefined) setMdbRoof(parsed.mdbRoof);
+    if (parsed.mdbRoofType !== undefined) setMdbRoofType(parsed.mdbRoofType);
+    if (parsed.mdbRoofWidth !== undefined) setMdbRoofWidth(parsed.mdbRoofWidth);
+    if (parsed.mdbRoofLength !== undefined) setMdbRoofLength(parsed.mdbRoofLength);
+    if (parsed.mdbRoofM2 !== undefined) setMdbRoofM2(parsed.mdbRoofM2);
+    if (parsed.chargerRoofType !== undefined) setChargerRoofType(parsed.chargerRoofType);
+    // โหลดข้อมูล Travel & Training
+    if (parsed.travelType !== undefined) setTravelType(parsed.travelType);
+    if (parsed.travelDistance !== undefined) setTravelDistance(parsed.travelDistance);
+    if (parsed.installationTravelDistance !== undefined) setInstallationTravelDistance(parsed.installationTravelDistance);
+    if (parsed.travelCostResult !== undefined) setTravelCostResult(parsed.travelCostResult);
+    if (parsed.installationTravelCost !== undefined) setInstallationTravelCost(parsed.installationTravelCost);
+    if (parsed.constructionTravelCost !== undefined) setConstructionTravelCost(parsed.constructionTravelCost);
+    if (parsed.trainingWork !== undefined) setTrainingWork(parsed.trainingWork);
+    // โหลดข้อมูล Additional Features
+    if (parsed.additionalSelection !== undefined) setAdditionalSelection(parsed.additionalSelection);
+    if (parsed.equipmentSelection !== undefined) setEquipmentSelection(parsed.equipmentSelection);
+    if (parsed.communicationSelection !== undefined) setCommunicationSelection(parsed.communicationSelection);
+    if (parsed.concreteSelection !== undefined) setConcreteSelection(parsed.concreteSelection);
+    if (parsed.paintingSelection !== undefined) setPaintingSelection(parsed.paintingSelection);
+    // Section 1: อุปกรณ์ประกอบสถานี
+    if (parsed.bumperPoles !== undefined) setBumperPoles(parsed.bumperPoles);
+    if (parsed.wheelStops !== undefined) setWheelStops(parsed.wheelStops);
+    if (parsed.fireExtinguisherCabinet !== undefined) setFireExtinguisherCabinet(parsed.fireExtinguisherCabinet);
+    if (parsed.signage !== undefined) setSignage(parsed.signage);
+    if (parsed.routerType !== undefined) setRouterType(parsed.routerType);
+    if (parsed.routerCableDistance !== undefined) setRouterCableDistance(parsed.routerCableDistance);
+    if (parsed.cctvCableDistance !== undefined) setCctvCableDistance(parsed.cctvCableDistance);
+    if (parsed.lightingCableDistance !== undefined) setLightingCableDistance(parsed.lightingCableDistance);
+    if (parsed.bumperPoleMaterial !== undefined) setBumperPoleMaterial(parsed.bumperPoleMaterial);
+    if (parsed.wheelStopMaterial !== undefined) setWheelStopMaterial(parsed.wheelStopMaterial);
+    // Section 2: ระบบสื่อสาร
+    if (parsed.wifi4gHub !== undefined) setWifi4gHub(parsed.wifi4gHub);
+    if (parsed.cctv !== undefined) setCctv(parsed.cctv);
+    if (parsed.lighting !== undefined) setLighting(parsed.lighting);
+    // Section 3: งานปูน
+    if (parsed.mdbConcreteBase !== undefined) setMdbConcreteBase(parsed.mdbConcreteBase);
+    if (parsed.chargerConcreteBase !== undefined) setChargerConcreteBase(parsed.chargerConcreteBase);
+    if (parsed.parkingConcreteFloor !== undefined) setParkingConcreteFloor(parsed.parkingConcreteFloor);
+    if (parsed.generalConcreteFloor !== undefined) setGeneralConcreteFloor(parsed.generalConcreteFloor);
+    if (parsed.generalConcreteFloorArea !== undefined) setGeneralConcreteFloorArea(parsed.generalConcreteFloorArea);
+    // Section 4: งานขุดดิน
+    if (parsed.excavationSelection !== undefined) setExcavationSelection(parsed.excavationSelection);
+    if (parsed.excavation30cm !== undefined) setExcavation30cm(parsed.excavation30cm);
+    if (parsed.excavation60cm !== undefined) setExcavation60cm(parsed.excavation60cm);
+    if (parsed.excavation10cm !== undefined) setExcavation10cm(parsed.excavation10cm);
+    if (parsed.excavation20cm !== undefined) setExcavation20cm(parsed.excavation20cm);
+    if (parsed.excavation30cmFloor !== undefined) setExcavation30cmFloor(parsed.excavation30cmFloor);
+    if (parsed.excavationLevel !== undefined) setExcavationLevel(parsed.excavationLevel);
+    if (parsed.excavationFill !== undefined) setExcavationFill(parsed.excavationFill);
+    // Section 5: งานทาสีช่องจอด
+    if (parsed.parkingPaintType !== undefined) setParkingPaintType(parsed.parkingPaintType);
+    if (parsed.sideLineMarking !== undefined) setSideLineMarking(parsed.sideLineMarking);
+    if (parsed.centerPattern !== undefined) setCenterPattern(parsed.centerPattern);
+    if (parsed.centerPatternOriginal !== undefined) setCenterPatternOriginal(parsed.centerPatternOriginal);
+    if (parsed.centerPatternNew !== undefined) setCenterPatternNew(parsed.centerPatternNew);
+    // Section 5: งานป้าย
+    if (parsed.signageWorkSelection !== undefined) setSignageWorkSelection(parsed.signageWorkSelection);
+    if (parsed.signageStationType !== undefined) setSignageStationType(parsed.signageStationType);
+    // โหลดข้อมูลกำไร% และ CF%
+    if (parsed.profitPercent !== undefined) setProfitPercent(parsed.profitPercent);
+    if (parsed.cfPercent !== undefined) setCfPercent(parsed.cfPercent);
+  };
+
+  // Load data from localStorage and server
+  const loadFormData = async () => {
+    const currentCustomerCode = customerCode || props.customerCode || '';
+
+    // พยายามโหลดจากเซิร์ฟเวอร์ก่อน (ถ้ามีรหัสลูกค้า)
+    if (currentCustomerCode.trim()) {
+      try {
+        console.log('🌐 Attempting to load data from server for customer:', currentCustomerCode);
+        const response = await axios.get(`${API_BASE_URL}/load-data/${encodeURIComponent(currentCustomerCode.trim())}`);
+
+        if (response.data.success && response.data.data) {
+          const serverData = response.data.data;
+          console.log('✅ Loaded data from server:', serverData);
+
+          // โหลดข้อมูลจาก server
+          if (serverData.stationAccessory) {
+            loadParsedDataIntoState(serverData.stationAccessory);
+          } else {
+            // ถ้าไม่มี stationAccessory ให้ลองโหลดจากข้อมูลโดยตรง
+            loadParsedDataIntoState(serverData);
+          }
+
+          // บันทึกข้อมูลจาก server ลง localStorage เพื่อใช้งานแบบ offline ได้
+          if (serverData.stationAccessory) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(serverData.stationAccessory));
+          }
+
+          alert('✅ โหลดข้อมูลสำเร็จจากเซิร์ฟเวอร์!');
+          return;
+        }
+      } catch (serverError: any) {
+        console.warn('⚠️ Failed to load from server, trying localStorage:', serverError.message);
+        // ถ้าโหลดจาก server ไม่ได้ ให้โหลดจาก localStorage แทน
+      }
+    }
+
+    // Fallback: โหลดจาก localStorage
     const savedData = localStorage.getItem(STORAGE_KEY);
     if (savedData) {
       try {
         const parsed = JSON.parse(savedData);
-        // โหลดข้อมูลพื้นฐาน
-        if (parsed.customerCode) setCustomerCode(parsed.customerCode);
-        if (parsed.trDistance !== undefined) setTrDistance(parsed.trDistance);
-        if (parsed.trWiringGroup2 !== undefined) setTrWiringGroup2(parsed.trWiringGroup2);
-        if (parsed.jobName !== undefined) setJobName(parsed.jobName);
-        if (parsed.location !== undefined) setLocation(parsed.location);
-        if (parsed.salesPerson !== undefined) setSalesPerson(parsed.salesPerson);
-        // โหลดข้อมูล Charger
-        if (parsed.chargerLineDistances) setChargerLineDistances(parsed.chargerLineDistances);
-        if (parsed.chargerConduitChoices) setChargerConduitChoices(parsed.chargerConduitChoices);
-        if (parsed.chargerResults) setChargerResults(parsed.chargerResults);
-        if (parsed.chargerSelection !== undefined) setChargerSelection(parsed.chargerSelection);
-        // โหลดข้อมูล Transformer
-        if (parsed.transformerSelection !== undefined) setTransformerSelection(parsed.transformerSelection);
-        if (parsed.transformerType !== undefined) setTransformerType(parsed.transformerType);
-        if (parsed.transformerPrice) setTransformerPrice(parsed.transformerPrice);
-        if (parsed.lowVoltageRequest !== undefined) setLowVoltageRequest(parsed.lowVoltageRequest);
-        if (parsed.lowVoltageDistance2 !== undefined) setLowVoltageDistance2(parsed.lowVoltageDistance2);
-        if (parsed.lowVoltageDistance3 !== undefined) setLowVoltageDistance3(parsed.lowVoltageDistance3);
-        // โหลดข้อมูล High Voltage
-        if (parsed.highVoltageDistance !== undefined) setHighVoltageDistance(parsed.highVoltageDistance);
-        if (parsed.highVoltageSystem !== undefined) setHighVoltageSystem(parsed.highVoltageSystem);
-        // โหลดข้อมูล MDB
-        if (parsed.mccbMainBrand !== undefined) setMccbMainBrand(parsed.mccbMainBrand);
-        if (parsed.mccbSubBrand !== undefined) setMccbSubBrand(parsed.mccbSubBrand);
-        if (parsed.mdbConfiguration) setMdbConfiguration(parsed.mdbConfiguration);
-        if (parsed.mdbSelection !== undefined) setMdbSelection(parsed.mdbSelection);
-        if (parsed.trMdbSelection !== undefined) setTrMdbSelection(parsed.trMdbSelection);
-        if (parsed.installationLocation !== undefined) setInstallationLocation(parsed.installationLocation);
-        if (parsed.installationLocationBrand !== undefined) setInstallationLocationBrand(parsed.installationLocationBrand);
-        // โหลดข้อมูล Parking & Roof
-        if (parsed.parkingSlots !== undefined) setParkingSlots(parsed.parkingSlots);
-        if (parsed.floorPainting !== undefined) setFloorPainting(parsed.floorPainting);
-        if (parsed.roofCoverType !== undefined) setRoofCoverType(parsed.roofCoverType);
-        if (parsed.roofCoverWidth !== undefined) setRoofCoverWidth(parsed.roofCoverWidth);
-        if (parsed.roofCoverLength !== undefined) setRoofCoverLength(parsed.roofCoverLength);
-        if (parsed.roofCoverM2 !== undefined) setRoofCoverM2(parsed.roofCoverM2);
-        if (parsed.mdbRoof !== undefined) setMdbRoof(parsed.mdbRoof);
-        if (parsed.mdbRoofType !== undefined) setMdbRoofType(parsed.mdbRoofType);
-        if (parsed.mdbRoofWidth !== undefined) setMdbRoofWidth(parsed.mdbRoofWidth);
-        if (parsed.mdbRoofLength !== undefined) setMdbRoofLength(parsed.mdbRoofLength);
-        if (parsed.mdbRoofM2 !== undefined) setMdbRoofM2(parsed.mdbRoofM2);
-        if (parsed.chargerRoofType !== undefined) setChargerRoofType(parsed.chargerRoofType);
-        // โหลดข้อมูล Travel & Training
-        if (parsed.travelType !== undefined) setTravelType(parsed.travelType);
-        if (parsed.travelDistance !== undefined) setTravelDistance(parsed.travelDistance);
-        if (parsed.installationTravelDistance !== undefined) setInstallationTravelDistance(parsed.installationTravelDistance);
-        if (parsed.travelCostResult !== undefined) setTravelCostResult(parsed.travelCostResult);
-        if (parsed.installationTravelCost !== undefined) setInstallationTravelCost(parsed.installationTravelCost);
-        if (parsed.constructionTravelCost !== undefined) setConstructionTravelCost(parsed.constructionTravelCost);
-        if (parsed.trainingWork !== undefined) setTrainingWork(parsed.trainingWork);
-        // โหลดข้อมูล Additional Features
-        if (parsed.additionalSelection !== undefined) setAdditionalSelection(parsed.additionalSelection);
-        if (parsed.equipmentSelection !== undefined) setEquipmentSelection(parsed.equipmentSelection);
-        if (parsed.communicationSelection !== undefined) setCommunicationSelection(parsed.communicationSelection);
-        if (parsed.concreteSelection !== undefined) setConcreteSelection(parsed.concreteSelection);
-        if (parsed.paintingSelection !== undefined) setPaintingSelection(parsed.paintingSelection);
-        // Section 1: อุปกรณ์ประกอบสถานี
-        if (parsed.bumperPoles !== undefined) setBumperPoles(parsed.bumperPoles);
-        if (parsed.wheelStops !== undefined) setWheelStops(parsed.wheelStops);
-        if (parsed.fireExtinguisherCabinet !== undefined) setFireExtinguisherCabinet(parsed.fireExtinguisherCabinet);
-        if (parsed.signage !== undefined) setSignage(parsed.signage);
-        if (parsed.routerType !== undefined) setRouterType(parsed.routerType);
-        if (parsed.routerCableDistance !== undefined) setRouterCableDistance(parsed.routerCableDistance);
-        if (parsed.cctvCableDistance !== undefined) setCctvCableDistance(parsed.cctvCableDistance);
-        if (parsed.lightingCableDistance !== undefined) setLightingCableDistance(parsed.lightingCableDistance);
-        if (parsed.bumperPoleMaterial !== undefined) setBumperPoleMaterial(parsed.bumperPoleMaterial);
-        if (parsed.wheelStopMaterial !== undefined) setWheelStopMaterial(parsed.wheelStopMaterial);
-        // Section 2: ระบบสื่อสาร
-        if (parsed.wifi4gHub !== undefined) setWifi4gHub(parsed.wifi4gHub);
-        if (parsed.cctv !== undefined) setCctv(parsed.cctv);
-        if (parsed.lighting !== undefined) setLighting(parsed.lighting);
-        // Section 3: งานปูน
-        if (parsed.mdbConcreteBase !== undefined) setMdbConcreteBase(parsed.mdbConcreteBase);
-        if (parsed.chargerConcreteBase !== undefined) setChargerConcreteBase(parsed.chargerConcreteBase);
-        if (parsed.parkingConcreteFloor !== undefined) setParkingConcreteFloor(parsed.parkingConcreteFloor);
-        if (parsed.generalConcreteFloor !== undefined) setGeneralConcreteFloor(parsed.generalConcreteFloor);
-        if (parsed.generalConcreteFloorArea !== undefined) setGeneralConcreteFloorArea(parsed.generalConcreteFloorArea);
-        // Section 4: งานขุดดิน
-        if (parsed.excavationSelection !== undefined) setExcavationSelection(parsed.excavationSelection);
-        if (parsed.excavation30cm !== undefined) setExcavation30cm(parsed.excavation30cm);
-        if (parsed.excavation60cm !== undefined) setExcavation60cm(parsed.excavation60cm);
-        if (parsed.excavation10cm !== undefined) setExcavation10cm(parsed.excavation10cm);
-        if (parsed.excavation20cm !== undefined) setExcavation20cm(parsed.excavation20cm);
-        if (parsed.excavation30cmFloor !== undefined) setExcavation30cmFloor(parsed.excavation30cmFloor);
-        if (parsed.excavationLevel !== undefined) setExcavationLevel(parsed.excavationLevel);
-        if (parsed.excavationFill !== undefined) setExcavationFill(parsed.excavationFill);
-        // Section 5: งานทาสีช่องจอด
-        if (parsed.parkingPaintType !== undefined) setParkingPaintType(parsed.parkingPaintType);
-        if (parsed.sideLineMarking !== undefined) setSideLineMarking(parsed.sideLineMarking);
-        if (parsed.centerPattern !== undefined) setCenterPattern(parsed.centerPattern);
-        if (parsed.centerPatternOriginal !== undefined) setCenterPatternOriginal(parsed.centerPatternOriginal);
-        if (parsed.centerPatternNew !== undefined) setCenterPatternNew(parsed.centerPatternNew);
-        // Section 5: งานป้าย
-        if (parsed.signageWorkSelection !== undefined) setSignageWorkSelection(parsed.signageWorkSelection);
-        if (parsed.signageStationType !== undefined) setSignageStationType(parsed.signageStationType);
-        alert('✅ โหลดข้อมูลสำเร็จ!');
+        loadParsedDataIntoState(parsed);
+        alert('✅ โหลดข้อมูลสำเร็จจากเครื่อง!');
         console.log('📂 Loaded data from localStorage:', parsed);
       } catch (error) {
-        console.error('❌ Error loading data:', error);
+        console.error('❌ Error loading data from localStorage:', error);
         alert('❌ เกิดข้อผิดพลาดในการโหลดข้อมูล');
       }
     } else {
@@ -549,114 +627,49 @@ function MoreDetailCard(props: any) {
   // Load saved data on mount
   useEffect(() => {
     console.log('🔍 MoreDetailCard mount - Loading saved data...');
+
+    // โหลดข้อมูลจาก localStorage ก่อน (เพื่อใช้เป็น fallback)
     const savedData = localStorage.getItem(STORAGE_KEY);
     if (savedData) {
       try {
         const parsed = JSON.parse(savedData);
-        console.log('📂 Found saved data:', parsed);
+        console.log('📂 Found saved data in localStorage:', parsed);
 
         // โหลดข้อมูลพื้นฐาน
         if (parsed.customerCode) {
           setCustomerCode(parsed.customerCode);
-          console.log('✅ Loaded customerCode:', parsed.customerCode);
+          console.log('✅ Loaded customerCode from localStorage:', parsed.customerCode);
+
+          // พยายามโหลดจากเซิร์ฟเวอร์หลังจากได้ customerCode แล้ว
+          (async () => {
+            try {
+              console.log('🌐 Attempting to load data from server for customer:', parsed.customerCode);
+              const response = await axios.get(`${API_BASE_URL}/load-data/${encodeURIComponent(parsed.customerCode.trim())}`);
+
+              if (response.data.success && response.data.data) {
+                const serverData = response.data.data;
+                console.log('✅ Loaded data from server on mount:', serverData);
+
+                // โหลดข้อมูลจาก server (จะทับข้อมูลจาก localStorage ถ้ามีข้อมูลใหม่กว่า)
+                if (serverData.stationAccessory) {
+                  loadParsedDataIntoState(serverData.stationAccessory);
+                  // อัพเดท localStorage ด้วยข้อมูลจาก server
+                  localStorage.setItem(STORAGE_KEY, JSON.stringify(serverData.stationAccessory));
+                } else {
+                  loadParsedDataIntoState(serverData);
+                  localStorage.setItem(STORAGE_KEY, JSON.stringify(serverData));
+                }
+              }
+            } catch (serverError: any) {
+              console.warn('⚠️ Failed to load from server on mount, using localStorage data:', serverError.message);
+              // ใช้ข้อมูลจาก localStorage ที่โหลดไว้แล้ว
+              loadParsedDataIntoState(parsed);
+            }
+          })();
+        } else {
+          // ถ้าไม่มี customerCode ใน localStorage ให้โหลดข้อมูลตามปกติ
+          loadParsedDataIntoState(parsed);
         }
-        if (parsed.trDistance !== undefined) setTrDistance(parsed.trDistance);
-        if (parsed.trWiringGroup2 !== undefined) setTrWiringGroup2(parsed.trWiringGroup2);
-        if (parsed.jobName !== undefined) setJobName(parsed.jobName);
-        if (parsed.location !== undefined) setLocation(parsed.location);
-        if (parsed.salesPerson !== undefined) setSalesPerson(parsed.salesPerson);
-        // โหลดข้อมูล Charger
-        if (parsed.chargerLineDistances) setChargerLineDistances(parsed.chargerLineDistances);
-        if (parsed.chargerConduitChoices) setChargerConduitChoices(parsed.chargerConduitChoices);
-        if (parsed.chargerResults) setChargerResults(parsed.chargerResults);
-        if (parsed.chargerSelection !== undefined) setChargerSelection(parsed.chargerSelection);
-        // โหลดข้อมูล Transformer
-        if (parsed.transformerSelection !== undefined) setTransformerSelection(parsed.transformerSelection);
-        if (parsed.transformerType !== undefined) setTransformerType(parsed.transformerType);
-        if (parsed.transformerPrice) setTransformerPrice(parsed.transformerPrice);
-        if (parsed.lowVoltageRequest !== undefined) setLowVoltageRequest(parsed.lowVoltageRequest);
-        if (parsed.lowVoltageDistance2 !== undefined) setLowVoltageDistance2(parsed.lowVoltageDistance2);
-        if (parsed.lowVoltageDistance3 !== undefined) setLowVoltageDistance3(parsed.lowVoltageDistance3);
-        // โหลดข้อมูล High Voltage
-        if (parsed.highVoltageDistance !== undefined) setHighVoltageDistance(parsed.highVoltageDistance);
-        if (parsed.highVoltageSystem !== undefined) setHighVoltageSystem(parsed.highVoltageSystem);
-        // โหลดข้อมูล MDB
-        if (parsed.mccbMainBrand !== undefined) setMccbMainBrand(parsed.mccbMainBrand);
-        if (parsed.mccbSubBrand !== undefined) setMccbSubBrand(parsed.mccbSubBrand);
-        if (parsed.mdbConfiguration) setMdbConfiguration(parsed.mdbConfiguration);
-        if (parsed.mdbSelection !== undefined) setMdbSelection(parsed.mdbSelection);
-        if (parsed.trMdbSelection !== undefined) setTrMdbSelection(parsed.trMdbSelection);
-        if (parsed.installationLocation !== undefined) setInstallationLocation(parsed.installationLocation);
-        if (parsed.installationLocationBrand !== undefined) setInstallationLocationBrand(parsed.installationLocationBrand);
-        // โหลดข้อมูล Parking & Roof
-        if (parsed.parkingSlots !== undefined) setParkingSlots(parsed.parkingSlots);
-        if (parsed.floorPainting !== undefined) setFloorPainting(parsed.floorPainting);
-        if (parsed.roofCoverType !== undefined) setRoofCoverType(parsed.roofCoverType);
-        if (parsed.roofCoverWidth !== undefined) setRoofCoverWidth(parsed.roofCoverWidth);
-        if (parsed.roofCoverLength !== undefined) setRoofCoverLength(parsed.roofCoverLength);
-        if (parsed.roofCoverM2 !== undefined) setRoofCoverM2(parsed.roofCoverM2);
-        if (parsed.mdbRoof !== undefined) setMdbRoof(parsed.mdbRoof);
-        if (parsed.mdbRoofType !== undefined) setMdbRoofType(parsed.mdbRoofType);
-        if (parsed.mdbRoofWidth !== undefined) setMdbRoofWidth(parsed.mdbRoofWidth);
-        if (parsed.mdbRoofLength !== undefined) setMdbRoofLength(parsed.mdbRoofLength);
-        if (parsed.mdbRoofM2 !== undefined) setMdbRoofM2(parsed.mdbRoofM2);
-        if (parsed.chargerRoofType !== undefined) setChargerRoofType(parsed.chargerRoofType);
-        // โหลดข้อมูล Travel & Training
-        if (parsed.travelType !== undefined) setTravelType(parsed.travelType);
-        if (parsed.travelDistance !== undefined) setTravelDistance(parsed.travelDistance);
-        if (parsed.installationTravelDistance !== undefined) setInstallationTravelDistance(parsed.installationTravelDistance);
-        if (parsed.travelCostResult !== undefined) setTravelCostResult(parsed.travelCostResult);
-        if (parsed.installationTravelCost !== undefined) setInstallationTravelCost(parsed.installationTravelCost);
-        if (parsed.constructionTravelCost !== undefined) setConstructionTravelCost(parsed.constructionTravelCost);
-        if (parsed.trainingWork !== undefined) setTrainingWork(parsed.trainingWork);
-        // โหลดข้อมูล Additional Features
-        if (parsed.additionalSelection !== undefined) setAdditionalSelection(parsed.additionalSelection);
-        if (parsed.equipmentSelection !== undefined) setEquipmentSelection(parsed.equipmentSelection);
-        if (parsed.communicationSelection !== undefined) setCommunicationSelection(parsed.communicationSelection);
-        if (parsed.concreteSelection !== undefined) setConcreteSelection(parsed.concreteSelection);
-        if (parsed.paintingSelection !== undefined) setPaintingSelection(parsed.paintingSelection);
-        // Section 1: อุปกรณ์ประกอบสถานี
-        if (parsed.bumperPoles !== undefined) setBumperPoles(parsed.bumperPoles);
-        if (parsed.wheelStops !== undefined) setWheelStops(parsed.wheelStops);
-        if (parsed.fireExtinguisherCabinet !== undefined) setFireExtinguisherCabinet(parsed.fireExtinguisherCabinet);
-        if (parsed.signage !== undefined) setSignage(parsed.signage);
-        if (parsed.routerType !== undefined) setRouterType(parsed.routerType);
-        if (parsed.routerCableDistance !== undefined) setRouterCableDistance(parsed.routerCableDistance);
-        if (parsed.cctvCableDistance !== undefined) setCctvCableDistance(parsed.cctvCableDistance);
-        if (parsed.lightingCableDistance !== undefined) setLightingCableDistance(parsed.lightingCableDistance);
-        if (parsed.bumperPoleMaterial !== undefined) setBumperPoleMaterial(parsed.bumperPoleMaterial);
-        if (parsed.wheelStopMaterial !== undefined) setWheelStopMaterial(parsed.wheelStopMaterial);
-        // Section 2: ระบบสื่อสาร
-        if (parsed.wifi4gHub !== undefined) setWifi4gHub(parsed.wifi4gHub);
-        if (parsed.cctv !== undefined) setCctv(parsed.cctv);
-        if (parsed.lighting !== undefined) setLighting(parsed.lighting);
-        // Section 3: งานปูน
-        if (parsed.mdbConcreteBase !== undefined) setMdbConcreteBase(parsed.mdbConcreteBase);
-        if (parsed.chargerConcreteBase !== undefined) setChargerConcreteBase(parsed.chargerConcreteBase);
-        if (parsed.parkingConcreteFloor !== undefined) setParkingConcreteFloor(parsed.parkingConcreteFloor);
-        if (parsed.generalConcreteFloor !== undefined) setGeneralConcreteFloor(parsed.generalConcreteFloor);
-        if (parsed.generalConcreteFloorArea !== undefined) setGeneralConcreteFloorArea(parsed.generalConcreteFloorArea);
-        // Section 4: งานขุดดิน
-        if (parsed.excavationSelection !== undefined) setExcavationSelection(parsed.excavationSelection);
-        if (parsed.excavation30cm !== undefined) setExcavation30cm(parsed.excavation30cm);
-        if (parsed.excavation60cm !== undefined) setExcavation60cm(parsed.excavation60cm);
-        if (parsed.excavation10cm !== undefined) setExcavation10cm(parsed.excavation10cm);
-        if (parsed.excavation20cm !== undefined) setExcavation20cm(parsed.excavation20cm);
-        if (parsed.excavation30cmFloor !== undefined) setExcavation30cmFloor(parsed.excavation30cmFloor);
-        if (parsed.excavationLevel !== undefined) setExcavationLevel(parsed.excavationLevel);
-        if (parsed.excavationFill !== undefined) setExcavationFill(parsed.excavationFill);
-        // Section 5: งานทาสีช่องจอด
-        if (parsed.parkingPaintType !== undefined) setParkingPaintType(parsed.parkingPaintType);
-        if (parsed.sideLineMarking !== undefined) setSideLineMarking(parsed.sideLineMarking);
-        if (parsed.centerPattern !== undefined) setCenterPattern(parsed.centerPattern);
-        if (parsed.centerPatternOriginal !== undefined) setCenterPatternOriginal(parsed.centerPatternOriginal);
-        if (parsed.centerPatternNew !== undefined) setCenterPatternNew(parsed.centerPatternNew);
-        // Section 5: งานป้าย
-        if (parsed.signageWorkSelection !== undefined) setSignageWorkSelection(parsed.signageWorkSelection);
-        if (parsed.signageStationType !== undefined) setSignageStationType(parsed.signageStationType);
-        // โหลดข้อมูลกำไร% และ CF%
-        if (parsed.profitPercent !== undefined) setProfitPercent(parsed.profitPercent);
-        if (parsed.cfPercent !== undefined) setCfPercent(parsed.cfPercent);
 
         console.log('✅ Loaded all saved data from localStorage');
         console.log('🔍 Debug - Loaded values:', {
