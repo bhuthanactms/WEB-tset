@@ -1,6 +1,6 @@
 # EV station Calculator
 
-A Python-based web application for calculating evaporative cooling requirements using Streamlit.
+A web application with a React frontend and an Express + Prisma backend for storing data in PostgreSQL.
 
 ## Features
 
@@ -13,16 +13,16 @@ A Python-based web application for calculating evaporative cooling requirements 
 ## Installation
 
 1. Clone this repository
-2. Install the required packages:
+2. Install Node dependencies:
    ```
-   pip install -r requirements.txt
+   npm install
    ```
 
 ## Usage
 
-Run the application:
+Start the API server:
 ```
-streamlit run app.py
+npm run api
 ```
 
 ## Demo Accounts
@@ -63,10 +63,10 @@ streamlit run app.py
 
 ## Technologies Used
 
-- Python
-- Streamlit
-- FPDF2 for PDF generation
-- Pandas for data handling
+- React
+- Express
+- Prisma
+- PostgreSQL
 - Custom CSS for styling
 
 ## Development

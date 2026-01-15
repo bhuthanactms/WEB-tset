@@ -38,3 +38,5 @@ ENV/
 .env
 .env.local
 .env.*.local
+
+/src/generated/prisma

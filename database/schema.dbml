@@ -1,0 +1,40 @@
+// PostgreSQL Database Schema for EV Station Calculator
+// DBML (Database Markup Language) Schema
+// Generated from database/schema.sql
+
+// ตารางสำหรับเก็บข้อมูลหลักของลูกค้า
+Table customer_data {
+  id serial [pk, increment]
+  customer_code varchar(255) [unique, not null]
+  data jsonb [not null, note: 'เก็บข้อมูลทั้งหมดเป็น JSON']
+  saved_at timestamp [default: `CURRENT_TIMESTAMP`]
+  last_updated timestamp [default: `CURRENT_TIMESTAMP`]
+  created_at timestamp [default: `CURRENT_TIMESTAMP`]
+  
+  Note: 'ข้อมูลหลักของลูกค้า - เก็บข้อมูล Home และ StationAccessory รวมกัน'
+  
+  indexes {
+    customer_code [name: 'idx_customer_code']
+    last_updated [name: 'idx_last_updated', type: desc]
+  }
+}
+
+// ตารางสำหรับเก็บประวัติการบันทึก (History)
+Table customer_history {
+  id serial [pk, increment]
+  customer_code varchar(255) [not null]
+  data jsonb [not null, note: 'เก็บข้อมูลประวัติการบันทึก']
+  saved_at timestamp [default: `CURRENT_TIMESTAMP`]
+  
+  Note: 'ประวัติการบันทึกข้อมูล - ใช้สำหรับเก็บ version history'
+  
+  indexes {
+    customer_code [name: 'idx_history_customer_code']
+    saved_at [name: 'idx_history_saved_at', type: desc]
+  }
+}
+
+// หมายเหตุ:
+// - JSONB เป็นประเภทข้อมูลที่เหมาะสมสำหรับเก็บข้อมูล JSON ที่มีโครงสร้างยืดหยุ่น
+// - JSONB รองรับการ query และ index ได้ดีกว่า JSON
+// - Trigger update_last_updated() จะอัพเดท last_updated อัตโนมัติเมื่อมีการ UPDATE

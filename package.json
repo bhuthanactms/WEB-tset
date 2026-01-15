@@ -6,7 +6,12 @@
     "dev": "node scripts/build.mjs",
     "build": "node scripts/build.mjs --production",
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist"
+    "deploy": "gh-pages -d dist",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev --name init",
+    "prisma:db-push": "prisma db push",
+    "prisma:studio": "prisma studio",
+    "api": "node server/index.js"
   },
   "dependencies": {
     "@azure/msal-browser": "^4.22.1",
@@ -39,6 +44,7 @@
     "@radix-ui/react-toggle": "^1.1.6",
     "@radix-ui/react-toggle-group": "^1.1.7",
     "@radix-ui/react-tooltip": "^1.2.4",
+    "@prisma/client": "^6.2.1",
     "@types/jspdf": "latest",
     "@types/node": "^24.3.1",
     "axios": "^1.11.0",
@@ -70,6 +76,9 @@
     "recharts": "^2.15.3",
     "sonner": "^2.0.3",
     "tailwind-merge": "^3.2.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.19.2",
+    "cors": "^2.8.5",
     "vaul": "^1.1.2",
     "xlsx": "^0.18.5",
     "zod": "^3.24.3",
@@ -83,6 +92,7 @@
     "esbuild": "^0.25.4",
     "esbuild-style-plugin": "^1.6.3",
     "postcss": "^8.5.3",
+    "prisma": "^6.2.1",
     "rimraf": "^6.0.1",
     "tailwindcss": "^3.4.17",
     "tailwindcss-animate": "^1.0.7"

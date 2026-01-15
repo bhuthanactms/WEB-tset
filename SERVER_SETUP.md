@@ -8,17 +8,17 @@
 
 ## การติดตั้งและใช้งาน
 
-### 1. ติดตั้ง Python dependencies
+### 1. ติดตั้ง Node dependencies
 ```bash
-pip install -r requirements.txt
+npm install
 ```
 
-### 2. เริ่มต้น Flask Server
+### 2. เริ่มต้น Express API Server
 ```bash
-python app.py
+npm run api
 ```
 
-Server จะรันที่ `http://localhost:5000`
+Server จะรันที่ `http://localhost:8000`
 
 ### 3. เปิดเว็บแอปพลิเคชัน
 เปิดเว็บแอปพลิเคชันในเบราว์เซอร์ตามปกติ

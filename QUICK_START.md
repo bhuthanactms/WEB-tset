@@ -4,19 +4,19 @@
 
 ## 📝 ขั้นตอนที่ 1: สร้างฐานข้อมูล (2 นาที)
 
-1. เปิด **pgAdmin 4**
-2. คลิกขวาที่ **Databases** → **Create** → **Database...**
-3. ตั้งชื่อ: `ev_station_db`
-4. คลิก **Save**
+1. เปิด **DBeaver**
+2. เปิด SQL Editor ที่ connection ของ PostgreSQL
+3. รันคำสั่ง: `CREATE DATABASE ev_station_db;`
+4. Refresh แล้วเห็นฐานข้อมูลใหม่
 
 ## 📝 ขั้นตอนที่ 2: สร้างตาราง (1 นาที)
 
-1. ใน pgAdmin 4: คลิกขวาที่ฐานข้อมูล `ev_station_db` → **Query Tool**
+1. ใน DBeaver: เลือกฐานข้อมูล `ev_station_db` → SQL Editor
 2. เปิดไฟล์ `database/schema.sql` ด้วยโปรแกรม Text Editor (เช่น Notepad++)
 3. **คัดลอกเนื้อหาทั้งหมด** (ยกเว้นบรรทัดที่มี `CREATE DATABASE` และ `\c`)
-4. **วางใน Query Tool**
-5. กด **F5** หรือคลิกปุ่ม **Execute (▶)**
-6. ควรเห็น "Query returned successfully" ✅
+4. **วางใน SQL Editor**
+5. กด **Execute (▶)**
+6. ควรเห็นว่ารันสำเร็จ ✅
 
 ## 📝 ขั้นตอนที่ 3: ตั้งค่าเชื่อมต่อ (1 นาที)
 
@@ -35,10 +35,10 @@
 python database/migrate_from_json.py
 ```
 
-## 📝 ขั้นตอนที่ 5: เริ่มใช้งาน
+## 📝 ขั้นตอนที่ 5: เริ่มใช้งาน (Express API)
 
 ```bash
-python app.py
+npm run api
 ```
 
 เปิดเบราว์เซอร์ไปที่: `http://localhost:8000/api/health`
