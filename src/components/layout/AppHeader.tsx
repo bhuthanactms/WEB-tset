@@ -209,11 +209,42 @@ export default function AppHeader(): React.JSX.Element {
   }
 
   const handleBack = () => {
-    window.history.back()
+    // ถ้าอยู่ที่หน้า Station Accessory ให้ navigate ไปหน้า Home โดยตรง
+    if (location.pathname === '/station-accessory') {
+      console.log('🔙 Back button clicked - Navigating to Home')
+      // เปลี่ยน hash เป็น #/ ก่อน
+      window.location.hash = '#/'
+      // ตรวจสอบว่าหน้าเปลี่ยนหรือไม่หลังจาก 100ms
+      // ถ้ายังไม่เปลี่ยน ให้ reload เพื่อให้แน่ใจว่าหน้าเปลี่ยน
+      setTimeout(() => {
+        // ถ้า hash เปลี่ยนเป็น #/ แล้ว แต่ component ยังไม่ re-render
+        // ให้ reload เพื่อ force navigation
+        const currentHash = window.location.hash
+        if (currentHash === '#/' || currentHash === '') {
+          // Hash เปลี่ยนแล้ว แต่ component อาจจะยังไม่ re-render
+          // ให้ reload เพื่อให้แน่ใจว่าหน้าเปลี่ยน
+          console.log('⚠️ Hash changed but component may not re-render, reloading')
+          window.location.reload()
+        }
+      }, 100)
+    } else {
+      // ถ้าอยู่ที่หน้า Home หรือหน้าอื่น ให้ย้อนกลับตามประวัติ
+      window.history.back()
+    }
   }
 
   const handleForward = () => {
-    window.history.forward()
+    // ตรวจสอบว่ามี history ให้ forward หรือไม่
+    // ถ้าอยู่ที่หน้า Home และมี history ต่อไป ให้ forward ตามปกติ
+    // ถ้าอยู่ที่หน้า Station Accessory แล้ว forward ไม่ควรทำอะไร (ไม่มีหน้าต่อไป)
+    if (location.pathname === '/station-accessory') {
+      console.log('➡️ Forward button clicked - Already at Station Accessory, no forward available')
+      // อยู่ที่หน้าสุดท้ายแล้ว ไม่สามารถ forward ได้
+      return
+    } else {
+      // Forward ตามประวัติของ browser
+      window.history.forward()
+    }
   }
 
   const handleGoHome = () => {

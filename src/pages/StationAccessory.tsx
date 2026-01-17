@@ -191,9 +191,14 @@ function MoreDetailCard(props: any) {
 
   // Save/Load functionality
   const STORAGE_KEY = 'ev_station_accessory_form_data';
-  // ใช้ window.location เพื่อหา base URL อัตโนมัติ (ใช้ hostname เดียวกัน แต่ port 8000 สำหรับ API)
+  // ใช้ meta tag หรือ window.location เพื่อหา base URL อัตโนมัติ (default: port 8000 สำหรับ API)
   const getApiBaseUrl = () => {
     if (typeof window !== 'undefined') {
+      const meta = document.querySelector('meta[name="api-base-url"]');
+      const configuredBaseUrl = meta?.getAttribute('content')?.trim();
+      if (configuredBaseUrl) {
+        return configuredBaseUrl.replace(/\/$/, '');
+      }
       const hostname = window.location.hostname;
       const protocol = window.location.protocol;
       // ใช้ port 8000 สำหรับ API server (หรือใช้ port เดียวกับที่เปิดเว็บถ้าเป็น 8000)
@@ -2057,7 +2062,52 @@ function MoreDetailCard(props: any) {
 
   const transformerTotals = React.useMemo(() => {
     const emptyTotals = { material: 0, labor: 0, total: 0 };
-    const transformerSize = parseInt(props.transformer || '0', 10) || 0;
+    const isLowVoltageMeter = props.transformer === 'มิเตอร์แรงต่ำ 400 A';
+    const transformerSize = isLowVoltageMeter ? 400 : (parseInt(props.transformer || '0', 10) || 0);
+
+    // กรณี "มิเตอร์แรงต่ำ 400 A" ให้คำนวณค่าได้ทันที (ไม่ต้องเช็ค transformerSize)
+    if (isLowVoltageMeter) {
+      if (props.powerAuthority === 'MEA' && lowVoltageRequest === 'low-voltage') {
+        const lowVoltageSheet = getExcelData('ตารางระบบงานแรงสูง');
+        if (!lowVoltageSheet || lowVoltageSheet.length === 0) {
+          return emptyTotals;
+        }
+
+        const row2 = lowVoltageSheet.find((row: any) => row.__rowNum__ === 2);
+        const row3 = lowVoltageSheet.find((row: any) => row.__rowNum__ === 3);
+
+        if (!row2 || !row3) {
+          return emptyTotals;
+        }
+
+        const calculateRowTotals = (row: any, distanceValue: string) => {
+          const quantity = row.__EMPTY_3 || '';
+          const isDistance = typeof quantity === 'string' && (quantity.includes('ม.') || quantity.includes('เมตร'));
+          const distance = parseFloat(distanceValue) || 0;
+          const materialUnit = parseFloat(row.__EMPTY_4 || 0) || 0;
+          const laborUnit = parseFloat(row.__EMPTY_5 || 0) || 0;
+
+          const material = isDistance ? materialUnit * distance : materialUnit;
+          const labor = isDistance ? laborUnit * distance : laborUnit;
+
+          return {
+            material,
+            labor,
+            total: material + labor,
+          };
+        };
+
+        const row2Totals = calculateRowTotals(row2, lowVoltageDistance2);
+        const row3Totals = calculateRowTotals(row3, lowVoltageDistance3);
+
+        return {
+          material: row2Totals.material + row3Totals.material,
+          labor: row2Totals.labor + row3Totals.labor,
+          total: row2Totals.total + row3Totals.total,
+        };
+      }
+      return emptyTotals;
+    }
 
     if (!transformerSize) {
       return emptyTotals;
@@ -2870,13 +2920,16 @@ function MoreDetailCard(props: any) {
     }> = [];
 
     if (sectionKey === 'transformer') {
-      const transformerSize = parseInt(props.transformer || '0', 10) || 0;
+      const isLowVoltageMeter = props.transformer === 'มิเตอร์แรงต่ำ 400 A';
+      const transformerSize = isLowVoltageMeter ? 400 : (parseInt(props.transformer || '0', 10) || 0);
 
-      if (props.powerAuthority === 'MEA' && transformerSize <= 400 && lowVoltageRequest === 'low-voltage') {
+      // กรณี "มิเตอร์แรงต่ำ 400 A" ให้ดึงข้อมูลได้ทันที
+      if (isLowVoltageMeter && props.powerAuthority === 'MEA' && lowVoltageRequest === 'low-voltage') {
         const lowVoltageSheet = getExcelData('ตารางระบบงานแรงสูง');
         if (lowVoltageSheet && lowVoltageSheet.length > 0) {
           const row2 = lowVoltageSheet.find((row: any) => row.__rowNum__ === 2);
           const row3 = lowVoltageSheet.find((row: any) => row.__rowNum__ === 3);
+          const row4 = lowVoltageSheet.find((row: any) => row.__rowNum__ === 4);
 
           if (row2) {
             // ดึงรหัสจากคอลัมน์ "ตาราง ระบบงานแรงสูง:"
@@ -2924,10 +2977,18 @@ function MoreDetailCard(props: any) {
             const material = isDistance ? materialUnit * distance : materialUnit;
             const labor = isDistance ? laborUnit * distance : laborUnit;
 
+            // ดึงสเปคสายจาก row4 (ตามที่ใช้ในส่วนแสดงผล)
+            const cableSpec = row4?.__EMPTY || '';
+
+            // ถ้ามีสเปคสาย ให้แสดงแค่ค่าสเปคสาย
+            const productName = cableSpec
+              ? cableSpec
+              : (row3.__EMPTY || '');
+
             products.push({
-              type: 'การขอแรงต่ำ',
+              type: 'สายไฟแรงต่ำ 400 A.',
               code: code3, // รหัสจากคอลัมน์ "ตาราง ระบบงานแรงสูง:"
-              productName: row3.__EMPTY || '', // ย้ายค่าจาก code ไปที่ productName
+              productName: productName, // แสดง "สเปคสาย: [ค่า]"
               distance: isDistance ? `${distance} เมตร` : undefined,
               materialTotal: material,
               laborTotal: labor,
@@ -4687,7 +4748,7 @@ function MoreDetailCard(props: any) {
         // สำหรับหัวข้ออื่นๆ ใช้ชื่อเดิม
         let typeName = '';
         if (section.key === 'transformer') {
-          typeName = 'Transformer';
+          typeName = 'Transformer (ขนาดหม้อแปลง)';
         } else if (section.key === 'high-voltage') {
           typeName = 'ระบบแรงสูง';
         } else if (section.key === 'installation') {
@@ -5173,7 +5234,10 @@ function MoreDetailCard(props: any) {
 
     if (mccbMainBrand && props.transformer && props.getMDBConfiguration) {
 
-      const transformerSize = parseInt(props.transformer);
+      // ถ้าเป็น "มิเตอร์แรงต่ำ 400 A" ให้ใช้ 400 แทน (เพื่อดูราคาจาก 400A)
+      const transformerSize = props.transformer === 'มิเตอร์แรงต่ำ 400 A'
+        ? 400
+        : parseInt(props.transformer);
 
       if (!isNaN(transformerSize)) {
 
@@ -5238,7 +5302,7 @@ function MoreDetailCard(props: any) {
 
               <span className="font-semibold ">
                 {props.transformer === 'มิเตอร์แรงต่ำ 400 A'
-                  ? 'ขอแรงต่ำ ที่ทำกับ 400 kVA'
+                  ? 'มิเตอร์แรงต่ำ 400 A'
                   : (
                     <>
                       {props.transformer} <span className="text-sm ">kVA</span>
@@ -5371,7 +5435,7 @@ function MoreDetailCard(props: any) {
 
                     <span className="font-semibold ">
                       {props.transformer === 'มิเตอร์แรงต่ำ 400 A'
-                        ? 'ขอแรงต่ำ ที่ทำกับ 400 kVA'
+                        ? 'มิเตอร์แรงต่ำ 400 A'
                         : (
                           <>
                             {props.transformer} <span className="text-sm ">kVA</span>
@@ -6685,8 +6749,8 @@ function MoreDetailCard(props: any) {
           )}
         </CardContent>
       </Card>
-      {/* TR to MDB Configuration Card - ซ่อนเมื่อเลือก "ขอแรงต่ำ" */}
-      {!(props.powerAuthority === 'MEA' && parseInt(props.transformer || '0') <= 400 && lowVoltageRequest === 'low-voltage') && (
+      {/* TR to MDB Configuration Card - ซ่อนเมื่อเลือก "ขอแรงต่ำ" หรือ transformer เป็น "มิเตอร์แรงต่ำ 400 A" */}
+      {!(props.transformer === 'มิเตอร์แรงต่ำ 400 A' || (props.powerAuthority === 'MEA' && parseInt(props.transformer || '0') <= 400 && lowVoltageRequest === 'low-voltage')) && (
         <Card className="shadow-xl border-0 overflow-hidden mb-6">
 
           <CardHeader className="bg-gradient-to-r from-gray-50 to-blue-50 border-b">

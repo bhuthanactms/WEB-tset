@@ -1,14 +1,227 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ตารางหลักของลูกค้า
+model Customer {
+  id          Int       @id @default(autoincrement())
+  customerCode String    @unique @map("customer_code") @db.VarChar(255)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  
+  // Relations
+  home        CustomerHome?
+  stationAccessory CustomerStationAccessory?
+  history     CustomerHistory[]
+
+  @@map("customers")
+  @@index([customerCode])
+  @@index([updatedAt(sort: Desc)])
+}
+
+// ข้อมูลจากหน้า Home (EV Calculator)
+model CustomerHome {
+  id              Int      @id @default(autoincrement())
+  customerId      Int      @unique @map("customer_id")
+  customerCode    String   @map("customer_code") @db.VarChar(255)
+  
+  // ข้อมูลพื้นฐานจาก Form
+  powerAuthority  String?  @map("power_authority") @db.VarChar(50)
+  charger         String?  @db.VarChar(255)
+  numberOfChargers String? @map("number_of_chargers") @db.VarChar(50)
+  trWiringType    String?  @map("tr_wiring_type") @db.VarChar(255)
+  chargerWiringType String? @map("charger_wiring_type") @db.VarChar(255)
+  
+  // Charger Type Mode
+  chargerTypeMode String?  @map("charger_type_mode") @db.VarChar(50) // 'same' | 'any'
+  multiChargers   Json?    @map("multi_chargers") // Array of strings
+  
+  // Transformer Data
+  transformer     String?  @db.VarChar(255)
+  trWiringSize    String?  @map("tr_wiring_size") @db.VarChar(255)
+  trWireConduit   String?  @map("tr_wire_conduit") @db.VarChar(255)
+  trDistance      Decimal? @map("tr_distance") @db.Decimal(10, 2)
+  
+  // MDB Data
+  mdb             String?  @db.VarChar(255)
+  mdbMainAt       String?  @map("mdb_main_at") @db.VarChar(255)
+  mdbMainAf       String?  @map("mdb_main_af") @db.VarChar(255)
+  mdbSubs         Json?    @map("mdb_subs") // Array
+  mdbLighting     String?  @map("mdb_lighting") @db.VarChar(255)
+  mdbCommu        String?  @map("mdb_commu") @db.VarChar(255)
+  
+  // Charger Summary & Wiring
+  chargerSummary       Json? @map("charger_summary") // Array
+  chargerWiringCable   String? @map("charger_wiring_cable") @db.VarChar(255)
+  chargerWireConduit   String? @map("charger_wire_conduit") @db.VarChar(255)
+  chargerWiringCableAll Json? @map("charger_wiring_cable_all") // Array
+  chargerWireConduitAll Json? @map("charger_wire_conduit_all") // Array
+  chargerDistance      Decimal? @map("charger_distance") @db.Decimal(10, 2)
+  
+  // Calculated Results
+  results          Json? // CalculatorResults
+  
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  
+  // Relation
+  customer         Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@map("customer_homes")
+  @@index([customerCode])
+}
+
+// ข้อมูลจากหน้า Station Accessory
+model CustomerStationAccessory {
+  id              Int      @id @default(autoincrement())
+  customerId      Int      @unique @map("customer_id")
+  customerCode    String   @map("customer_code") @db.VarChar(255)
+  
+  // ข้อมูลพื้นฐาน
+  jobName         String?  @map("job_name") @db.VarChar(255)
+  location        String?  @db.VarChar(255)
+  salesPerson     String?  @map("sales_person") @db.VarChar(255)
+  trDistance      Decimal? @map("tr_distance") @db.Decimal(10, 2)
+  trWiringGroup2  String?  @map("tr_wiring_group_2") @db.VarChar(255)
+  
+  // ข้อมูล Charger
+  chargerLineDistances  Json? @map("charger_line_distances") // Array
+  chargerConduitChoices Json? @map("charger_conduit_choices") // Array
+  chargerResults        Json? @map("charger_results")
+  chargerSelection      String? @map("charger_selection") @db.VarChar(255)
+  
+  // ข้อมูล Transformer
+  transformerSelection  String? @map("transformer_selection") @db.VarChar(255)
+  transformerType       String? @map("transformer_type") @db.VarChar(255)
+  transformerPrice      Decimal? @map("transformer_price") @db.Decimal(12, 2)
+  lowVoltageRequest     String? @map("low_voltage_request") @db.VarChar(50)
+  lowVoltageDistance2   Decimal? @map("low_voltage_distance_2") @db.Decimal(10, 2)
+  lowVoltageDistance3   Decimal? @map("low_voltage_distance_3") @db.Decimal(10, 2)
+  
+  // ข้อมูล High Voltage
+  highVoltageDistance   Decimal? @map("high_voltage_distance") @db.Decimal(10, 2)
+  highVoltageSystem     String?  @map("high_voltage_system") @db.VarChar(255)
+  
+  // ข้อมูล MDB
+  mccbMainBrand     String? @map("mccb_main_brand") @db.VarChar(50)
+  mccbSubBrand      String? @map("mccb_sub_brand") @db.VarChar(50)
+  mdbConfiguration  Json?   @map("mdb_configuration")
+  mdbSelection      String? @map("mdb_selection") @db.VarChar(255)
+  trMdbSelection    String? @map("tr_mdb_selection") @db.VarChar(255)
+  installationLocation String? @map("installation_location") @db.VarChar(255)
+  installationLocationBrand String? @map("installation_location_brand") @db.VarChar(50)
+  
+  // ข้อมูล Parking & Roof
+  parkingSlots      Int?     @map("parking_slots")
+  floorPainting     String?  @map("floor_painting") @db.VarChar(255)
+  roofCoverType     String?  @map("roof_cover_type") @db.VarChar(255)
+  roofCoverWidth    Decimal? @map("roof_cover_width") @db.Decimal(10, 2)
+  roofCoverLength   Decimal? @map("roof_cover_length") @db.Decimal(10, 2)
+  roofCoverM2       Decimal? @map("roof_cover_m2") @db.Decimal(10, 2)
+  mdbRoof           String?  @map("mdb_roof") @db.VarChar(50)
+  mdbRoofType       String?  @map("mdb_roof_type") @db.VarChar(255)
+  mdbRoofWidth      Decimal? @map("mdb_roof_width") @db.Decimal(10, 2)
+  mdbRoofLength     Decimal? @map("mdb_roof_length") @db.Decimal(10, 2)
+  mdbRoofM2         Decimal? @map("mdb_roof_m2") @db.Decimal(10, 2)
+  chargerRoofType   String?  @map("charger_roof_type") @db.VarChar(255)
+  
+  // ข้อมูล Travel & Training
+  travelType                String?  @map("travel_type") @db.VarChar(50)
+  travelDistance            Decimal? @map("travel_distance") @db.Decimal(10, 2)
+  installationTravelDistance Decimal? @map("installation_travel_distance") @db.Decimal(10, 2)
+  travelCostResult          Decimal? @map("travel_cost_result") @db.Decimal(12, 2)
+  installationTravelCost    Json?    @map("installation_travel_cost")
+  constructionTravelCost    Decimal? @map("construction_travel_cost") @db.Decimal(12, 2)
+  trainingWork              String?  @map("training_work") @db.VarChar(50)
+  
+  // ข้อมูล Additional Features
+  additionalSelection       Json? @map("additional_selection")
+  equipmentSelection        Json? @map("equipment_selection")
+  communicationSelection    Json? @map("communication_selection")
+  concreteSelection         Json? @map("concrete_selection")
+  paintingSelection         Json? @map("painting_selection")
+  
+  // Section 1: อุปกรณ์ประกอบสถานี
+  bumperPoles               Int?     @map("bumper_poles")
+  wheelStops                Int?     @map("wheel_stops")
+  fireExtinguisherCabinet   String?  @map("fire_extinguisher_cabinet") @db.VarChar(50)
+  signage                   String?  @db.VarChar(50)
+  routerType                String?  @map("router_type") @db.VarChar(255)
+  routerCableDistance       Decimal? @map("router_cable_distance") @db.Decimal(10, 2)
+  cctvCableDistance         Decimal? @map("cctv_cable_distance") @db.Decimal(10, 2)
+  lightingCableDistance     Decimal? @map("lighting_cable_distance") @db.Decimal(10, 2)
+  bumperPoleMaterial        String?  @map("bumper_pole_material") @db.VarChar(50)
+  wheelStopMaterial         String?  @map("wheel_stop_material") @db.VarChar(50)
+  
+  // Section 2: ระบบสื่อสาร
+  wifi4gHub                 String?  @map("wifi_4g_hub") @db.VarChar(50)
+  cctv                      String?  @db.VarChar(50)
+  lighting                  String?  @db.VarChar(50)
+  
+  // Section 3: งานปูน
+  mdbConcreteBase           String?  @map("mdb_concrete_base") @db.VarChar(50)
+  chargerConcreteBase       String?  @map("charger_concrete_base") @db.VarChar(50)
+  parkingConcreteFloor      String?  @map("parking_concrete_floor") @db.VarChar(50)
+  generalConcreteFloor      String?  @map("general_concrete_floor") @db.VarChar(50)
+  generalConcreteFloorArea  Decimal? @map("general_concrete_floor_area") @db.Decimal(10, 2)
+  
+  // Section 4: งานขุดดิน
+  excavationSelection       Json?    @map("excavation_selection")
+  excavation30cm            Decimal? @map("excavation_30cm") @db.Decimal(10, 2)
+  excavation60cm            Decimal? @map("excavation_60cm") @db.Decimal(10, 2)
+  excavation10cm            Decimal? @map("excavation_10cm") @db.Decimal(10, 2)
+  excavation20cm            Decimal? @map("excavation_20cm") @db.Decimal(10, 2)
+  excavation30cmFloor       Decimal? @map("excavation_30cm_floor") @db.Decimal(10, 2)
+  excavationLevel           Decimal? @map("excavation_level") @db.Decimal(10, 2)
+  excavationFill            Decimal? @map("excavation_fill") @db.Decimal(10, 2)
+  
+  // Section 5: งานทาสีช่องจอด
+  parkingPaintType          String?  @map("parking_paint_type") @db.VarChar(255)
+  sideLineMarking           String?  @map("side_line_marking") @db.VarChar(50)
+  centerPattern             String?  @map("center_pattern") @db.VarChar(255)
+  centerPatternOriginal     String?  @map("center_pattern_original") @db.VarChar(255)
+  centerPatternNew          String?  @map("center_pattern_new") @db.VarChar(255)
+  
+  // Section 6: งานป้าย
+  signageWorkSelection      String?  @map("signage_work_selection") @db.VarChar(50)
+  signageStationType        String?  @map("signage_station_type") @db.VarChar(255)
+  
+  // ข้อมูลกำไร% และ CF%
+  profitPercent             Decimal? @map("profit_percent") @db.Decimal(5, 2)
+  cfPercent                 Decimal? @map("cf_percent") @db.Decimal(5, 2)
+  
+  // ข้อมูลอื่นๆ ที่ซับซ้อนเก็บเป็น JSON
+  extraData                 Json?    @map("extra_data") // สำหรับข้อมูลอื่นๆ ที่ไม่ได้ระบุ
+  
+  createdAt                 DateTime  @default(now()) @map("created_at")
+  updatedAt                 DateTime  @updatedAt @map("updated_at")
+  
+  // Relation
+  customer                  Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@map("customer_station_accessories")
+  @@index([customerCode])
+}
+
+// ประวัติการบันทึก (History)
+model CustomerHistory {
+  id            Int       @id @default(autoincrement())
+  customerId    Int       @map("customer_id")
+  customerCode  String    @map("customer_code") @db.VarChar(255)
+  dataType      String    @map("data_type") @db.VarChar(50) // 'home' | 'station-accessory' | 'combined'
+  data          Json      // เก็บข้อมูล snapshot ตอนนั้น
+  savedAt       DateTime  @default(now()) @map("saved_at")
+  
+  // Relation
+  customer      Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@map("customer_histories")
+  @@index([customerCode])
+  @@index([savedAt(sort: Desc)])
+  @@index([dataType])
 }
