@@ -739,10 +739,15 @@ export default function Home(): React.JSX.Element {
       console.log('📊 จำนวน Sheets ทั้งหมด:', workbook.SheetNames.length);
       console.log('📋 รายชื่อ Sheets:', workbook.SheetNames);
 
-      const sheetName = workbook.SheetNames[0];
-      console.log('📝 Sheet ที่ใช้:', sheetName);
+      // ระบุชื่อ Sheet โดยตรงเพื่อป้องกันการอ่านผิดเมื่อมี Sheet2
+      // ลองหา Sheet1 ก่อน ถ้าไม่มีก็ใช้ Sheet แรก
+      const targetSheetName = workbook.SheetNames.find(name =>
+        name.toLowerCase() === 'sheet1' || name === 'Sheet1'
+      ) || workbook.SheetNames[0];
 
-      const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+      console.log('📝 Sheet ที่ใช้:', targetSheetName);
+
+      const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[targetSheetName]);
       console.log('✅ อ่านข้อมูล Excel สำเร็จ');
       console.log('📊 จำนวนแถวข้อมูล:', jsonData.length);
       console.log('🔍 ตัวอย่างข้อมูล 5 แถวแรก:', jsonData.slice(0, 5));
