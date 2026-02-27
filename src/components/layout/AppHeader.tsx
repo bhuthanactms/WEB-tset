@@ -229,7 +229,7 @@ export default function AppHeader(): React.JSX.Element {
       }, 100)
     } else {
       // ถ้าอยู่ที่หน้า Home หรือหน้าอื่น ให้ย้อนกลับตามประวัติ
-      window.history.back()
+    window.history.back()
     }
   }
 
@@ -243,7 +243,7 @@ export default function AppHeader(): React.JSX.Element {
       return
     } else {
       // Forward ตามประวัติของ browser
-      window.history.forward()
+    window.history.forward()
     }
   }
 
