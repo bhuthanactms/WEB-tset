@@ -50,6 +50,13 @@ function MoreDetailCard(props: any) {
     return props.excelData?.[sheetName] || [];
   };
 
+  // ฟังก์ชันช่วยเหลือสำหรับแปลงค่าเป็นตัวเลขและป้องกัน NaN
+  const parsePrice = (value: any): number => {
+    if (value === null || value === undefined || value === '') return 0;
+    const parsed = parseFloat(value);
+    return isNaN(parsed) ? 0 : parsed;
+  };
+
   // ฟังก์ชันดึงจำนวนชุดจาก MCCB Sub string (เช่น "450A (2ชุด)" → 2)
   const extractSetCount = (mccbSubValue: string): number => {
     const match = mccbSubValue.match(/\((\d+)ชุด\)/);
@@ -182,8 +189,13 @@ function MoreDetailCard(props: any) {
   };
 
   const [trDistance, setTrDistance] = useState(props.trDistance || '');
+  // TR to Land: ค่า default เป็น 9 เมตร หรือ 12 เมตร ถ้า inside-station
   const [trToLandDistance, setTrToLandDistance] = useState('');
   const [landToMdbDistance, setLandToMdbDistance] = useState('');
+  const trToLandDistanceInitialized = useRef(false);
+  
+  // State สำหรับสถานที่การติดตั้ง (ต้องประกาศก่อน useEffect ที่ใช้มัน)
+  const [installationLocation, setInstallationLocation] = useState<'inside-station' | 'outside-station' | ''>('');
 
   const [trWiringGroup2, setTrWiringGroup2] = useState(props.trWiringGroup2 || '');
   const [landToMdbWiringGroup2, setLandToMdbWiringGroup2] = useState('');
@@ -507,13 +519,52 @@ function MoreDetailCard(props: any) {
     saveFormDataRef.current = saveFormData;
   });
 
+  // ตั้งค่า default ของ trToLandDistance เมื่อ installationLocation เปลี่ยน
+  useEffect(() => {
+    if (!props.trToLand) {
+      trToLandDistanceInitialized.current = false;
+      return;
+    }
+    
+    const defaultDistance = installationLocation === 'inside-station' ? '12' : '9';
+    
+    // ถ้ายังไม่เคย initialize หรือยังไม่มีค่า ให้ตั้งค่า default
+    const isEmpty = !trToLandDistance || (typeof trToLandDistance === 'string' && trToLandDistance.trim() === '');
+    if (!trToLandDistanceInitialized.current || isEmpty) {
+      if (isEmpty) {
+        setTrToLandDistance(defaultDistance);
+      }
+      trToLandDistanceInitialized.current = true;
+      return;
+    }
+    
+    // ถ้ามีค่าแล้ว ให้เช็คว่าค่าเดิมเป็น 9 หรือ 12 หรือไม่
+    try {
+      const currentValue = parseFloat(String(trToLandDistance || '0'));
+      if (!isNaN(currentValue) && (currentValue === 9 || currentValue === 12)) {
+        // ถ้าค่าเดิมเป็น 9 หรือ 12 และค่าใหม่ต่างจากค่าเดิม ให้อัพเดท
+        const newDefaultValue = parseFloat(defaultDistance);
+        if (newDefaultValue !== currentValue) {
+          setTrToLandDistance(defaultDistance);
+        }
+      }
+    } catch (error) {
+      // ถ้าเกิด error ให้ตั้งค่า default
+      setTrToLandDistance(defaultDistance);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [installationLocation, props.trToLand]);
+
   // Helper function to load parsed data into state
   const loadParsedDataIntoState = (parsed: any) => {
     // โหลดข้อมูลพื้นฐาน
     if (parsed.customerCode) setCustomerCode(parsed.customerCode);
     if (parsed.trDistance !== undefined) setTrDistance(parsed.trDistance);
     if (parsed.trWiringGroup2 !== undefined) setTrWiringGroup2(parsed.trWiringGroup2);
-    if (parsed.trToLandDistance !== undefined) setTrToLandDistance(parsed.trToLandDistance);
+    if (parsed.trToLandDistance !== undefined) {
+      setTrToLandDistance(parsed.trToLandDistance);
+      trToLandDistanceInitialized.current = true;
+    }
     if (parsed.landToMdbDistance !== undefined) setLandToMdbDistance(parsed.landToMdbDistance);
     if (parsed.landToMdbWiringGroup2 !== undefined) setLandToMdbWiringGroup2(parsed.landToMdbWiringGroup2);
     if (parsed.jobName !== undefined) setJobName(parsed.jobName);
@@ -1571,8 +1622,7 @@ function MoreDetailCard(props: any) {
 
   const [mdbConfiguration, setMdbConfiguration] = useState<any>(null);
 
-  // State สำหรับสถานที่การติดตั้ง
-  const [installationLocation, setInstallationLocation] = useState<'inside-station' | 'outside-station' | ''>('');
+  // State สำหรับสถานที่การติดตั้ง (installationLocation ถูกย้ายไปไว้ด้านบนแล้ว)
   const [installationLocationBrand, setInstallationLocationBrand] = useState<'ABB' | 'EATON' | 'LS'>('ABB');
 
   const [trMdbSelection, setTrMdbSelection] = useState(props.trMdbSelection || 'no');
@@ -1798,13 +1848,6 @@ function MoreDetailCard(props: any) {
   const toNumber = (value: any) => {
     if (typeof value === 'number' && Number.isFinite(value)) return value;
     const parsed = parseFloat((value ?? '').toString());
-    return Number.isNaN(parsed) ? 0 : parsed;
-  };
-
-  const parsePrice = (value: any) => {
-    if (typeof value === 'number' && Number.isFinite(value)) return value;
-    const normalized = (value ?? '').toString().replace(/[^0-9.\-]/g, '');
-    const parsed = parseFloat(normalized);
     return Number.isNaN(parsed) ? 0 : parsed;
   };
 
@@ -2855,32 +2898,31 @@ function MoreDetailCard(props: any) {
       };
 
       // คำนวณ TR to Land
-      const trToLandInputDistance = parseFloat(trToLandDistance || '0');
-      // ถ้าเลือก "ภายในปั้ม" ให้บวก 6 เมตร, ถ้าไม่ใช่ให้บวก 3 เมตร
-      const trToLandBuffer = installationLocation === 'inside-station' ? 6 : 3;
-      const trToLandDistanceCalc = trToLandInputDistance + trToLandBuffer;
+      // ใช้ค่าที่ผู้ใช้กรอก (ถ้ามี) หรือใช้ค่า default (9 หรือ 12 เมตร)
+      const trToLandInputDistance = trToLandDistance ? parseFloat(trToLandDistance) : 0;
+      const trToLandDistanceCalc = trToLandInputDistance > 0 && !isNaN(trToLandInputDistance)
+        ? trToLandInputDistance 
+        : (installationLocation === 'inside-station' ? 12 : 9);
 
-      if (trToLandInputDistance > 0) {
-        const trToLandNormalized = normalizeWiringType(props.trToLand);
-        const trToLandConduit = trToLandNormalized === 'ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2' ? trWiringGroup2 : '';
-        const trToLandPriceData = getTrToMdbPrice(
-          trToLandNormalized,
-          trToLandConduit,
-          props.powerAuthority,
-          props.transformer,
-          trToLandDistanceCalc
-        );
+      const trToLandNormalized = normalizeWiringType(props.trToLand);
+      const trToLandConduit = trToLandNormalized === 'ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2' ? trWiringGroup2 : '';
+      const trToLandPriceData = getTrToMdbPrice(
+        trToLandNormalized,
+        trToLandConduit,
+        props.powerAuthority,
+        props.transformer,
+        trToLandDistanceCalc
+      );
 
-        if (trToLandPriceData) {
-          materialTotal += parsePrice(trToLandPriceData.materialPrice);
-          laborTotal += parsePrice(trToLandPriceData.laborPrice);
-          totalPrice += parsePrice(trToLandPriceData.totalPrice);
-        }
+      if (trToLandPriceData) {
+        materialTotal += parsePrice(trToLandPriceData.materialPrice);
+        laborTotal += parsePrice(trToLandPriceData.laborPrice);
+        totalPrice += parsePrice(trToLandPriceData.totalPrice);
       }
 
       // คำนวณ Land to MDB
       const landToMdbInputDistance = parseFloat(landToMdbDistance || '0');
-      const landToMdbDistanceCalc = landToMdbInputDistance + 6;
+      const landToMdbDistanceCalc = landToMdbInputDistance + 3;
 
       if (landToMdbInputDistance > 0) {
         const landToMdbNormalized = normalizeWiringType(props.landToMdb);
@@ -4529,49 +4571,48 @@ function MoreDetailCard(props: any) {
         // กรณีมี trToLand และ landToMdb แยกกัน
         if (props.trToLand && props.landToMdb) {
           // TR to Land
-          const trToLandInputDistance = parseFloat(trToLandDistance || '0');
-          // ถ้าเลือก "ภายในปั้ม" ให้บวก 6 เมตร, ถ้าไม่ใช่ให้บวก 3 เมตร
-          const trToLandBuffer = installationLocation === 'inside-station' ? 6 : 3;
-          const trToLandDistanceCalc = trToLandInputDistance + trToLandBuffer;
+          // ใช้ค่าที่ผู้ใช้กรอก (ถ้ามี) หรือใช้ค่า default (9 หรือ 12 เมตร)
+          const trToLandInputDistance = trToLandDistance ? parseFloat(trToLandDistance) : 0;
+          const trToLandDistanceCalc = trToLandInputDistance > 0 && !isNaN(trToLandInputDistance)
+            ? trToLandInputDistance 
+            : (installationLocation === 'inside-station' ? 12 : 9);
 
-          if (trToLandInputDistance > 0) {
-            const normalizeWiringType = (wiringType: string) => {
-              if (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ') {
-                return 'ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2';
-              }
-              if (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน') {
-                return 'ขนาดสายไฟ 3P 4W ร้อยท่อฝังใต้ดิน กลุ่ม 5';
-              }
-              return wiringType;
-            };
-
-            const trToLandNormalized = normalizeWiringType(props.trToLand);
-            const trToLandConduit = trToLandNormalized === 'ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2' ? trWiringGroup2 : '';
-            const trToLandPriceData = getTrToMdbPrice(
-              trToLandNormalized,
-              trToLandConduit,
-              props.powerAuthority,
-              props.transformer,
-              trToLandDistanceCalc
-            );
-
-            if (trToLandPriceData) {
-              products.push(createProductFromPriceData(
-                props.trToLand,
-                props.trWiringSize,
-                props.trWireConduit,
-                trToLandConduit,
-                trToLandPriceData,
-                trToLandInputDistance,
-                trToLandDistanceCalc,
-                'TR to Land'
-              ));
+          const normalizeWiringType = (wiringType: string) => {
+            if (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ') {
+              return 'ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2';
             }
+            if (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน') {
+              return 'ขนาดสายไฟ 3P 4W ร้อยท่อฝังใต้ดิน กลุ่ม 5';
+            }
+            return wiringType;
+          };
+
+          const trToLandNormalized = normalizeWiringType(props.trToLand);
+          const trToLandConduit = trToLandNormalized === 'ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2' ? trWiringGroup2 : '';
+          const trToLandPriceData = getTrToMdbPrice(
+            trToLandNormalized,
+            trToLandConduit,
+            props.powerAuthority,
+            props.transformer,
+            trToLandDistanceCalc
+          );
+
+          if (trToLandPriceData) {
+            products.push(createProductFromPriceData(
+              props.trToLand,
+              props.trWiringSize,
+              props.trWireConduit,
+              trToLandConduit,
+              trToLandPriceData,
+              trToLandInputDistance > 0 ? trToLandInputDistance : trToLandDistanceCalc,
+              trToLandDistanceCalc,
+              'TR to Land'
+            ));
           }
 
           // Land to MDB
           const landToMdbInputDistance = parseFloat(landToMdbDistance || '0');
-          const landToMdbDistanceCalc = landToMdbInputDistance + 6;
+          const landToMdbDistanceCalc = landToMdbInputDistance + 3;
 
           if (landToMdbInputDistance > 0) {
             const normalizeWiringType = (wiringType: string) => {
@@ -8707,12 +8748,13 @@ function MoreDetailCard(props: any) {
                           {(() => {
                             // กรณีมี trToLand และ landToMdb แยกกัน
                             if (props.trToLand && props.landToMdb) {
-                              const trToLandInputDistance = parseFloat(trToLandDistance || '0');
-                              // ถ้าเลือก "ภายในปั้ม" ให้บวก 6 เมตร, ถ้าไม่ใช่ให้บวก 3 เมตร
-                              const trToLandBuffer = installationLocation === 'inside-station' ? 6 : 3;
-                              const trToLandDistanceCalc = trToLandInputDistance + trToLandBuffer;
+                              // TR to Land: ใช้ค่าที่ผู้ใช้กรอก (ถ้ามี) หรือใช้ค่า default (9 หรือ 12 เมตร)
+                              const trToLandInputDistance = trToLandDistance ? parseFloat(trToLandDistance) : 0;
+                              const trToLandDistanceCalc = trToLandInputDistance > 0 && !isNaN(trToLandInputDistance)
+                                ? trToLandInputDistance 
+                                : (installationLocation === 'inside-station' ? 12 : 9);
                               const landToMdbInputDistance = parseFloat(landToMdbDistance || '0');
-                              const landToMdbDistanceCalc = landToMdbInputDistance + 6;
+                              const landToMdbDistanceCalc = landToMdbInputDistance + 3;
 
                               // แปลง wiringType ให้ตรงกับที่ getTrToMdbPrice คาดหวัง
                               const normalizeWiringType = (wiringType: string) => {
@@ -8731,13 +8773,13 @@ function MoreDetailCard(props: any) {
                               const trToLandConduit = trToLandNormalized === 'ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2' ? trWiringGroup2 : '';
                               const landToMdbConduit = landToMdbNormalized === 'ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2' ? landToMdbWiringGroup2 : '';
 
-                              const trToLandPriceData = trToLandInputDistance > 0 ? getTrToMdbPrice(
+                              const trToLandPriceData = getTrToMdbPrice(
                                 trToLandNormalized,
                                 trToLandConduit,
                                 props.powerAuthority,
                                 props.transformer,
                                 trToLandDistanceCalc
-                              ) : null;
+                              );
 
                               const landToMdbPriceData = landToMdbInputDistance > 0 ? getTrToMdbPrice(
                                 landToMdbNormalized,
@@ -8764,26 +8806,26 @@ function MoreDetailCard(props: any) {
                                           </div>
                                           <div className="mt-1 text-sm">
                                             <span className="font-medium text-gray-700">ระยะทาง:</span>
-                                            <span className="text-gray-600 ml-1">{trToLandDistanceCalc} เมตร ({trToLandInputDistance} เมตร)</span>
+                                            <span className="text-gray-600 ml-1">{trToLandDistanceCalc} เมตร</span>
                                           </div>
                                         </div>
                                         <div className="grid grid-cols-3 gap-4">
                                           <div>
                                             <div className="text-sm text-gray-600 mb-1">ค่าของ:</div>
                                             <div className="text-xl font-bold text-gray-800">
-                                              {trToLandPriceData.materialPrice.toLocaleString('th-TH')} บาท
+                                              {parsePrice(trToLandPriceData.materialPrice).toLocaleString('th-TH')} บาท
                                             </div>
                                           </div>
                                           <div>
                                             <div className="text-sm text-gray-600 mb-1">ค่าแรง:</div>
                                             <div className="text-xl font-bold text-gray-800">
-                                              {trToLandPriceData.laborPrice.toLocaleString('th-TH')} บาท
+                                              {parsePrice(trToLandPriceData.laborPrice).toLocaleString('th-TH')} บาท
                                             </div>
                                           </div>
                                           <div>
                                             <div className="text-sm text-blue-700 font-semibold mb-1">ค่าใช้จ่าย:</div>
                                             <div className="text-xl font-bold text-blue-700">
-                                              {trToLandPriceData.totalPrice.toLocaleString('th-TH')} บาท
+                                              {parsePrice(trToLandPriceData.totalPrice).toLocaleString('th-TH')} บาท
                                             </div>
                                           </div>
                                         </div>
@@ -9058,9 +9100,9 @@ function MoreDetailCard(props: any) {
                                         {/* ค่าของรวม, ค่าแรงรวม, รวมค่าใช้จ่าย สำหรับ TR to Land */}
                                         {(() => {
                                           // คำนวณค่าจาก TR to Land
-                                          let totalMaterial = trToLandPriceData.materialPrice || 0;
-                                          let totalLabor = trToLandPriceData.laborPrice || 0;
-                                          let totalCost = trToLandPriceData.totalPrice || 0;
+                                          let totalMaterial = parsePrice(trToLandPriceData.materialPrice);
+                                          let totalLabor = parsePrice(trToLandPriceData.laborPrice);
+                                          let totalCost = parsePrice(trToLandPriceData.totalPrice);
 
                                           // เพิ่มค่าจากอุปกรณ์เสริม TRAY/LADDER (ถ้ามี)
                                           const isTrayOrLadder = props.trToLand === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' || props.trToLand === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา';
@@ -9230,19 +9272,19 @@ function MoreDetailCard(props: any) {
                                           <div>
                                             <div className="text-sm text-gray-600 mb-1">ค่าของ:</div>
                                             <div className="text-xl font-bold text-gray-800">
-                                              {landToMdbPriceData.materialPrice.toLocaleString('th-TH')} บาท
+                                              {parsePrice(landToMdbPriceData.materialPrice).toLocaleString('th-TH')} บาท
                                             </div>
                                           </div>
                                           <div>
                                             <div className="text-sm text-gray-600 mb-1">ค่าแรง:</div>
                                             <div className="text-xl font-bold text-gray-800">
-                                              {landToMdbPriceData.laborPrice.toLocaleString('th-TH')} บาท
+                                              {parsePrice(landToMdbPriceData.laborPrice).toLocaleString('th-TH')} บาท
                                             </div>
                                           </div>
                                           <div>
                                             <div className="text-sm text-green-700 font-semibold mb-1">ค่าใช้จ่าย:</div>
                                             <div className="text-xl font-bold text-green-700">
-                                              {landToMdbPriceData.totalPrice.toLocaleString('th-TH')} บาท
+                                              {parsePrice(landToMdbPriceData.totalPrice).toLocaleString('th-TH')} บาท
                                             </div>
                                           </div>
                                         </div>
@@ -9516,9 +9558,9 @@ function MoreDetailCard(props: any) {
                                         {/* ค่าของรวม, ค่าแรงรวม, รวมค่าใช้จ่าย สำหรับ Land to MDB */}
                                         {(() => {
                                           // คำนวณค่าจาก Land to MDB
-                                          let totalMaterial = landToMdbPriceData.materialPrice || 0;
-                                          let totalLabor = landToMdbPriceData.laborPrice || 0;
-                                          let totalCost = landToMdbPriceData.totalPrice || 0;
+                                          let totalMaterial = parsePrice(landToMdbPriceData.materialPrice);
+                                          let totalLabor = parsePrice(landToMdbPriceData.laborPrice);
+                                          let totalCost = parsePrice(landToMdbPriceData.totalPrice);
 
                                           // เพิ่มค่าจากอุปกรณ์เสริม TRAY/LADDER (ถ้ามี)
                                           const isTrayOrLadder = props.landToMdb === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' || props.landToMdb === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา';
@@ -11695,117 +11737,6 @@ function MoreDetailCard(props: any) {
                                 />
                                 <span className="text-red-600 text-sm ml-2">*ระยะศูนย์กลางMDB ถึง ศูนย์กลางCharger*</span>
                               </div>
-
-                              <div className="flex items-center gap-2">
-                                <Checkbox
-                                  id={`useCustomWiringType_${idx}`}
-                                  checked={isUsingCustom}
-                                  onCheckedChange={(checked) => setUseCustomWiringTypeAt(checked === true)}
-                                />
-                                <Label htmlFor={`useCustomWiringType_${idx}`} className="text-xs text-gray-600 cursor-pointer">
-                                  เพิ่มประเภทสายอื่น
-                                </Label>
-                              </div>
-
-                              {(currentWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ') && (
-
-                                <div className="flex items-center gap-3">
-
-                                  <Label className=" font-medium min-w-[100px]">เลือกท่อ:</Label>
-
-                                  <Select value={group2Selected} onValueChange={setConduitChoiceAt}>
-
-                                    <SelectTrigger className="w-32">
-
-                                      <SelectValue placeholder="เลือกท่อ" />
-
-                                    </SelectTrigger>
-
-                                    <SelectContent>
-
-                                      <SelectItem value="IMC">IMC</SelectItem>
-
-                                      <SelectItem value="RSC">RSC</SelectItem>
-
-                                    </SelectContent>
-
-                                  </Select>
-
-                                </div>
-
-                              )}
-
-                            </div>
-
-                            <div className="mt-3 flex flex-wrap items-center gap-4">
-
-                              {/* เลือกท่อ สำหรับกรณี กลุ่ม 2 เดินในอากาศ - ให้อยู่เหนือระยะ และบังคับให้เลือกก่อนกรอกระยะ */}
-                              {currentWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ' && (
-                                <div className="flex items-center gap-3 mb-3">
-                                  <Label className=" font-medium min-w-[100px]">เลือกท่อ:</Label>
-                                  <Select value={group2Selected} onValueChange={setConduitChoiceAt}>
-                                    <SelectTrigger className="w-32">
-                                      <SelectValue placeholder="เลือกท่อ" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="IMC">IMC</SelectItem>
-                                      <SelectItem value="RSC">RSC</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                              )}
-
-                              <div className="flex items-center gap-3">
-                                <Label htmlFor={`chargerDistance_${idx}`} className=" font-medium min-w-[100px]">ระยะ (เมตร):</Label>
-                                <Input
-                                  id={`chargerDistance_${idx}`}
-                                  type="number"
-                                  className="w-32 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                  value={distance}
-                                  onChange={(e) => setDistanceAt(e.target.value)}
-                                  disabled={currentWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ' && !group2Selected}
-                                />
-                                <span className="text-red-600 text-sm ml-2">*ระยะศูนย์กลางMDB ถึง ศูนย์กลางCharger*</span>
-                              </div>
-
-                              <div className="flex items-center gap-2">
-                                <Checkbox
-                                  id={`useCustomWiringType_${idx}`}
-                                  checked={isUsingCustom}
-                                  onCheckedChange={(checked) => setUseCustomWiringTypeAt(checked === true)}
-                                />
-                                <Label htmlFor={`useCustomWiringType_${idx}`} className="text-xs text-gray-600 cursor-pointer">
-                                  เพิ่มประเภทสายอื่น
-                                </Label>
-                              </div>
-
-                              {(currentWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ') && (
-
-                                <div className="flex items-center gap-3">
-
-                                  <Label className=" font-medium min-w-[100px]">เลือกท่อ:</Label>
-
-                                  <Select value={group2Selected} onValueChange={setConduitChoiceAt}>
-
-                                    <SelectTrigger className="w-32">
-
-                                      <SelectValue placeholder="เลือกท่อ" />
-
-                                    </SelectTrigger>
-
-                                    <SelectContent>
-
-                                      <SelectItem value="IMC">IMC</SelectItem>
-
-                                      <SelectItem value="RSC">RSC</SelectItem>
-
-                                    </SelectContent>
-
-                                  </Select>
-
-                                </div>
-
-                              )}
 
                             </div>
                           </>
@@ -17770,9 +17701,13 @@ function StationAccessory() {
     } else if (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อฝังใต้ดิน กลุ่ม 5') {
       // Sheet แบบ 9.12
       productCode = data.__EMPTY || '';
-      materialPrice = (data.__EMPTY_14 || 0) * distance;
-      laborPrice = (data.__EMPTY_15 || 0) * distance;
-      totalPrice = (data.__EMPTY_16 || 0) * distance;
+      // ใช้ safeParseFloat เพื่อป้องกัน NaN
+      const materialUnit = parseFloat(data.__EMPTY_16) || 0; // ค่าของต่อเมตร
+      const laborUnit = parseFloat(data.__EMPTY_17) || 0; // ค่าแรงต่อเมตร
+      const totalUnit = parseFloat(data.__EMPTY_18) || 0; // รวมค่าใช้จ่ายต่อเมตร
+      materialPrice = materialUnit * distance;
+      laborPrice = laborUnit * distance;
+      totalPrice = totalUnit * distance;
     } else if (wiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา') {
       // Sheet แบบ 9.15
       productCode = data.__EMPTY || '';
