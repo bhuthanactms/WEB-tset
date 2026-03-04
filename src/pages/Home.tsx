@@ -126,8 +126,15 @@ export default function Home(): React.JSX.Element {
 
       // โหลดข้อมูลทั้งหมด
       if (loadData.form) {
-        setForm(loadData.form);
-        console.log('✅ Set form:', loadData.form);
+        // แปลง chargerWiringType จาก string เป็น array ถ้าเป็น string (backward compatibility)
+        const normalizedForm = {
+          ...loadData.form,
+          chargerWiringType: Array.isArray(loadData.form.chargerWiringType)
+            ? loadData.form.chargerWiringType
+            : (loadData.form.chargerWiringType ? [loadData.form.chargerWiringType] : [])
+        };
+        setForm(normalizedForm);
+        console.log('✅ Set form:', normalizedForm);
       }
       if (loadData.chargerInstallationType) {
         setChargerInstallationType(loadData.chargerInstallationType);
@@ -172,8 +179,15 @@ export default function Home(): React.JSX.Element {
         try {
           const parsed = JSON.parse(savedData);
           if (parsed.form) {
-            setForm(parsed.form);
-            console.log('✅ Set form from localStorage:', parsed.form);
+            // แปลง chargerWiringType จาก string เป็น array ถ้าเป็น string (backward compatibility)
+            const normalizedForm = {
+              ...parsed.form,
+              chargerWiringType: Array.isArray(parsed.form.chargerWiringType)
+                ? parsed.form.chargerWiringType
+                : (parsed.form.chargerWiringType ? [parsed.form.chargerWiringType] : [])
+            };
+            setForm(normalizedForm);
+            console.log('✅ Set form from localStorage:', normalizedForm);
           }
           if (parsed.chargerInstallationType) {
             setChargerInstallationType(parsed.chargerInstallationType);
@@ -223,7 +237,16 @@ export default function Home(): React.JSX.Element {
       if (savedData) {
         try {
           const parsed = JSON.parse(savedData);
-          if (parsed.form) setForm(parsed.form);
+          if (parsed.form) {
+            // แปลง chargerWiringType จาก string เป็น array ถ้าเป็น string (backward compatibility)
+            const normalizedForm = {
+              ...parsed.form,
+              chargerWiringType: Array.isArray(parsed.form.chargerWiringType)
+                ? parsed.form.chargerWiringType
+                : (parsed.form.chargerWiringType ? [parsed.form.chargerWiringType] : [])
+            };
+            setForm(normalizedForm);
+          }
           if (parsed.chargerInstallationType) setChargerInstallationType(parsed.chargerInstallationType);
           if (parsed.chargerTypeMode) setChargerTypeMode(parsed.chargerTypeMode);
           if (parsed.multiChargers) setMultiChargers(parsed.multiChargers);
@@ -464,7 +487,16 @@ export default function Home(): React.JSX.Element {
     if (savedData) {
       try {
         const parsed = JSON.parse(savedData);
-        if (parsed.form) setForm(parsed.form);
+        if (parsed.form) {
+          // แปลง chargerWiringType จาก string เป็น array ถ้าเป็น string (backward compatibility)
+          const normalizedForm = {
+            ...parsed.form,
+            chargerWiringType: Array.isArray(parsed.form.chargerWiringType)
+              ? parsed.form.chargerWiringType
+              : (parsed.form.chargerWiringType ? [parsed.form.chargerWiringType] : [])
+          };
+          setForm(normalizedForm);
+        }
         if (parsed.chargerInstallationType) setChargerInstallationType(parsed.chargerInstallationType);
         if (parsed.chargerTypeMode) setChargerTypeMode(parsed.chargerTypeMode);
         if (parsed.multiChargers) setMultiChargers(parsed.multiChargers);

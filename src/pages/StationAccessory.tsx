@@ -252,6 +252,8 @@ function MoreDetailCard(props: any) {
         charger: props.charger || '',
         numberOfChargers: props.numberOfChargers || '',
         trWiringType: props.trWiringType || '',
+        trToLand: props.trToLand || '',
+        landToMdb: props.landToMdb || '',
         chargerWiringType: Array.isArray(props.chargerWiringType) ? props.chargerWiringType : (props.chargerWiringType ? [props.chargerWiringType] : [])
       },
       chargerTypeMode: props.chargerTypeMode || 'same',
@@ -288,8 +290,20 @@ function MoreDetailCard(props: any) {
         if (savedHomeData.customerCode === customerCode.trim() && savedHomeData.form && savedHomeData.form.charger) {
           console.log('📦 Using saved homeData from localStorage (has charger info)');
           // รวมข้อมูลจาก localStorage กับ props (ให้ props มีความสำคัญสูงกว่า)
+          // แปลง chargerWiringType จาก string เป็น array ถ้าเป็น string (backward compatibility)
+          const normalizedForm = savedHomeData.form ? {
+            ...savedHomeData.form,
+            chargerWiringType: Array.isArray(savedHomeData.form.chargerWiringType)
+              ? savedHomeData.form.chargerWiringType
+              : (savedHomeData.form.chargerWiringType ? [savedHomeData.form.chargerWiringType] : []),
+            // ถ้า props มีข้อมูล ให้ใช้จาก props แทน (เพราะอาจเป็นข้อมูลล่าสุด)
+            trToLand: props.trToLand || savedHomeData.form.trToLand || savedHomeData.trToLand || '',
+            landToMdb: props.landToMdb || savedHomeData.form.landToMdb || savedHomeData.landToMdb || ''
+          } : savedHomeData.form;
+
           homeDataParsed = {
             ...savedHomeData,
+            form: normalizedForm,
             // ถ้า props มีข้อมูล ให้ใช้จาก props แทน (เพราะอาจเป็นข้อมูลล่าสุด)
             transformer: props.transformer || savedHomeData.transformer || '',
             trWiringSize: props.trWiringSize || savedHomeData.trWiringSize || '',
@@ -16990,8 +17004,18 @@ function StationAccessory() {
         const combinedData = JSON.parse(localStorage.getItem(combinedDataKey) || '{}');
         if (combinedData.customerCode) setCustomerCode(combinedData.customerCode);
         if (combinedData.home) {
-          setHomeData(combinedData.home);
-          console.log('✅ Loaded combined home data:', combinedData.home);
+          // แปลง chargerWiringType จาก string เป็น array ถ้าเป็น string (backward compatibility)
+          const normalizedHomeData = {
+            ...combinedData.home,
+            form: combinedData.home.form ? {
+              ...combinedData.home.form,
+              chargerWiringType: Array.isArray(combinedData.home.form.chargerWiringType)
+                ? combinedData.home.form.chargerWiringType
+                : (combinedData.home.form.chargerWiringType ? [combinedData.home.form.chargerWiringType] : [])
+            } : combinedData.home.form
+          };
+          setHomeData(normalizedHomeData);
+          console.log('✅ Loaded combined home data:', normalizedHomeData);
         }
       } catch (error) {
         console.error('Error loading combined data:', error);
@@ -17012,8 +17036,18 @@ function StationAccessory() {
       try {
         const parsed = JSON.parse(savedHomeData);
         if (parsed.customerCode === customerCode || !customerCode) {
-          setHomeData(parsed);
-          console.log('✅ Loaded home data from localStorage:', parsed);
+          // แปลง chargerWiringType จาก string เป็น array ถ้าเป็น string (backward compatibility)
+          const normalizedParsed = {
+            ...parsed,
+            form: parsed.form ? {
+              ...parsed.form,
+              chargerWiringType: Array.isArray(parsed.form.chargerWiringType)
+                ? parsed.form.chargerWiringType
+                : (parsed.form.chargerWiringType ? [parsed.form.chargerWiringType] : [])
+            } : parsed.form
+          };
+          setHomeData(normalizedParsed);
+          console.log('✅ Loaded home data from localStorage:', normalizedParsed);
         }
       } catch (error) {
         console.error('Error loading home data:', error);
@@ -17028,7 +17062,19 @@ function StationAccessory() {
       const loadData = (state as any).loadData;
       console.log('📦 Loading from navigation state.loadData:', loadData);
       if (loadData.customerCode) setCustomerCode(loadData.customerCode);
-      if (loadData.home) setHomeData(loadData.home);
+      if (loadData.home) {
+        // แปลง chargerWiringType จาก string เป็น array ถ้าเป็น string (backward compatibility)
+        const normalizedLoadHomeData = {
+          ...loadData.home,
+          form: loadData.home.form ? {
+            ...loadData.home.form,
+            chargerWiringType: Array.isArray(loadData.home.form.chargerWiringType)
+              ? loadData.home.form.chargerWiringType
+              : (loadData.home.form.chargerWiringType ? [loadData.home.form.chargerWiringType] : [])
+          } : loadData.home.form
+        };
+        setHomeData(normalizedLoadHomeData);
+      }
       // ถ้า loadData เป็น stationData ให้โหลดไปยัง localStorage เพื่อให้ MoreDetailCard โหลดได้
       if (loadData.trDistance !== undefined || loadData.jobName || loadData.concreteSelection !== undefined || loadData.travelCostResult !== undefined || loadData.highVoltageSystem !== undefined || loadData.transformerType !== undefined || loadData.parkingSlots !== undefined) {
         console.log('📦 Detected stationData in loadData, saving to localStorage');
@@ -17045,13 +17091,30 @@ function StationAccessory() {
       const stateObj = state as any;
       // ตรวจสอบว่ามีข้อมูล Home data ที่ spread มา (ไม่ใช่ loadData)
       if ((stateObj.powerAuthority || stateObj.charger || stateObj.transformer) && !stateObj.loadData) {
-        setHomeData(stateObj);
-        console.log('✅ Using Home data from navigation state (spread):', stateObj);
+        // แปลง chargerWiringType จาก string เป็น array ถ้าเป็น string (backward compatibility)
+        const normalizedStateObj = {
+          ...stateObj,
+          chargerWiringType: Array.isArray(stateObj.chargerWiringType)
+            ? stateObj.chargerWiringType
+            : (stateObj.chargerWiringType ? [stateObj.chargerWiringType] : [])
+        };
+        setHomeData(normalizedStateObj);
+        console.log('✅ Using Home data from navigation state (spread):', normalizedStateObj);
       }
       // ถ้ามี homeData ใน state โดยตรง
       if (stateObj.homeData) {
-        setHomeData(stateObj.homeData);
-        console.log('✅ Using Home data from state.homeData:', stateObj.homeData);
+        // แปลง chargerWiringType จาก string เป็น array ถ้าเป็น string (backward compatibility)
+        const normalizedHomeData = {
+          ...stateObj.homeData,
+          form: stateObj.homeData.form ? {
+            ...stateObj.homeData.form,
+            chargerWiringType: Array.isArray(stateObj.homeData.form.chargerWiringType)
+              ? stateObj.homeData.form.chargerWiringType
+              : (stateObj.homeData.form.chargerWiringType ? [stateObj.homeData.form.chargerWiringType] : [])
+          } : stateObj.homeData.form
+        };
+        setHomeData(normalizedHomeData);
+        console.log('✅ Using Home data from state.homeData:', normalizedHomeData);
       }
     }
   }, [state]);
@@ -17062,12 +17125,19 @@ function StationAccessory() {
 
     // ถ้า homeData มี form ให้แปลงเป็น props format
     if (homeData.form) {
+      // แปลง chargerWiringType จาก string เป็น array ถ้าเป็น string (backward compatibility)
+      const normalizedChargerWiringType = Array.isArray(homeData.form.chargerWiringType)
+        ? homeData.form.chargerWiringType
+        : (homeData.form.chargerWiringType ? [homeData.form.chargerWiringType] : []);
+
       return {
         powerAuthority: homeData.form.powerAuthority || '',
         charger: homeData.form.charger || '',
         numberOfChargers: homeData.form.numberOfChargers || '',
         trWiringType: homeData.form.trWiringType || '',
-        chargerWiringType: homeData.form.chargerWiringType || '',
+        trToLand: homeData.form.trToLand || homeData.trToLand || '',
+        landToMdb: homeData.form.landToMdb || homeData.landToMdb || '',
+        chargerWiringType: normalizedChargerWiringType,
         chargerTypeMode: homeData.chargerTypeMode || 'same',
         multiChargers: homeData.multiChargers || [],
         // ใช้ transformer ถ้ามี ถ้าไม่มีให้ใช้ transformerSize (สำหรับข้อมูลเก่า)
@@ -17090,10 +17160,15 @@ function StationAccessory() {
       };
     }
 
-    // ถ้า homeData เป็น props format อยู่แล้ว ใช้เลย แต่เพิ่ม fallback สำหรับ transformer
+    // ถ้า homeData เป็น props format อยู่แล้ว ใช้เลย แต่เพิ่ม fallback สำหรับ transformer และ chargerWiringType
     return {
       ...homeData,
-      transformer: homeData.transformer || homeData.transformerSize || ''
+      transformer: homeData.transformer || homeData.transformerSize || '',
+      chargerWiringType: Array.isArray(homeData.chargerWiringType)
+        ? homeData.chargerWiringType
+        : (homeData.chargerWiringType ? [homeData.chargerWiringType] : []),
+      trToLand: homeData.trToLand || homeData.form?.trToLand || '',
+      landToMdb: homeData.landToMdb || homeData.form?.landToMdb || ''
     };
   }, [homeData]);
 
