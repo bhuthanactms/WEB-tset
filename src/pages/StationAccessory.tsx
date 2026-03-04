@@ -252,7 +252,7 @@ function MoreDetailCard(props: any) {
         charger: props.charger || '',
         numberOfChargers: props.numberOfChargers || '',
         trWiringType: props.trWiringType || '',
-        chargerWiringType: props.chargerWiringType || ''
+        chargerWiringType: Array.isArray(props.chargerWiringType) ? props.chargerWiringType : (props.chargerWiringType ? [props.chargerWiringType] : [])
       },
       chargerTypeMode: props.chargerTypeMode || 'same',
       multiChargers: props.multiChargers || [],
@@ -1136,7 +1136,11 @@ function MoreDetailCard(props: any) {
       for (let i = 0; i < props.chargerSummary.length; i++) {
         const charger = props.chargerSummary[i];
         const chargerName = charger.name;
-        const wiringType = props.chargerWiringType;
+        // รองรับทั้ง array และ string (backward compatibility)
+        const wiringTypes = Array.isArray(props.chargerWiringType)
+          ? props.chargerWiringType
+          : (props.chargerWiringType ? [props.chargerWiringType] : []);
+        const wiringType = wiringTypes.length > 0 ? wiringTypes[0] : ''; // ใช้ประเภทแรกเป็นหลัก
 
         // Extract kW from charger name
         const kwMatch = chargerName.match(/(\d+)\s*kW/i);
@@ -1476,6 +1480,10 @@ function MoreDetailCard(props: any) {
     Array(chargersCount).fill('')
   );
 
+  // State สำหรับเก็บระยะทางของแต่ละประเภทสาย (สำหรับกรณีมีมากกว่า 1 ประเภท)
+  // Structure: { [chargerIndex]: { [wiringType]: distance } }
+  const [chargerWiringTypeDistances, setChargerWiringTypeDistances] = useState<{ [key: number]: { [wiringType: string]: string } }>({});
+
 
 
 
@@ -1557,7 +1565,12 @@ function MoreDetailCard(props: any) {
 
   const [mdbSelection, setMdbSelection] = useState(props.mdbSelection || 'no');
 
-  const [chargerSelection, setChargerSelection] = useState(props.chargerSelection || 'no');
+  // ตั้งค่าเริ่มต้น chargerSelection เป็น 'yes' ถ้ามีข้อมูล chargerWiringType หรือ chargerSummary
+  const hasChargerWiringType = props.chargerWiringType &&
+    (Array.isArray(props.chargerWiringType) ? props.chargerWiringType.length > 0 : !!props.chargerWiringType);
+  const hasChargerSummary = props.chargerSummary && props.chargerSummary.length > 0;
+  const initialChargerSelection = props.chargerSelection || (hasChargerWiringType || hasChargerSummary ? 'yes' : 'no');
+  const [chargerSelection, setChargerSelection] = useState(initialChargerSelection);
 
   // Auto calculate when values change
   useEffect(() => {
@@ -1565,37 +1578,59 @@ function MoreDetailCard(props: any) {
       const newResults: any = {};
 
       for (let i = 0; i < chargersCount; i++) {
-        const inputDistance = parseFloat(chargerLineDistances[i] || '0');
-        const distance = inputDistance + 3; // ระยะที่กรอก + 3 สำหรับการคำนวณ
         const chargerName = props.chargerSummary?.[i]?.name || '';
-        const hasRequiredData = inputDistance > 0 && chargerName;
-
-        if (!hasRequiredData) continue;
+        if (!chargerName) continue;
 
         // หา cable จาก chargerWiringCableAll หรือ chargerWiringCable
         const cables: string[] = Array.isArray(props.chargerWiringCableAll) ? props.chargerWiringCableAll : (props.chargerWiringCable ? [props.chargerWiringCable] : []);
         const cable = cables[i] ?? cables[cables.length - 1] ?? '';
 
         // คำนวณประเภทสายหลัก (จาก props.chargerWiringType)
-        const mainWiringType = props.chargerWiringType || '';
-        if (mainWiringType) {
-          const mainConduitType = (mainWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ')
-            ? (chargerConduitChoices[i] || '')
-            : '';
-          const isMainUnderground = mainWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน';
-          const isMainTray = mainWiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา';
-          const isMainLadder = mainWiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา';
-          const hasMainConduitType = isMainUnderground || isMainTray || isMainLadder || (mainConduitType && mainConduitType !== '');
+        // รองรับทั้ง array และ string (backward compatibility)
+        const wiringTypes = Array.isArray(props.chargerWiringType)
+          ? props.chargerWiringType
+          : (props.chargerWiringType ? [props.chargerWiringType] : []);
 
-          if (hasMainConduitType) {
-            try {
-              const mainResult = await getMdbToChargerConfig(chargerName, mainWiringType, mainConduitType, distance, cable);
-              if (mainResult) {
-                if (!newResults[i]) newResults[i] = { main: null, additional: null };
-                newResults[i].main = mainResult;
+        // วน loop ผ่านทุกประเภทที่เลือกและเก็บผลลัพธ์แยกตาม wiring type
+        if (wiringTypes.length > 0) {
+          if (!newResults[i]) newResults[i] = { wiringTypes: {}, additional: null };
+          
+          for (const wiringType of wiringTypes) {
+            if (!wiringType) continue;
+
+            // ดึงระยะทางจาก chargerWiringTypeDistances ถ้ามีหลายประเภท หรือใช้ chargerLineDistances ถ้ามีประเภทเดียว
+            const typeDistance = chargerWiringTypeDistances[i]?.[wiringType] || chargerLineDistances[i] || '0';
+            const inputDistance = parseFloat(typeDistance || '0');
+            const distance = inputDistance + 3; // ระยะที่กรอก + 3 สำหรับการคำนวณ
+
+            if (inputDistance <= 0) continue;
+
+            const mainConduitType = (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ')
+              ? (chargerConduitChoices[i] || '')
+              : '';
+            const isMainUnderground = wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน';
+            const isMainTray = wiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา';
+            const isMainLadder = wiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา';
+            const hasMainConduitType = isMainUnderground || isMainTray || isMainLadder || (mainConduitType && mainConduitType !== '');
+
+            if (hasMainConduitType) {
+              try {
+                const mainResult = await getMdbToChargerConfig(chargerName, wiringType, mainConduitType, distance, cable);
+                if (mainResult) {
+                  // เก็บผลลัพธ์แยกตาม wiring type
+                  newResults[i].wiringTypes[wiringType] = {
+                    code: mainResult.code || '',
+                    materialCost: mainResult.materialCost || 0,
+                    laborCost: mainResult.laborCost || 0,
+                    totalCost: mainResult.totalCost || 0,
+                    productName: mainResult.productName || wiringType,
+                    distance: inputDistance,
+                    conduitType: mainConduitType
+                  };
+                }
+              } catch (error) {
+                console.error(`Error calculating wiring type ${wiringType}:`, error);
               }
-            } catch (error) {
-              console.error('Error calculating main wiring type:', error);
             }
           }
         }
@@ -1607,8 +1642,13 @@ function MoreDetailCard(props: any) {
           const additionalInputDistance = parseFloat(additionalChargerLineDistances[i] || '0');
           const additionalDistance = additionalInputDistance + 3; // ระยะที่กรอก + 3 สำหรับการคำนวณ
           const additionalCable = additionalChargerCables[i] || '';
+          
+          // ตรวจสอบว่า wiring type นี้ยังไม่ได้คำนวณในส่วน main
+          const mainWiringTypes = Array.isArray(props.chargerWiringType)
+            ? props.chargerWiringType
+            : (props.chargerWiringType ? [props.chargerWiringType] : []);
 
-          if (additionalWiringType && additionalWiringType !== mainWiringType && additionalInputDistance > 0) {
+          if (additionalWiringType && !mainWiringTypes.includes(additionalWiringType) && additionalInputDistance > 0) {
             const additionalConduitType = (additionalWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ')
               ? (additionalChargerConduitChoices[i] || '')
               : '';
@@ -1641,6 +1681,7 @@ function MoreDetailCard(props: any) {
     }
   }, [
     chargerLineDistances,
+    chargerWiringTypeDistances,
     chargerConduitChoices,
     props.chargerWiringType,
     props.chargerSummary,
@@ -2801,7 +2842,9 @@ function MoreDetailCard(props: any) {
 
       // คำนวณ TR to Land
       const trToLandInputDistance = parseFloat(trToLandDistance || '0');
-      const trToLandDistanceCalc = trToLandInputDistance + 9;
+      // ถ้าเลือก "ภายในปั้ม" ให้บวก 6 เมตร, ถ้าไม่ใช่ให้บวก 3 เมตร
+      const trToLandBuffer = installationLocation === 'inside-station' ? 6 : 3;
+      const trToLandDistanceCalc = trToLandInputDistance + trToLandBuffer;
 
       if (trToLandInputDistance > 0) {
         const trToLandNormalized = normalizeWiringType(props.trToLand);
@@ -2823,7 +2866,7 @@ function MoreDetailCard(props: any) {
 
       // คำนวณ Land to MDB
       const landToMdbInputDistance = parseFloat(landToMdbDistance || '0');
-      const landToMdbDistanceCalc = landToMdbInputDistance + 9;
+      const landToMdbDistanceCalc = landToMdbInputDistance + 6;
 
       if (landToMdbInputDistance > 0) {
         const landToMdbNormalized = normalizeWiringType(props.landToMdb);
@@ -3384,7 +3427,8 @@ function MoreDetailCard(props: any) {
     props.landToMdb,
     trToLandDistance,
     landToMdbDistance,
-    landToMdbWiringGroup2
+    landToMdbWiringGroup2,
+    installationLocation
   ]);
 
   // ฟังก์ชันดึงข้อมูลตู้ MDB จาก Sheet "ตารางขนาดและราคาตู้ MDB"
@@ -3531,31 +3575,141 @@ function MoreDetailCard(props: any) {
       return emptyTotals;
     }
 
-    const results = Object.values(chargerResults || {});
+    const results = Object.entries(chargerResults || {});
 
     if (!results.length) {
       return emptyTotals;
     }
 
-    // รวมทั้ง main และ additional
-    const material = results.reduce((acc, result: any) => {
-      const mainMaterial = result.main ? parsePrice(result.main.materialCost) : 0;
-      const additionalMaterial = result.additional ? parsePrice(result.additional.materialCost) : 0;
-      return acc + mainMaterial + additionalMaterial;
-    }, 0);
+    // รวมทั้ง wiringTypes และ additional รวมถึงอุปกรณ์เสริม
+    let material = 0;
+    let labor = 0;
+    let total = 0;
 
-    const labor = results.reduce((acc, result: any) => {
-      const mainLabor = result.main ? parsePrice(result.main.laborCost) : 0;
-      const additionalLabor = result.additional ? parsePrice(result.additional.laborCost) : 0;
-      return acc + mainLabor + additionalLabor;
-    }, 0);
+    results.forEach(([index, result]: [string, any]) => {
+      const chargerIndex = parseInt(index);
+      const chargerWiringTypes = Array.isArray(props.chargerWiringType)
+        ? props.chargerWiringType
+        : (props.chargerWiringType ? [props.chargerWiringType] : []);
+
+      // รวมจาก wiringTypes (โครงสร้างใหม่)
+      if (result.wiringTypes) {
+        Object.entries(result.wiringTypes).forEach(([wiringType, typeResult]: [string, any]) => {
+          material += parsePrice(typeResult.materialCost || 0);
+          labor += parsePrice(typeResult.laborCost || 0);
+          total += parsePrice(typeResult.totalCost || 0);
+
+          // เพิ่มค่าจากอุปกรณ์เสริม TRAY/LADDER (ถ้ามี)
+          const isTray = wiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา';
+          const isLadder = wiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา';
+          const inputDistance = typeResult.distance || 0;
+
+          if ((isTray || isLadder) && inputDistance > 0) {
+            const chargerName = props.chargerSummary?.[chargerIndex]?.name || '';
+            const kwMatch = chargerName.match(/(\d+)\s*kW/i);
+            const kw = kwMatch ? parseInt(kwMatch[1]) : 0;
+            const powerAuthority = props.powerAuthority || 'MEA';
+
+            const rowMapping = getMdbToChargerRowMapping(
+              wiringType,
+              '',
+              powerAuthority,
+              props.chargerInstallationType === 'group'
+            );
+            const rowNum = rowMapping[kw];
+
+            if (rowNum) {
+              const sheetName = isTray ? 'แบบ 9.15' : 'แบบ 9.16';
+              const sheet = getExcelData(sheetName);
+              const row = sheet.find((r: any) => r.__rowNum__ === rowNum);
+
+              if (row) {
+                const divided = inputDistance / 1.2;
+                const fractional = divided - Math.floor(divided);
+                const quantity = fractional < 0.5 ? Math.floor(divided) : Math.ceil(divided);
+
+                // เหล็กเท้าแขนสามเหลี่ยมรับ TRAY-LADDER
+                const bracketMaterialUnit = parsePrice(row.__EMPTY_29 || 0);
+                const bracketLaborUnit = parsePrice(row.__EMPTY_31 || 0);
+                const bracketTotalUnit = parsePrice(row.__EMPTY_33 || 0);
+                material += bracketMaterialUnit * quantity;
+                labor += bracketLaborUnit * quantity;
+                total += bracketTotalUnit * quantity;
+
+                // Support ยึดพื้น TRAY / LADDER
+                const supportMaterialUnit = parsePrice(row.__EMPTY_39 || 0);
+                const supportLaborUnit = parsePrice(row.__EMPTY_41 || 0);
+                const supportTotalUnit = parsePrice(row.__EMPTY_43 || 0);
+                material += supportMaterialUnit * quantity;
+                labor += supportLaborUnit * quantity;
+                total += supportTotalUnit * quantity;
+              }
+            }
+          }
+
+          // เพิ่มค่าจากเหล็กเท้าแขนสามเหลี่ยมรับท่อ (ถ้ามี)
+          const isGroup2Air = wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ';
+          const conduitType = typeResult.conduitType || '';
+          const hasValidConduit = conduitType === 'IMC' || conduitType === 'RSC';
+
+          if (isGroup2Air && hasValidConduit) {
+            const chargerName = props.chargerSummary?.[chargerIndex]?.name || '';
+            const kwMatch = chargerName.match(/(\d+)\s*kW/i);
+            const kw = kwMatch ? parseInt(kwMatch[1]) : 0;
+            const rowMapping: { [key: number]: number } = {
+              30: 9, 40: 10, 60: 12, 80: 13, 120: 15, 160: 17, 180: 18, 200: 18,
+              240: 22, 320: 25, 360: 28, 480: 29, 600: 34, 640: 35, 720: 38, 800: 22
+            };
+            const rowNum = rowMapping[kw];
+
+            if (rowNum) {
+              const sheetName = conduitType === 'IMC' ? 'แบบ 9.10' : 'แบบ 9.11';
+              const sheet = getExcelData(sheetName);
+              const row = sheet.find((r: any) => r.__rowNum__ === rowNum);
+
+              if (row) {
+                let multiplier, materialUnit, laborUnit, totalUnit;
+                if (conduitType === 'RSC') {
+                  multiplier = parsePrice(row.__EMPTY_27 || 1);
+                  materialUnit = parsePrice(row.__EMPTY_28 || 0);
+                  laborUnit = parsePrice(row.__EMPTY_30 || 0);
+                  totalUnit = parsePrice(row.__EMPTY_32 || 0);
+                } else {
+                  multiplier = parsePrice(row.__EMPTY_28 || 1);
+                  materialUnit = parsePrice(row.__EMPTY_29 || 0);
+                  laborUnit = parsePrice(row.__EMPTY_31 || 0);
+                  totalUnit = parsePrice(row.__EMPTY_33 || 0);
+                }
+                material += materialUnit * multiplier;
+                labor += laborUnit * multiplier;
+                total += totalUnit * multiplier;
+              }
+            }
+          }
+        });
+      }
+
+      // รวมจาก additional (ถ้ามี)
+      if (result.additional) {
+        material += parsePrice(result.additional.materialCost || 0);
+        labor += parsePrice(result.additional.laborCost || 0);
+        total += parsePrice((result.additional.materialCost || 0) + (result.additional.laborCost || 0));
+      }
+
+      // รองรับโครงสร้างเก่า (backward compatibility)
+      if (result.main) {
+        material += parsePrice(result.main.materialCost || 0);
+        labor += parsePrice(result.main.laborCost || 0);
+        total += parsePrice((result.main.materialCost || 0) + (result.main.laborCost || 0));
+      }
+    });
 
     return {
       material,
       labor,
-      total: material + labor,
+      total,
     };
-  }, [chargerSelection, chargerResults]);
+  }, [chargerSelection, chargerResults, props.chargerWiringType, props.chargerSummary, props.powerAuthority, props.chargerInstallationType, getMdbToChargerRowMapping, getExcelData]);
 
   const travelTotals = React.useMemo(() => {
     const total = parsePrice(travelCostResult);
@@ -4362,7 +4516,9 @@ function MoreDetailCard(props: any) {
         if (props.trToLand && props.landToMdb) {
           // TR to Land
           const trToLandInputDistance = parseFloat(trToLandDistance || '0');
-          const trToLandDistanceCalc = trToLandInputDistance + 9;
+          // ถ้าเลือก "ภายในปั้ม" ให้บวก 6 เมตร, ถ้าไม่ใช่ให้บวก 3 เมตร
+          const trToLandBuffer = installationLocation === 'inside-station' ? 6 : 3;
+          const trToLandDistanceCalc = trToLandInputDistance + trToLandBuffer;
 
           if (trToLandInputDistance > 0) {
             const normalizeWiringType = (wiringType: string) => {
@@ -4401,7 +4557,7 @@ function MoreDetailCard(props: any) {
 
           // Land to MDB
           const landToMdbInputDistance = parseFloat(landToMdbDistance || '0');
-          const landToMdbDistanceCalc = landToMdbInputDistance + 9;
+          const landToMdbDistanceCalc = landToMdbInputDistance + 6;
 
           if (landToMdbInputDistance > 0) {
             const normalizeWiringType = (wiringType: string) => {
@@ -4954,33 +5110,72 @@ function MoreDetailCard(props: any) {
       }
     } else if (sectionKey === 'mdb-to-charger') {
       if (chargerSelection === 'yes' && chargerResults) {
-        const results = Object.values(chargerResults || {});
+        const results = Object.entries(chargerResults || {});
         const cables: string[] = Array.isArray(props.chargerWiringCableAll) ? props.chargerWiringCableAll : (props.chargerWiringCable ? [props.chargerWiringCable] : []);
 
-        results.forEach((result: any, idx: number) => {
-          const inputDistance = parseFloat(chargerLineDistances[idx] || '0') || 0;
-          const distance = inputDistance + 3; // ระยะที่กรอก + 3 สำหรับการคำนวณ
+        results.forEach(([index, result]: [string, any]) => {
+          const idx = parseInt(index);
+          const cables: string[] = Array.isArray(props.chargerWiringCableAll) ? props.chargerWiringCableAll : (props.chargerWiringCable ? [props.chargerWiringCable] : []);
           const cable = cables[idx] || cables[0] || '';
           // ลบ "ChargerX: " ออกจาก cable ถ้ามี
           const cableSize = cable.replace(/^Charger\d+:\s*/, '').trim();
 
           // สร้างฟังก์ชันช่วยสำหรับสร้าง product
           const createProduct = (wiringType: string, resultData: any, isAdditional: boolean = false) => {
+            // ดึงระยะทางจาก resultData
+            const inputDistance = resultData.distance || parseFloat(chargerLineDistances[idx] || '0') || 0;
+            const distance = inputDistance + 3; // ระยะที่กรอก + 3 สำหรับการคำนวณ
+
             // สร้างรายการสินค้า: ขนาดสาย (CV/THW) + ท่อ
             let productNameParts: string[] = [];
 
             // 1. ขนาดสาย: เพิ่ม CV ด้านหน้า และ THWG ต่อท้าย
-            if (cableSize) {
-              productNameParts.push(`CV ${cableSize} THWG`);
+            // ดึงขนาดสายจาก props.chargerWiringCableAll สำหรับ wiring type นี้
+            const typeCableFromProps = cables[idx] || cables[0] || '';
+            let cableValue = typeCableFromProps.replace(/^Charger\d+:\s*/i, '').trim();
+            
+            // ถ้ามีหลายประเภทใน cable (เช่น "ประเภท1: value1 | ประเภท2: value2")
+            if (cableValue.includes('|')) {
+              const parts = cableValue.split('|');
+              for (const part of parts) {
+                const trimmedPart = part.trim();
+                if (trimmedPart.startsWith(wiringType + ':')) {
+                  const match = trimmedPart.match(/^[^:]+:\s*(.+)$/);
+                  if (match && match[1]) {
+                    cableValue = match[1].trim();
+                    break;
+                  }
+                }
+              }
+            }
+            
+            if (cableValue) {
+              productNameParts.push(`CV ${cableValue} THWG`);
             }
 
             // 2. ท่อ: เพิ่มตามประเภทการเดินสาย
             const conduits: string[] = Array.isArray(props.chargerWireConduitAll) ? props.chargerWireConduitAll : (props.chargerWireConduit ? [props.chargerWireConduit] : []);
             let conduitDisplay = conduits[idx] || conduits[0] || '';
+            
+            // ถ้ามีหลายประเภทใน conduit
+            if (conduitDisplay.includes('|')) {
+              const parts = conduitDisplay.split('|');
+              for (const part of parts) {
+                const trimmedPart = part.trim();
+                if (trimmedPart.startsWith(wiringType + ':')) {
+                  const match = trimmedPart.match(/^[^:]+:\s*(.+)$/);
+                  if (match && match[1]) {
+                    conduitDisplay = match[1].trim();
+                    break;
+                  }
+                }
+              }
+            }
 
             // 2.1 ถ้า ประเภท: ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2 ให้เพิ่ม เลือกท่อ: ที่กดเลือกมาวางไว้หน้าค่า
-            if (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ' && chargerConduitChoices[idx]) {
-              conduitDisplay = `${chargerConduitChoices[idx]} ${conduitDisplay}`.trim();
+            const conduitType = resultData.conduitType || '';
+            if (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ' && conduitType) {
+              conduitDisplay = `${conduitType} ${conduitDisplay}`.trim();
             }
 
             // 2.2 ถ้า ประเภท: ขนาดสายไฟ 3P 4W ร้อยท่อฝังใต้ดิน กลุ่ม 5 ให้เพิ่ม __EMPTY_11 วางหน้าค่าเดิม
@@ -5009,21 +5204,45 @@ function MoreDetailCard(props: any) {
 
             const productName = productNameParts.length > 0 ? productNameParts.join(', ') : '-';
 
+            // ดึงชื่อ Charger
+            const chargerName = props.chargerSummary?.[idx]?.name || '';
+            const chargerLabel = chargerName ? `Charger ${idx + 1}: ${chargerName}` : `Charger ${idx + 1}`;
+
             products.push({
-              type: isAdditional ? `${wiringType} (เพิ่มเติม)` : (wiringType || 'MDB to Charger'),
+              type: isAdditional 
+                ? `${chargerLabel} - ${wiringType} (เพิ่มเติม)` 
+                : `${chargerLabel} - ${wiringType || 'MDB to Charger'}`,
               code: resultData.code || '',
               productName: productName,
               distance: inputDistance > 0 ? `${distance}(${inputDistance})` : undefined, // แสดงเป็น x(y) โดย x = distance, y = inputDistance
-              materialTotal: parsePrice(resultData.materialCost),
-              laborTotal: parsePrice(resultData.laborCost),
-              totalPrice: parsePrice(resultData.materialCost) + parsePrice(resultData.laborCost),
+              materialTotal: parsePrice(resultData.materialCost || 0),
+              laborTotal: parsePrice(resultData.laborCost || 0),
+              totalPrice: parsePrice(resultData.totalCost || 0),
               quantity: '1',
             });
           };
 
-          // เพิ่มรายการประเภทสายหลัก
+          // เพิ่มรายการประเภทสายหลัก (ใช้โครงสร้างใหม่ wiringTypes)
+          if (result.wiringTypes) {
+            Object.entries(result.wiringTypes).forEach(([wiringType, typeResult]: [string, any]) => {
+              if (wiringType && typeResult) {
+                createProduct(wiringType, typeResult, false);
+              }
+            });
+          }
+
+          // รองรับโครงสร้างเก่า (backward compatibility)
           if (result.main) {
-            createProduct(props.chargerWiringType || '', result.main, false);
+            // รองรับทั้ง array และ string (backward compatibility)
+            const wiringTypes = Array.isArray(props.chargerWiringType)
+              ? props.chargerWiringType
+              : (props.chargerWiringType ? [props.chargerWiringType] : []);
+            // สร้าง product สำหรับทุกประเภทที่เลือก
+            wiringTypes.forEach((wiringType: string) => {
+              if (wiringType) {
+                createProduct(wiringType, result.main, false);
+              }
+            });
           }
 
           // เพิ่มรายการประเภทสายเพิ่มเติม
@@ -5073,8 +5292,12 @@ function MoreDetailCard(props: any) {
 
               const additionalProductName = additionalProductNameParts.length > 0 ? additionalProductNameParts.join(', ') : '-';
 
+              // ดึงชื่อ Charger
+              const chargerName = props.chargerSummary?.[idx]?.name || '';
+              const chargerLabel = chargerName ? `Charger ${idx + 1}: ${chargerName}` : `Charger ${idx + 1}`;
+
               products.push({
-                type: `${additionalWiringType} (เพิ่มเติม)`,
+                type: `${chargerLabel} - ${additionalWiringType} (เพิ่มเติม)`,
                 code: result.additional.code || '',
                 productName: additionalProductName,
                 distance: additionalInputDistance > 0 ? `${additionalDistance}(${additionalInputDistance})` : undefined,
@@ -5087,7 +5310,10 @@ function MoreDetailCard(props: any) {
           }
 
           // เพิ่มรายการ "เหล็กเท้าแขนสามเหลี่ยมรับท่อ" สำหรับกรณี "ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ"
-          if (props.chargerWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ' && chargerConduitChoices[idx] && (chargerConduitChoices[idx] === 'IMC' || chargerConduitChoices[idx] === 'RSC')) {
+          const wiringTypes = Array.isArray(props.chargerWiringType)
+            ? props.chargerWiringType
+            : (props.chargerWiringType ? [props.chargerWiringType] : []);
+          if (wiringTypes.includes('ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ') && chargerConduitChoices[idx] && (chargerConduitChoices[idx] === 'IMC' || chargerConduitChoices[idx] === 'RSC')) {
             const chargerName = props.chargerSummary?.[idx]?.name || '';
             const kwMatch = chargerName.match(/(\d+)\s*kW/i);
             const kw = kwMatch ? parseInt(kwMatch[1]) : 0;
@@ -8468,9 +8694,11 @@ function MoreDetailCard(props: any) {
                             // กรณีมี trToLand และ landToMdb แยกกัน
                             if (props.trToLand && props.landToMdb) {
                               const trToLandInputDistance = parseFloat(trToLandDistance || '0');
-                              const trToLandDistanceCalc = trToLandInputDistance + 9;
+                              // ถ้าเลือก "ภายในปั้ม" ให้บวก 6 เมตร, ถ้าไม่ใช่ให้บวก 3 เมตร
+                              const trToLandBuffer = installationLocation === 'inside-station' ? 6 : 3;
+                              const trToLandDistanceCalc = trToLandInputDistance + trToLandBuffer;
                               const landToMdbInputDistance = parseFloat(landToMdbDistance || '0');
-                              const landToMdbDistanceCalc = landToMdbInputDistance + 9;
+                              const landToMdbDistanceCalc = landToMdbInputDistance + 6;
 
                               // แปลง wiringType ให้ตรงกับที่ getTrToMdbPrice คาดหวัง
                               const normalizeWiringType = (wiringType: string) => {
@@ -11015,6 +11243,18 @@ function MoreDetailCard(props: any) {
 
                 // Render each group. If a group has 1, it's a normal row. If >1, render a combined row with Units.
 
+                // รองรับทั้ง array และ string (backward compatibility) - ประกาศนอก map เพื่อใช้ร่วมกัน
+                const allWiringTypes = Array.isArray(props.chargerWiringType)
+                  ? props.chargerWiringType
+                  : (props.chargerWiringType ? [props.chargerWiringType] : []);
+
+                // ถ้าไม่มี groups (ไม่มี cable data) ให้สร้าง groups จาก chargerSummary
+                if (groups.size === 0 && props.chargerSummary && props.chargerSummary.length > 0) {
+                  for (let i = 0; i < props.chargerSummary.length; i++) {
+                    groups.set(`charger-${i}`, { key: `charger-${i}`, label: '', idxs: [i] });
+                  }
+                }
+
                 return Array.from(groups.values()).map(({ label: cable, idxs }) => {
 
                   // Conduits may vary per index; collect unique
@@ -11025,7 +11265,7 @@ function MoreDetailCard(props: any) {
 
                   const conduitDisplay = Array.from(conduitSet).filter(Boolean).join(', ');
 
-                  const isGroup2Air = props.chargerWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ';
+                  const isGroup2Air = allWiringTypes.includes('ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ');
 
 
 
@@ -11070,9 +11310,13 @@ function MoreDetailCard(props: any) {
                     };
 
                     const isUsingCustom = useCustomWiringType[idx] || false;
+                    // รองรับทั้ง array และ string (backward compatibility)
+                    const chargerWiringTypesArray = Array.isArray(props.chargerWiringType)
+                      ? props.chargerWiringType
+                      : (props.chargerWiringType ? [props.chargerWiringType] : []);
                     const currentWiringType = isUsingCustom
-                      ? (chargerWiringTypeSelects[idx] || props.chargerWiringType || '')
-                      : (props.chargerWiringType || '');
+                      ? (chargerWiringTypeSelects[idx] || (chargerWiringTypesArray.length > 0 ? chargerWiringTypesArray[0] : '') || '')
+                      : (chargerWiringTypesArray.length > 0 ? chargerWiringTypesArray[0] : '');
 
                     // ตัวเลือกประเภทสาย (ขึ้นอยู่กับ chargerInstallationType)
                     const wiringTypeOptions = props.chargerInstallationType === 'group'
@@ -11088,242 +11332,471 @@ function MoreDetailCard(props: any) {
                         'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา'
                       ].filter(Boolean);
 
+                    // ตรวจสอบว่ามีมากกว่า 1 ประเภทหรือไม่
+                    const hasMultipleTypes = chargerWiringTypesArray.length > 1;
+
                     return (
 
                       <div key={`${cable}-single-${idx}`} className="p-3 rounded-md border border-gray-200">
 
-                        <div className="flex flex-wrap items-center gap-4">
+                        {hasMultipleTypes ? (
+                          // แสดงแต่ละประเภทแยกกันเหมือน TR to MDB
+                          <div className="space-y-4">
+                            {chargerWiringTypesArray.map((wiringType: string, typeIdx: number) => {
+                              const typeDistance = chargerWiringTypeDistances[idx]?.[wiringType] || '';
+                              const setTypeDistance = (val: string) => {
+                                const next = { ...chargerWiringTypeDistances };
+                                if (!next[idx]) next[idx] = {};
+                                next[idx][wiringType] = val;
+                                setChargerWiringTypeDistances(next);
+                              };
+                              const bgColor = typeIdx % 2 === 0 ? 'bg-blue-50' : 'bg-green-50';
+                              const isGroup2Air = wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ';
+                              const typeConduitChoice = chargerConduitChoices[idx] || '';
+                              const setTypeConduitChoice = (val: string) => {
+                                const next = [...chargerConduitChoices];
+                                next[idx] = val;
+                                setChargerConduitChoices(next);
+                              };
 
-                          <div className="flex items-center gap-2">
+                              // ดึงค่าขนาดสายจาก props.chargerWiringCableAll ที่ส่งมาจาก Home.tsx
+                              const getCableForWiringType = (wiringType: string, chargerIdx: number): string => {
+                                // ดึงข้อมูลจาก props.chargerWiringCableAll
+                                const cables: string[] = Array.isArray(props.chargerWiringCableAll)
+                                  ? props.chargerWiringCableAll
+                                  : (props.chargerWiringCable ? [props.chargerWiringCable] : []);
 
-                            <span className="text-sm ">ประเภท:</span>
+                                const cable = cables[chargerIdx] || cables[0] || '';
+                                if (!cable) return '';
 
-                            <span className="font-semibold ">{props.chargerWiringType || '-'}</span>
+                                // ลบ "ChargerX: " ออกจาก cable ถ้ามี
+                                let cableValue = cable.replace(/^Charger\d+:\s*/i, '').trim();
 
-                          </div>
-
-                          {isUsingCustom && (
-                            <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                              <div className="text-sm font-semibold text-blue-800 mb-3">ประเภทสายเพิ่มเติม:</div>
-
-                              <div className="space-y-3">
-                                {/* ประเภทสาย */}
-                                <div className="flex items-center gap-2">
-                                  <Label className="text-sm font-medium min-w-[120px]">ประเภท:</Label>
-                                  <Select value={chargerWiringTypeSelects[idx] || ''} onValueChange={setWiringTypeAt}>
-                                    <SelectTrigger className="w-80">
-                                      <SelectValue placeholder="เลือกประเภทสายเพิ่มเติม" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {wiringTypeOptions
-                                        .filter(option => option !== props.chargerWiringType) // กรองค่าที่ซ้ำกับ props
-                                        .map((option) => (
-                                          <SelectItem key={option} value={option}>
-                                            {option}
-                                          </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-
-                                {/* ขนาดสาย */}
-                                <div className="flex items-center gap-2">
-                                  <Label className="text-sm font-medium min-w-[120px]">ขนาดสาย (CV/THW):</Label>
-                                  <Input
-                                    type="text"
-                                    className="w-80"
-                                    value={additionalChargerCables[idx] || ''}
-                                    onChange={(e) => {
-                                      const next = [...additionalChargerCables];
-                                      next[idx] = e.target.value;
-                                      setAdditionalChargerCables(next);
-                                    }}
-                                    placeholder="กรอกขนาดสาย เช่น 2x240mm²"
-                                  />
-                                </div>
-
-                                {/* ท่อ */}
-                                <div className="flex items-center gap-2">
-                                  <Label className="text-sm font-medium min-w-[120px]">ท่อ:</Label>
-                                  {chargerWiringTypeSelects[idx] === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ' ? (
-                                    <Select
-                                      value={additionalChargerConduitChoices[idx] || ''}
-                                      onValueChange={(val) => {
-                                        const next = [...additionalChargerConduitChoices];
-                                        next[idx] = val;
-                                        setAdditionalChargerConduitChoices(next);
-                                      }}
-                                    >
-                                      <SelectTrigger className="w-80">
-                                        <SelectValue placeholder="เลือกท่อ" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="IMC">IMC</SelectItem>
-                                        <SelectItem value="RSC">RSC</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  ) : (
-                                    <Input
-                                      type="text"
-                                      className="w-80"
-                                      value={additionalChargerConduitChoices[idx] || ''}
-                                      onChange={(e) => {
-                                        const next = [...additionalChargerConduitChoices];
-                                        next[idx] = e.target.value;
-                                        setAdditionalChargerConduitChoices(next);
-                                      }}
-                                      placeholder="กรอกท่อ"
-                                    />
-                                  )}
-                                </div>
-
-                                {/* ระยะ */}
-                                <div className="flex items-center gap-2">
-                                  <Label htmlFor={`additionalChargerDistance_${idx}`} className="text-sm font-medium min-w-[120px]">ระยะ (เมตร):</Label>
-                                  <Input
-                                    id={`additionalChargerDistance_${idx}`}
-                                    type="number"
-                                    className="w-32 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                    value={additionalChargerLineDistances[idx] || ''}
-                                    onChange={(e) => {
-                                      const next = [...additionalChargerLineDistances];
-                                      next[idx] = e.target.value;
-                                      setAdditionalChargerLineDistances(next);
-                                    }}
-                                    placeholder="0"
-                                  />
-                                  <span className="text-red-600 text-sm ml-2">*ระยะศูนย์กลางMDB ถึง ศูนย์กลางCharger*</span>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          <div className="flex items-center gap-2">
-
-                            <span className="text-sm ">ขนาดสาย (CV/THW):</span>
-
-                            <span className="font-semibold ">{cable ? `CV ${cable} THWG` : ''}</span>
-                            {cable && cable.includes('2 SET OF') && (
-                              <span className="text-xs text-orange-600 font-semibold ml-2">(ใช้สาย 2 ชุด)</span>
-                            )}
-
-                          </div>
-
-                          <div className="flex items-center gap-2">
-
-                            <span className="text-sm ">ท่อ:</span>
-
-                            <span className="font-semibold ">
-                              {(() => {
-                                let conduitDisplay = conduits[idx] ?? conduits[conduits.length - 1] ?? '';
-
-                                // ถ้า ประเภท: ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2 ให้เพิ่ม เลือกท่อ: ที่กดเลือกมาวางไว้หน้าค่า
-                                if (isGroup2Air && group2Selected) {
-                                  conduitDisplay = `${group2Selected} ${conduitDisplay}`.trim();
-                                }
-
-                                // ถ้า ประเภท: ขนาดสายไฟ 3P 4W ร้อยท่อฝังใต้ดิน กลุ่ม 5 ให้เพิ่ม __EMPTY_11 วางหน้าค่า
-                                if (props.chargerWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน') {
-                                  // ดึงข้อมูล __EMPTY_11 จาก Excel data
-                                  const chargerName = props.chargerSummary?.[idx]?.name || '';
-                                  const kwMatch = chargerName.match(/(\d+)\s*kW/i);
-                                  const kw = kwMatch ? parseInt(kwMatch[1]) : 0;
-                                  const powerAuthority = props.powerAuthority || 'MEA';
-                                  const rowMapping = getMdbToChargerRowMapping(props.chargerWiringType, '', powerAuthority);
-                                  const rowNum = rowMapping[kw];
-                                  if (rowNum) {
-                                    const sheet912 = getExcelData('แบบ 9.12');
-                                    const row = sheet912.find((r: any) => r.__rowNum__ === rowNum);
-                                    const empty11Value = row?.__EMPTY_11 || '';
-                                    if (empty11Value) {
-                                      conduitDisplay = `${empty11Value} ${conduitDisplay}`.trim();
+                                // ถ้ามีหลายประเภทใน cable (เช่น "ประเภท1: value1 | ประเภท2: value2")
+                                // ให้หาเฉพาะค่าที่ตรงกับ wiringType ปัจจุบัน
+                                if (cableValue.includes('|')) {
+                                  const parts = cableValue.split('|');
+                                  for (const part of parts) {
+                                    const trimmedPart = part.trim();
+                                    // ตรวจสอบว่า part เริ่มต้นด้วย wiringType หรือไม่
+                                    if (trimmedPart.startsWith(wiringType + ':')) {
+                                      const match = trimmedPart.match(/^[^:]+:\s*(.+)$/);
+                                      if (match && match[1]) {
+                                        cableValue = match[1].trim();
+                                        break;
+                                      }
                                     }
                                   }
                                 }
 
-                                return conduitDisplay;
-                              })()}
-                            </span>
+                                return cableValue;
+                              };
 
+                              const typeCable = getCableForWiringType(wiringType, idx);
+
+                              return (
+                                <div key={typeIdx} className={`${bgColor} rounded-lg p-4 border ${typeIdx % 2 === 0 ? 'border-blue-200' : 'border-green-200'}`}>
+                                  <h4 className={`font-semibold mb-3 ${typeIdx % 2 === 0 ? 'text-blue-800' : 'text-green-800'}`}>
+                                    {wiringType}
+                                  </h4>
+                                  <div className="flex flex-wrap items-center gap-4 mb-3">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-sm ">ขนาดสาย (CV/THW):</span>
+                                      <span className="font-semibold ">{typeCable ? `CV ${typeCable} THWG` : ''}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-sm ">ท่อ:</span>
+                                      <span className="font-semibold ">
+                                        {(() => {
+                                          // ดึงค่าท่อจาก props.chargerWireConduitAll ที่ส่งมาจาก Home.tsx
+                                          const conduits: string[] = Array.isArray(props.chargerWireConduitAll)
+                                            ? props.chargerWireConduitAll
+                                            : (props.chargerWireConduit ? [props.chargerWireConduit] : []);
+
+                                          const conduit = conduits[idx] || conduits[0] || '';
+                                          if (!conduit) return '';
+
+                                          // ลบ "ChargerX: " ออกจาก conduit ถ้ามี
+                                          let conduitValue = conduit.replace(/^Charger\d+:\s*/i, '').trim();
+
+                                          // ถ้ามีหลายประเภทใน conduit (เช่น "ประเภท1: value1 | ประเภท2: value2")
+                                          // ให้หาเฉพาะค่าที่ตรงกับ wiringType ปัจจุบัน
+                                          if (conduitValue.includes('|')) {
+                                            const parts = conduitValue.split('|');
+                                            for (const part of parts) {
+                                              const trimmedPart = part.trim();
+                                              // ตรวจสอบว่า part เริ่มต้นด้วย wiringType หรือไม่
+                                              if (trimmedPart.startsWith(wiringType + ':')) {
+                                                const match = trimmedPart.match(/^[^:]+:\s*(.+)$/);
+                                                if (match && match[1]) {
+                                                  conduitValue = match[1].trim();
+                                                  break;
+                                                }
+                                              }
+                                            }
+                                          }
+
+                                          // ถ้าเป็น "ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ" และมี typeConduitChoice ให้เพิ่มเข้าไป
+                                          if (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ' && typeConduitChoice) {
+                                            conduitValue = `${typeConduitChoice} ${conduitValue}`.trim();
+                                          }
+
+                                          return conduitValue;
+                                        })()}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  {isGroup2Air && (
+                                    <div className="flex items-center gap-3 mb-3">
+                                      <Label className="font-medium min-w-[100px]">เลือกท่อ:</Label>
+                                      <Select value={typeConduitChoice} onValueChange={setTypeConduitChoice}>
+                                        <SelectTrigger className="w-32">
+                                          <SelectValue placeholder="เลือกท่อ" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="IMC">IMC</SelectItem>
+                                          <SelectItem value="RSC">RSC</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                  )}
+                                  <div className="flex items-center gap-3">
+                                    <Label htmlFor={`chargerDistance_${idx}_${typeIdx}`} className="font-medium min-w-[100px]">ระยะ (เมตร):</Label>
+                                    <Input
+                                      id={`chargerDistance_${idx}_${typeIdx}`}
+                                      type="number"
+                                      className="w-32 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                      value={typeDistance}
+                                      onChange={(e) => setTypeDistance(e.target.value)}
+                                      disabled={isGroup2Air && !typeConduitChoice}
+                                    />
+                                    <span className="text-red-600 text-sm ml-2">*ระยะศูนย์กลางMDB ถึง ศูนย์กลางCharger*</span>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
+                        ) : (
+                          // แสดงแบบเดิมเมื่อมีเพียง 1 ประเภท
+                          <>
+                            <div className="flex flex-wrap items-center gap-4">
 
-                        </div>
+                              <div className="flex items-center gap-2">
 
-                        <div className="mt-3 flex flex-wrap items-center gap-4">
+                                <span className="text-sm ">ประเภท:</span>
 
-                          {/* เลือกท่อ สำหรับกรณี กลุ่ม 2 เดินในอากาศ - ให้อยู่เหนือระยะ และบังคับให้เลือกก่อนกรอกระยะ */}
-                          {currentWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ' && (
-                            <div className="flex items-center gap-3 mb-3">
-                              <Label className=" font-medium min-w-[100px]">เลือกท่อ:</Label>
-                              <Select value={group2Selected} onValueChange={setConduitChoiceAt}>
-                                <SelectTrigger className="w-32">
-                                  <SelectValue placeholder="เลือกท่อ" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="IMC">IMC</SelectItem>
-                                  <SelectItem value="RSC">RSC</SelectItem>
-                                </SelectContent>
-                              </Select>
+                                <span className="font-semibold ">
+                                  {chargerWiringTypesArray.length > 0 ? chargerWiringTypesArray.join(', ') : '-'}
+                                </span>
+
+                              </div>
+
+                              {isUsingCustom && (
+                                <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                                  <div className="text-sm font-semibold text-blue-800 mb-3">ประเภทสายเพิ่มเติม:</div>
+
+                                  <div className="space-y-3">
+                                    {/* ประเภทสาย */}
+                                    <div className="flex items-center gap-2">
+                                      <Label className="text-sm font-medium min-w-[120px]">ประเภท:</Label>
+                                      <Select value={chargerWiringTypeSelects[idx] || ''} onValueChange={setWiringTypeAt}>
+                                        <SelectTrigger className="w-80">
+                                          <SelectValue placeholder="เลือกประเภทสายเพิ่มเติม" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {wiringTypeOptions
+                                            .filter(option => {
+                                              // กรองค่าที่ซ้ำกับ props.chargerWiringType (รองรับทั้ง array และ string)
+                                              const chargerWiringTypes = Array.isArray(props.chargerWiringType)
+                                                ? props.chargerWiringType
+                                                : (props.chargerWiringType ? [props.chargerWiringType] : []);
+                                              return !chargerWiringTypes.includes(option);
+                                            })
+                                            .map((option) => (
+                                              <SelectItem key={option} value={option}>
+                                                {option}
+                                              </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+
+                                    {/* ขนาดสาย */}
+                                    <div className="flex items-center gap-2">
+                                      <Label className="text-sm font-medium min-w-[120px]">ขนาดสาย (CV/THW):</Label>
+                                      <Input
+                                        type="text"
+                                        className="w-80"
+                                        value={additionalChargerCables[idx] || ''}
+                                        onChange={(e) => {
+                                          const next = [...additionalChargerCables];
+                                          next[idx] = e.target.value;
+                                          setAdditionalChargerCables(next);
+                                        }}
+                                        placeholder="กรอกขนาดสาย เช่น 2x240mm²"
+                                      />
+                                    </div>
+
+                                    {/* ท่อ */}
+                                    <div className="flex items-center gap-2">
+                                      <Label className="text-sm font-medium min-w-[120px]">ท่อ:</Label>
+                                      {chargerWiringTypeSelects[idx] === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ' ? (
+                                        <Select
+                                          value={additionalChargerConduitChoices[idx] || ''}
+                                          onValueChange={(val) => {
+                                            const next = [...additionalChargerConduitChoices];
+                                            next[idx] = val;
+                                            setAdditionalChargerConduitChoices(next);
+                                          }}
+                                        >
+                                          <SelectTrigger className="w-80">
+                                            <SelectValue placeholder="เลือกท่อ" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="IMC">IMC</SelectItem>
+                                            <SelectItem value="RSC">RSC</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                      ) : (
+                                        <Input
+                                          type="text"
+                                          className="w-80"
+                                          value={additionalChargerConduitChoices[idx] || ''}
+                                          onChange={(e) => {
+                                            const next = [...additionalChargerConduitChoices];
+                                            next[idx] = e.target.value;
+                                            setAdditionalChargerConduitChoices(next);
+                                          }}
+                                          placeholder="กรอกท่อ"
+                                        />
+                                      )}
+                                    </div>
+
+                                    {/* ระยะ */}
+                                    <div className="flex items-center gap-2">
+                                      <Label htmlFor={`additionalChargerDistance_${idx}`} className="text-sm font-medium min-w-[120px]">ระยะ (เมตร):</Label>
+                                      <Input
+                                        id={`additionalChargerDistance_${idx}`}
+                                        type="number"
+                                        className="w-32 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                        value={additionalChargerLineDistances[idx] || ''}
+                                        onChange={(e) => {
+                                          const next = [...additionalChargerLineDistances];
+                                          next[idx] = e.target.value;
+                                          setAdditionalChargerLineDistances(next);
+                                        }}
+                                        placeholder="0"
+                                      />
+                                      <span className="text-red-600 text-sm ml-2">*ระยะศูนย์กลางMDB ถึง ศูนย์กลางCharger*</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
+                              <div className="flex items-center gap-2">
+
+                                <span className="text-sm ">ขนาดสาย (CV/THW):</span>
+
+                                <span className="font-semibold ">{cable ? `CV ${cable} THWG` : ''}</span>
+                                {cable && cable.includes('2 SET OF') && (
+                                  <span className="text-xs text-orange-600 font-semibold ml-2">(ใช้สาย 2 ชุด)</span>
+                                )}
+
+                              </div>
+
+                              <div className="flex items-center gap-2">
+
+                                <span className="text-sm ">ท่อ:</span>
+
+                                <span className="font-semibold ">
+                                  {(() => {
+                                    let conduitDisplay = conduits[idx] ?? conduits[conduits.length - 1] ?? '';
+
+                                    // ถ้า ประเภท: ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2 ให้เพิ่ม เลือกท่อ: ที่กดเลือกมาวางไว้หน้าค่า
+                                    if (isGroup2Air && group2Selected) {
+                                      conduitDisplay = `${group2Selected} ${conduitDisplay}`.trim();
+                                    }
+
+                                    // ถ้า ประเภท: ขนาดสายไฟ 3P 4W ร้อยท่อฝังใต้ดิน กลุ่ม 5 ให้เพิ่ม __EMPTY_11 วางหน้าค่า
+                                    const wiringTypes = Array.isArray(props.chargerWiringType)
+                                      ? props.chargerWiringType
+                                      : (props.chargerWiringType ? [props.chargerWiringType] : []);
+                                    if (wiringTypes.includes('ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน')) {
+                                      // ดึงข้อมูล __EMPTY_11 จาก Excel data
+                                      const chargerName = props.chargerSummary?.[idx]?.name || '';
+                                      const kwMatch = chargerName.match(/(\d+)\s*kW/i);
+                                      const kw = kwMatch ? parseInt(kwMatch[1]) : 0;
+                                      const powerAuthority = props.powerAuthority || 'MEA';
+                                      // ใช้ประเภทแรกจาก array (หรือ string เดียวถ้าเป็น backward compatibility)
+                                      const firstWiringType = Array.isArray(props.chargerWiringType)
+                                        ? (props.chargerWiringType.length > 0 ? props.chargerWiringType[0] : '')
+                                        : (props.chargerWiringType || '');
+                                      const rowMapping = getMdbToChargerRowMapping(firstWiringType, '', powerAuthority);
+                                      const rowNum = rowMapping[kw];
+                                      if (rowNum) {
+                                        const sheet912 = getExcelData('แบบ 9.12');
+                                        const row = sheet912.find((r: any) => r.__rowNum__ === rowNum);
+                                        const empty11Value = row?.__EMPTY_11 || '';
+                                        if (empty11Value) {
+                                          conduitDisplay = `${empty11Value} ${conduitDisplay}`.trim();
+                                        }
+                                      }
+                                    }
+
+                                    return conduitDisplay;
+                                  })()}
+                                </span>
+
+                              </div>
+
                             </div>
-                          )}
 
-                          <div className="flex items-center gap-3">
-                            <Label htmlFor={`chargerDistance_${idx}`} className=" font-medium min-w-[100px]">ระยะ (เมตร):</Label>
-                            <Input
-                              id={`chargerDistance_${idx}`}
-                              type="number"
-                              className="w-32 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                              value={distance}
-                              onChange={(e) => setDistanceAt(e.target.value)}
-                              disabled={currentWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ' && !group2Selected}
-                            />
-                            <span className="text-red-600 text-sm ml-2">*ระยะศูนย์กลางMDB ถึง ศูนย์กลางCharger*</span>
-                          </div>
+                            <div className="mt-3 flex flex-wrap items-center gap-4">
 
-                          <div className="flex items-center gap-2">
-                            <Checkbox
-                              id={`useCustomWiringType_${idx}`}
-                              checked={isUsingCustom}
-                              onCheckedChange={(checked) => setUseCustomWiringTypeAt(checked === true)}
-                            />
-                            <Label htmlFor={`useCustomWiringType_${idx}`} className="text-xs text-gray-600 cursor-pointer">
-                              เพิ่มประเภทสายอื่น
-                            </Label>
-                          </div>
+                              {/* เลือกท่อ สำหรับกรณี กลุ่ม 2 เดินในอากาศ - ให้อยู่เหนือระยะ และบังคับให้เลือกก่อนกรอกระยะ */}
+                              {currentWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ' && (
+                                <div className="flex items-center gap-3 mb-3">
+                                  <Label className=" font-medium min-w-[100px]">เลือกท่อ:</Label>
+                                  <Select value={group2Selected} onValueChange={setConduitChoiceAt}>
+                                    <SelectTrigger className="w-32">
+                                      <SelectValue placeholder="เลือกท่อ" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="IMC">IMC</SelectItem>
+                                      <SelectItem value="RSC">RSC</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              )}
 
-                          {(currentWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ') && (
+                              <div className="flex items-center gap-3">
+                                <Label htmlFor={`chargerDistance_${idx}`} className=" font-medium min-w-[100px]">ระยะ (เมตร):</Label>
+                                <Input
+                                  id={`chargerDistance_${idx}`}
+                                  type="number"
+                                  className="w-32 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  value={distance}
+                                  onChange={(e) => setDistanceAt(e.target.value)}
+                                  disabled={currentWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ' && !group2Selected}
+                                />
+                                <span className="text-red-600 text-sm ml-2">*ระยะศูนย์กลางMDB ถึง ศูนย์กลางCharger*</span>
+                              </div>
 
-                            <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-2">
+                                <Checkbox
+                                  id={`useCustomWiringType_${idx}`}
+                                  checked={isUsingCustom}
+                                  onCheckedChange={(checked) => setUseCustomWiringTypeAt(checked === true)}
+                                />
+                                <Label htmlFor={`useCustomWiringType_${idx}`} className="text-xs text-gray-600 cursor-pointer">
+                                  เพิ่มประเภทสายอื่น
+                                </Label>
+                              </div>
 
-                              <Label className=" font-medium min-w-[100px]">เลือกท่อ:</Label>
+                              {(currentWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ') && (
 
-                              <Select value={group2Selected} onValueChange={setConduitChoiceAt}>
+                                <div className="flex items-center gap-3">
 
-                                <SelectTrigger className="w-32">
+                                  <Label className=" font-medium min-w-[100px]">เลือกท่อ:</Label>
 
-                                  <SelectValue placeholder="เลือกท่อ" />
+                                  <Select value={group2Selected} onValueChange={setConduitChoiceAt}>
 
-                                </SelectTrigger>
+                                    <SelectTrigger className="w-32">
 
-                                <SelectContent>
+                                      <SelectValue placeholder="เลือกท่อ" />
 
-                                  <SelectItem value="IMC">IMC</SelectItem>
+                                    </SelectTrigger>
 
-                                  <SelectItem value="RSC">RSC</SelectItem>
+                                    <SelectContent>
 
-                                </SelectContent>
+                                      <SelectItem value="IMC">IMC</SelectItem>
 
-                              </Select>
+                                      <SelectItem value="RSC">RSC</SelectItem>
+
+                                    </SelectContent>
+
+                                  </Select>
+
+                                </div>
+
+                              )}
 
                             </div>
 
-                          )}
+                            <div className="mt-3 flex flex-wrap items-center gap-4">
 
-                        </div>
+                              {/* เลือกท่อ สำหรับกรณี กลุ่ม 2 เดินในอากาศ - ให้อยู่เหนือระยะ และบังคับให้เลือกก่อนกรอกระยะ */}
+                              {currentWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ' && (
+                                <div className="flex items-center gap-3 mb-3">
+                                  <Label className=" font-medium min-w-[100px]">เลือกท่อ:</Label>
+                                  <Select value={group2Selected} onValueChange={setConduitChoiceAt}>
+                                    <SelectTrigger className="w-32">
+                                      <SelectValue placeholder="เลือกท่อ" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="IMC">IMC</SelectItem>
+                                      <SelectItem value="RSC">RSC</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              )}
 
+                              <div className="flex items-center gap-3">
+                                <Label htmlFor={`chargerDistance_${idx}`} className=" font-medium min-w-[100px]">ระยะ (เมตร):</Label>
+                                <Input
+                                  id={`chargerDistance_${idx}`}
+                                  type="number"
+                                  className="w-32 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  value={distance}
+                                  onChange={(e) => setDistanceAt(e.target.value)}
+                                  disabled={currentWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ' && !group2Selected}
+                                />
+                                <span className="text-red-600 text-sm ml-2">*ระยะศูนย์กลางMDB ถึง ศูนย์กลางCharger*</span>
+                              </div>
 
+                              <div className="flex items-center gap-2">
+                                <Checkbox
+                                  id={`useCustomWiringType_${idx}`}
+                                  checked={isUsingCustom}
+                                  onCheckedChange={(checked) => setUseCustomWiringTypeAt(checked === true)}
+                                />
+                                <Label htmlFor={`useCustomWiringType_${idx}`} className="text-xs text-gray-600 cursor-pointer">
+                                  เพิ่มประเภทสายอื่น
+                                </Label>
+                              </div>
+
+                              {(currentWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ') && (
+
+                                <div className="flex items-center gap-3">
+
+                                  <Label className=" font-medium min-w-[100px]">เลือกท่อ:</Label>
+
+                                  <Select value={group2Selected} onValueChange={setConduitChoiceAt}>
+
+                                    <SelectTrigger className="w-32">
+
+                                      <SelectValue placeholder="เลือกท่อ" />
+
+                                    </SelectTrigger>
+
+                                    <SelectContent>
+
+                                      <SelectItem value="IMC">IMC</SelectItem>
+
+                                      <SelectItem value="RSC">RSC</SelectItem>
+
+                                    </SelectContent>
+
+                                  </Select>
+
+                                </div>
+
+                              )}
+
+                            </div>
+                          </>
+                        )}
                       </div>
-
                     );
 
                   }
@@ -11369,9 +11842,13 @@ function MoreDetailCard(props: any) {
                   const groupConduitChoice = idxs.map(i => chargerConduitChoices[i]).find(v => v !== undefined) || '';
 
                   const groupUseCustom = idxs.map(i => useCustomWiringType[i]).find(v => v === true) || false;
+                  // รองรับทั้ง array และ string (backward compatibility)
+                  const groupWiringTypes = Array.isArray(props.chargerWiringType)
+                    ? props.chargerWiringType
+                    : (props.chargerWiringType ? [props.chargerWiringType] : []);
                   const groupWiringType = groupUseCustom
-                    ? (idxs.map(i => chargerWiringTypeSelects[i]).find(v => v !== undefined && v !== '') || props.chargerWiringType || '')
-                    : (props.chargerWiringType || '');
+                    ? (idxs.map(i => chargerWiringTypeSelects[i]).find(v => v !== undefined && v !== '') || (groupWiringTypes.length > 0 ? groupWiringTypes[0] : '') || '')
+                    : (groupWiringTypes.length > 0 ? groupWiringTypes[0] : '');
 
                   // ตัวเลือกประเภทสาย (ขึ้นอยู่กับ chargerInstallationType)
                   const wiringTypeOptions = props.chargerInstallationType === 'group'
@@ -11605,59 +12082,91 @@ function MoreDetailCard(props: any) {
                             {/* Content ที่สามารถพับได้ */}
                             <CollapsibleContent>
                               <div className="px-4 pb-4 space-y-4">
-                                {/* ข้อมูลเพิ่มเติม */}
-                                <div>
-                                  <div className="text-xs text-gray-500">
-                                    ประเภท: {props.chargerWiringType}
-                                  </div>
-                                  <div className="mt-2 text-sm">
-                                    <span className="font-medium text-gray-700">รหัส:</span>
-                                    <span className="text-gray-600 ml-1">{result.main?.code || '-'}</span>
-                                    <span className="text-gray-400 mx-2">|</span>
-                                    <span className="font-medium text-gray-700">ระยะ:</span>
-                                    <span className="text-gray-600 ml-1">
-                                      {(() => {
-                                        const inputDistance = parseFloat(chargerLineDistances[chargerIndex] || '0') || 0;
-                                        const distance = inputDistance + 3; // ระยะที่กรอก + 3 สำหรับการคำนวณ (ต้องตรงกับการคำนวณ)
-                                        return inputDistance > 0 ? `${distance} เมตร (${inputDistance} เมตร)` : '-';
-                                      })()}
-                                    </span>
-                                    {props.chargerWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ' && chargerConduitChoices[chargerIndex] && (
-                                      <>
-                                        <span className="text-gray-400 mx-2">|</span>
-                                        <span className="font-medium text-gray-700">เลือกท่อ:</span>
-                                        <span className="text-gray-600 ml-1">{chargerConduitChoices[chargerIndex]}</span>
-                                      </>
-                                    )}
-                                  </div>
-                                </div>
+                                {/* แสดงผลลัพธ์แยกตาม wiring type แต่ละตัว */}
+                                {(() => {
+                                  const wiringTypes = Array.isArray(props.chargerWiringType)
+                                    ? props.chargerWiringType
+                                    : (props.chargerWiringType ? [props.chargerWiringType] : []);
+                                  
+                                  // ถ้าไม่มี wiringTypes หรือไม่มีผลลัพธ์ ให้แสดงข้อความ
+                                  if (wiringTypes.length === 0 || !result.wiringTypes || Object.keys(result.wiringTypes).length === 0) {
+                                    return (
+                                      <div className="text-sm text-gray-500 p-4 bg-gray-50 rounded-lg border">
+                                        ยังไม่มีผลลัพธ์ - กรุณากรอกข้อมูลและเลือกประเภทท่อ
+                                      </div>
+                                    );
+                                  }
 
-                                {/* ค่าใช้จ่าย */}
-                                <div className="grid grid-cols-3 gap-4">
-                                  <div>
-                                    <div className="text-sm text-gray-600 mb-1">ค่าของ:</div>
-                                    <div className="text-xl font-bold text-gray-800">
-                                      {(result.main?.materialCost || 0).toLocaleString('th-TH')} บาท
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <div className="text-sm text-gray-600 mb-1">ค่าแรง:</div>
-                                    <div className="text-xl font-bold text-gray-800">
-                                      {(result.main?.laborCost || 0).toLocaleString('th-TH')} บาท
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <div className="text-sm text-blue-700 font-semibold mb-1">ค่าใช้จ่าย:</div>
-                                    <div className="text-2xl font-bold text-blue-700">
-                                      {((result.main?.laborCost || 0) + (result.main?.materialCost || 0)).toLocaleString('th-TH')} บาท
-                                    </div>
-                                  </div>
-                                </div>
+                                  return wiringTypes.map((wiringType, typeIdx) => {
+                                    const typeResult = result.wiringTypes?.[wiringType];
+                                    if (!typeResult) return null;
+
+                                    const inputDistance = typeResult.distance || 0;
+                                    const distance = inputDistance + 3;
+                                    const conduitType = typeResult.conduitType || '';
+
+                                    return (
+                                      <div key={typeIdx} className={`p-4 rounded-lg border ${typeIdx % 2 === 0 ? 'bg-blue-50 border-blue-200' : 'bg-green-50 border-green-200'}`}>
+                                        <h5 className={`font-semibold mb-3 ${typeIdx % 2 === 0 ? 'text-blue-800' : 'text-green-800'}`}>
+                                          {wiringType}
+                                        </h5>
+                                        
+                                        {/* ข้อมูลเพิ่มเติม */}
+                                        <div className="mb-3">
+                                          <div className="text-xs text-gray-500 mb-2">
+                                            <span className="font-medium text-gray-700">ประเภท:</span>
+                                            <span className="text-gray-600 ml-1">{wiringType}</span>
+                                            <span className="text-gray-400 mx-2">|</span>
+                                            <span className="font-medium text-gray-700">รหัส:</span>
+                                            <span className="text-gray-600 ml-1">{typeResult.code || '-'}</span>
+                                            <span className="text-gray-400 mx-2">|</span>
+                                            <span className="font-medium text-gray-700">ระยะ:</span>
+                                            <span className="text-gray-600 ml-1">
+                                              {inputDistance > 0 ? `${distance} เมตร (${inputDistance} เมตร)` : '-'}
+                                            </span>
+                                            {wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ' && conduitType && (
+                                              <>
+                                                <span className="text-gray-400 mx-2">|</span>
+                                                <span className="font-medium text-gray-700">เลือกท่อ:</span>
+                                                <span className="text-gray-600 ml-1">{conduitType}</span>
+                                              </>
+                                            )}
+                                          </div>
+                                        </div>
+
+                                        {/* ค่าใช้จ่าย */}
+                                        <div className="grid grid-cols-3 gap-4 mb-3">
+                                          <div>
+                                            <div className="text-sm text-gray-600 mb-1">ค่าของ:</div>
+                                            <div className="text-xl font-bold text-gray-800">
+                                              {(typeResult.materialCost || 0).toLocaleString('th-TH')} บาท
+                                            </div>
+                                          </div>
+                                          <div>
+                                            <div className="text-sm text-gray-600 mb-1">ค่าแรง:</div>
+                                            <div className="text-xl font-bold text-gray-800">
+                                              {(typeResult.laborCost || 0).toLocaleString('th-TH')} บาท
+                                            </div>
+                                          </div>
+                                          <div>
+                                            <div className={`text-sm font-semibold mb-1 ${typeIdx % 2 === 0 ? 'text-blue-700' : 'text-green-700'}`}>ค่าใช้จ่าย:</div>
+                                            <div className={`text-2xl font-bold ${typeIdx % 2 === 0 ? 'text-blue-700' : 'text-green-700'}`}>
+                                              {(typeResult.totalCost || 0).toLocaleString('th-TH')} บาท
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  });
+                                })()}
 
                                 {/* แสดงเหล็กเท้าแขนสามเหลี่ยมรับท่อ สำหรับกรณี "ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ" */}
                                 {(() => {
                                   // ตรวจสอบเงื่อนไข
-                                  const isGroup2Air = props.chargerWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ';
+                                  const wiringTypes = Array.isArray(props.chargerWiringType)
+                                    ? props.chargerWiringType
+                                    : (props.chargerWiringType ? [props.chargerWiringType] : []);
+                                  const isGroup2Air = wiringTypes.includes('ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ');
                                   const conduitChoice = chargerConduitChoices && chargerConduitChoices[chargerIndex];
                                   const hasValidConduit = conduitChoice === 'IMC' || conduitChoice === 'RSC';
 
@@ -11787,8 +12296,11 @@ function MoreDetailCard(props: any) {
 
                                 {/* แสดงเหล็กเท้าแขนสามเหลี่ยมรับ TRAY-LADDER และ Support ยึดพื้น TRAY / LADDER สำหรับกรณี TRAY หรือ LADDER */}
                                 {(() => {
-                                  const isTray = props.chargerWiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา';
-                                  const isLadder = props.chargerWiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา';
+                                  const wiringTypes = Array.isArray(props.chargerWiringType)
+                                    ? props.chargerWiringType
+                                    : (props.chargerWiringType ? [props.chargerWiringType] : []);
+                                  const isTray = wiringTypes.includes('ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา');
+                                  const isLadder = wiringTypes.includes('ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา');
 
                                   if (isTray || isLadder) {
                                     const inputDistance = parseFloat(chargerLineDistances[chargerIndex] || '0') || 0;
@@ -11800,8 +12312,12 @@ function MoreDetailCard(props: any) {
                                       const powerAuthority = props.powerAuthority || 'MEA';
 
                                       // ใช้ row mapping จาก getMdbToChargerRowMapping
+                                      // ใช้ประเภทแรกจาก array (หรือ string เดียวถ้าเป็น backward compatibility)
+                                      const firstWiringType = Array.isArray(props.chargerWiringType)
+                                        ? (props.chargerWiringType.length > 0 ? props.chargerWiringType[0] : '')
+                                        : (props.chargerWiringType || '');
                                       const rowMapping = getMdbToChargerRowMapping(
-                                        props.chargerWiringType,
+                                        firstWiringType,
                                         '',
                                         powerAuthority,
                                         props.chargerInstallationType === 'group'
@@ -11908,14 +12424,27 @@ function MoreDetailCard(props: any) {
 
                                 {/* ค่าของรวม, ค่าแรงรวม, รวมค่าใช้จ่าย สำหรับ MDB to Charger Configuration */}
                                 {(() => {
-                                  // คำนวณค่าจาก Charger main
-                                  let totalMaterial = (result.main?.materialCost || 0);
-                                  let totalLabor = (result.main?.laborCost || 0);
-                                  let totalCost = (result.main?.materialCost || 0) + (result.main?.laborCost || 0);
+                                  // รองรับทั้ง array และ string (backward compatibility) - ประกาศนอก scope เพื่อใช้ร่วมกัน
+                                  const chargerWiringTypes = Array.isArray(props.chargerWiringType)
+                                    ? props.chargerWiringType
+                                    : (props.chargerWiringType ? [props.chargerWiringType] : []);
+
+                                  // คำนวณค่าจาก wiringTypes ทั้งหมด
+                                  let totalMaterial = 0;
+                                  let totalLabor = 0;
+                                  let totalCost = 0;
+
+                                  if (result.wiringTypes) {
+                                    Object.values(result.wiringTypes).forEach((typeResult: any) => {
+                                      totalMaterial += typeResult.materialCost || 0;
+                                      totalLabor += typeResult.laborCost || 0;
+                                      totalCost += typeResult.totalCost || 0;
+                                    });
+                                  }
 
                                   // เพิ่มค่าจากอุปกรณ์เสริม TRAY/LADDER (ถ้ามี)
-                                  const isTray = props.chargerWiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา';
-                                  const isLadder = props.chargerWiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา';
+                                  const isTray = chargerWiringTypes.includes('ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา');
+                                  const isLadder = chargerWiringTypes.includes('ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา');
                                   if (isTray || isLadder) {
                                     const inputDistance = parseFloat(chargerLineDistances[chargerIndex] || '0') || 0;
                                     if (inputDistance > 0) {
@@ -11963,7 +12492,7 @@ function MoreDetailCard(props: any) {
                                   }
 
                                   // เพิ่มค่าจากเหล็กเท้าแขนสามเหลี่ยมรับท่อ (ถ้ามี)
-                                  const isGroup2Air = props.chargerWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ';
+                                  const isGroup2Air = chargerWiringTypes.includes('ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ');
                                   const conduitChoice = chargerConduitChoices && chargerConduitChoices[chargerIndex];
                                   const hasValidConduit = conduitChoice === 'IMC' || conduitChoice === 'RSC';
 
@@ -12067,9 +12596,16 @@ function MoreDetailCard(props: any) {
                                 <div className="text-sm text-gray-600 mb-1">ค่าของรวม:</div>
                                 <div className="text-xl font-bold text-gray-800">
                                   {Object.values(chargerResults).reduce((total, result: any) => {
-                                    const mainMaterial = result.main ? (result.main.materialCost || 0) : 0;
-                                    const additionalMaterial = result.additional ? (result.additional.materialCost || 0) : 0;
-                                    return total + mainMaterial + additionalMaterial;
+                                    let materialTotal = 0;
+                                    if (result.wiringTypes) {
+                                      Object.values(result.wiringTypes).forEach((typeResult: any) => {
+                                        materialTotal += typeResult.materialCost || 0;
+                                      });
+                                    }
+                                    if (result.additional) {
+                                      materialTotal += result.additional.materialCost || 0;
+                                    }
+                                    return total + materialTotal;
                                   }, 0).toLocaleString('th-TH')} บาท
                                 </div>
                               </div>
@@ -12077,9 +12613,16 @@ function MoreDetailCard(props: any) {
                                 <div className="text-sm text-gray-600 mb-1">ค่าแรงรวม:</div>
                                 <div className="text-xl font-bold text-gray-800">
                                   {Object.values(chargerResults).reduce((total, result: any) => {
-                                    const mainLabor = result.main ? (result.main.laborCost || 0) : 0;
-                                    const additionalLabor = result.additional ? (result.additional.laborCost || 0) : 0;
-                                    return total + mainLabor + additionalLabor;
+                                    let laborTotal = 0;
+                                    if (result.wiringTypes) {
+                                      Object.values(result.wiringTypes).forEach((typeResult: any) => {
+                                        laborTotal += typeResult.laborCost || 0;
+                                      });
+                                    }
+                                    if (result.additional) {
+                                      laborTotal += result.additional.laborCost || 0;
+                                    }
+                                    return total + laborTotal;
                                   }, 0).toLocaleString('th-TH')} บาท
                                 </div>
                               </div>
@@ -12087,9 +12630,16 @@ function MoreDetailCard(props: any) {
                                 <div className="text-sm text-green-700 font-semibold mb-1">ราคารวม:</div>
                                 <div className="text-2xl font-bold text-green-700">
                                   {Object.values(chargerResults).reduce((total, result: any) => {
-                                    const mainTotal = result.main ? ((result.main.materialCost || 0) + (result.main.laborCost || 0)) : 0;
-                                    const additionalTotal = result.additional ? ((result.additional.materialCost || 0) + (result.additional.laborCost || 0)) : 0;
-                                    return total + mainTotal + additionalTotal;
+                                    let costTotal = 0;
+                                    if (result.wiringTypes) {
+                                      Object.values(result.wiringTypes).forEach((typeResult: any) => {
+                                        costTotal += typeResult.totalCost || 0;
+                                      });
+                                    }
+                                    if (result.additional) {
+                                      costTotal += (result.additional.materialCost || 0) + (result.additional.laborCost || 0);
+                                    }
+                                    return total + costTotal;
                                   }, 0).toLocaleString('th-TH')} บาท
                                 </div>
                               </div>
