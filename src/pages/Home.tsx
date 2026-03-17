@@ -589,8 +589,9 @@ export default function Home(): React.JSX.Element {
   };
 
   // Mapping Charger Type กับเซลล์ใน Excel สำหรับ Group Charger
-  // ใช้ row 152-169, mea: __EMPTY_21, pea: __EMPTY_96
+  // ใช้ row 151-170, mea: __EMPTY_21, pea: __EMPTY_96
   const groupChargerToExcelCell: Record<string, { mea?: string; pea?: string; rowNum: number }> = {
+    '240 kW': { mea: '__EMPTY_21', pea: '__EMPTY_96', rowNum: 151 },
     '280 kW': { mea: '__EMPTY_21', pea: '__EMPTY_96', rowNum: 152 },
     '320 kW': { mea: '__EMPTY_21', pea: '__EMPTY_96', rowNum: 153 },
     '360 kW': { mea: '__EMPTY_21', pea: '__EMPTY_96', rowNum: 154 },
@@ -625,16 +626,16 @@ export default function Home(): React.JSX.Element {
       if (!groupCell) return undefined;
       rowNum = groupCell.rowNum;
     } else {
-      const cell = chargerToExcelCell[charger];
-      if (!cell) return undefined;
+    const cell = chargerToExcelCell[charger];
+    if (!cell) return undefined;
 
-      // ดึงเลข row จาก cell เช่น 'C7' => 7
-      if (form.powerAuthority === 'MEA' && cell.mea) {
-        rowNum = parseInt(cell.mea.replace('C', ''));
-      }
-      if (form.powerAuthority === 'PEA' && cell.pea) {
-        rowNum = parseInt(cell.pea.replace('C', ''));
-      }
+    // ดึงเลข row จาก cell เช่น 'C7' => 7
+    if (form.powerAuthority === 'MEA' && cell.mea) {
+      rowNum = parseInt(cell.mea.replace('C', ''));
+    }
+    if (form.powerAuthority === 'PEA' && cell.pea) {
+      rowNum = parseInt(cell.pea.replace('C', ''));
+    }
     }
 
     if (rowNum === undefined) return undefined;
@@ -656,21 +657,54 @@ export default function Home(): React.JSX.Element {
       value = (row as any)[colKey];
       console.log(`[getInFromExcel] Group Charger - Row ${rowNum}, Column ${colKey}, Value: ${value}`);
     } else {
-      // สำหรับ Stand-alone: ใช้คอลัมน์ MEA. 24kV/416/240V: สำหรับทั้ง MEA และ PEA
-      const colKey = 'MEA. 24kV/416/240V:';
-      value = (row as any)[colKey];
-
-      // ถ้าไม่เจอ ลองหา key ที่มี "24kV" หรือ "416" หรือ "240V"
-      if (value === undefined || value === null || value === '') {
+      // สำหรับ Stand-alone: เลือกคอลัมน์ตาม Land to MDB wiring type
+      let colKey: string | undefined;
+      
+      // ตรวจสอบ Land to MDB wiring type
+      if (form.landToMdb === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' && form.powerAuthority === 'MEA') {
+        // สำหรับ TRAY ไม่มีฝา + MEA: ใช้คอลัมน์ MEA. กฟน. 416 V:
         const keys = Object.keys(row);
-        const foundKey = keys.find(k =>
-          k.includes('24kV') &&
+        // ลองหาคอลัมน์ที่มี "กฟน" และ "416" หรือ "MEA" และ "416"
+        colKey = keys.find(k => 
+          (k.includes('กฟน') || k.includes('MEA')) && 
           k.includes('416') &&
-          k.includes('240V')
-        );
-        if (foundKey) {
-          value = (row as any)[foundKey];
-          console.log(`[getInFromExcel] Found alternative key: ${foundKey} = ${value}`);
+          !k.includes('24kV')
+        ) || 'MEA. กฟน. 416 V:';
+        
+      value = (row as any)[colKey];
+        console.log(`[getInFromExcel] Stand-alone Charger - Row ${rowNum}, Land to MDB: ${form.landToMdb}, MEA, Column ${colKey}, Value: ${value}`);
+        
+        // ถ้าไม่เจอ ลองหา key ที่มี "416" และ "V" (ไม่ใช่ 24kV)
+        if (value === undefined || value === null || value === '') {
+          const foundKey = keys.find(k =>
+            k.includes('416') &&
+            k.includes('V') &&
+            !k.includes('24kV')
+          );
+          if (foundKey) {
+            colKey = foundKey;
+            value = (row as any)[foundKey];
+            console.log(`[getInFromExcel] Found alternative key for TRAY MEA: ${foundKey} = ${value}`);
+          }
+        }
+      } else {
+        // สำหรับ wiring type อื่นๆ หรือ PEA: ใช้คอลัมน์เดิม
+        colKey = 'MEA. 24kV/416/240V:';
+        value = (row as any)[colKey];
+        console.log(`[getInFromExcel] Stand-alone Charger - Row ${rowNum}, Land to MDB: ${form.landToMdb}, Column ${colKey}, Value: ${value}`);
+
+    // ถ้าไม่เจอ ลองหา key ที่มี "24kV" หรือ "416" หรือ "240V"
+    if (value === undefined || value === null || value === '') {
+      const keys = Object.keys(row);
+      const foundKey = keys.find(k =>
+        k.includes('24kV') &&
+        k.includes('416') &&
+        k.includes('240V')
+      );
+      if (foundKey) {
+        value = (row as any)[foundKey];
+        console.log(`[getInFromExcel] Found alternative key: ${foundKey} = ${value}`);
+          }
         }
       }
     }
@@ -819,7 +853,7 @@ export default function Home(): React.JSX.Element {
 
   // Charger options สำหรับ Group Charger
   const groupChargerOptions = [
-    '280 kW', '320 kW', '360 kW', '400 kW', '440 kW', '480 kW', '520 kW', '560 kW',
+    '240 kW', '280 kW', '320 kW', '360 kW', '400 kW', '440 kW', '480 kW', '520 kW', '560 kW',
     '600 kW', '640 kW', '680 kW', '720 kW', '760 kW', '800 kW', '840 kW', '880 kW',
     '920 kW', '960 kW', '1000 kW'
   ]
@@ -851,6 +885,12 @@ export default function Home(): React.JSX.Element {
     'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา'
   ]
 
+  // กรณี มิเตอร์แรงต่ำ 400 A: ทั้ง TR to Land และ Land to MDB เลือกได้แค่ 2 แบบนี้
+  const lowVoltageMeterWiringOptions = [
+    'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ',
+    'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน'
+  ]
+
   // Charger wiring type options สำหรับ Stand-alone
   const standAloneChargerWiringTypeOptions = [
     'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ',
@@ -870,6 +910,32 @@ export default function Home(): React.JSX.Element {
   const chargerWiringTypeOptions = chargerInstallationType === 'group'
     ? groupChargerWiringTypeOptions
     : standAloneChargerWiringTypeOptions;
+
+  // คำนวณ kW สำหรับแสดง/จำกัดตัวเลือก TR to MDB (รวมก่อนกด Calculate)
+  const formKwForTrMdb = chargerTypeMode === 'any'
+    ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => sum + extractPowerValue(chargerName), 0)
+    : (results?.kWAllCharger ?? (form.charger && form.numberOfChargers ? extractPowerValue(form.charger) * parseInt(String(form.numberOfChargers), 10) : 0));
+  const isLowVoltageMeter400 = form.powerAuthority === 'MEA' && formKwForTrMdb > 0 && formKwForTrMdb <= 280;
+
+  // ตัวเลือก TR to Land / Land to MDB: กรณี มิเตอร์แรงต่ำ 400 A จำกัดแค่ 2 แบบ
+  const trToLandOptionsEffective = isLowVoltageMeter400 ? lowVoltageMeterWiringOptions : trToLandOptions;
+  const landToMdbOptionsEffective = isLowVoltageMeter400 ? lowVoltageMeterWiringOptions : landToMdbOptions;
+
+  // กรณีเปลี่ยนเป็น มิเตอร์แรงต่ำ 400 A ถ้าเลือกค่าที่ไม่อยู่ใน 2 ตัวเลือก ให้รีเซ็ตเป็นตัวเลือกแรก
+  useEffect(() => {
+    if (!isLowVoltageMeter400) return;
+    const allowed = lowVoltageMeterWiringOptions;
+    setForm(f => {
+      const needTr = f.trToLand && !allowed.includes(f.trToLand);
+      const needLand = f.landToMdb && !allowed.includes(f.landToMdb);
+      if (!needTr && !needLand) return f;
+      return {
+        ...f,
+        ...(needTr && { trToLand: allowed[0] ?? '' }),
+        ...(needLand && { landToMdb: allowed[0] ?? '' }),
+      };
+    });
+  }, [isLowVoltageMeter400]);
 
   const fetchExcelData = async () => {
     // Convert Google Sheets sharing URL to direct download URL
@@ -1006,14 +1072,14 @@ export default function Home(): React.JSX.Element {
           if (!groupCell) return { name: chargerName, in: 0 };
           rowNum = groupCell.rowNum;
         } else {
-          const cell = chargerToExcelCell[chargerName];
-          if (!cell) return { name: chargerName, in: 0 };
-          if (form.powerAuthority === 'MEA' && cell.mea) {
-            rowNum = parseInt(cell.mea.replace('C', ''));
-          }
-          if (form.powerAuthority === 'PEA' && cell.pea) {
-            rowNum = parseInt(cell.pea.replace('C', ''));
-          }
+        const cell = chargerToExcelCell[chargerName];
+        if (!cell) return { name: chargerName, in: 0 };
+        if (form.powerAuthority === 'MEA' && cell.mea) {
+          rowNum = parseInt(cell.mea.replace('C', ''));
+        }
+        if (form.powerAuthority === 'PEA' && cell.pea) {
+          rowNum = parseInt(cell.pea.replace('C', ''));
+        }
         }
 
         if (rowNum === undefined) return { name: chargerName, in: 0 };
@@ -1034,20 +1100,20 @@ export default function Home(): React.JSX.Element {
           console.log(`[getMultiChargersIn] Group Charger - Charger: ${chargerName}, Row ${rowNum}, Column ${colKey}, Value: ${value}`);
         } else {
           // สำหรับ Stand-alone: ใช้คอลัมน์ MEA. 24kV/416/240V: สำหรับทั้ง MEA และ PEA
-          const colKey = 'MEA. 24kV/416/240V:';
+        const colKey = 'MEA. 24kV/416/240V:';
           value = (row as any)[colKey];
 
-          // ถ้าไม่เจอ ลองหา key ที่มี "24kV" หรือ "416" หรือ "240V"
-          if (value === undefined || value === null || value === '') {
-            const keys = Object.keys(row);
-            const foundKey = keys.find(k =>
-              k.includes('24kV') &&
-              k.includes('416') &&
-              k.includes('240V')
-            );
-            if (foundKey) {
-              value = (row as any)[foundKey];
-              console.log(`[getMultiChargersIn] Found alternative key: ${foundKey} = ${value}`);
+        // ถ้าไม่เจอ ลองหา key ที่มี "24kV" หรือ "416" หรือ "240V"
+        if (value === undefined || value === null || value === '') {
+          const keys = Object.keys(row);
+          const foundKey = keys.find(k =>
+            k.includes('24kV') &&
+            k.includes('416') &&
+            k.includes('240V')
+          );
+          if (foundKey) {
+            value = (row as any)[foundKey];
+            console.log(`[getMultiChargersIn] Found alternative key: ${foundKey} = ${value}`);
             }
           }
         }
@@ -1610,34 +1676,34 @@ export default function Home(): React.JSX.Element {
         ], // __EMPTY_74 to __EMPTY_85
       }
       : form.powerAuthority === 'MEA'
-        ? {
-          'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ': [
-            '__EMPTY_27', '__EMPTY_28', '__EMPTY_29', '__EMPTY_30', '__EMPTY_31', '__EMPTY_32', '__EMPTY_33', '__EMPTY_34', '__EMPTY_35', '__EMPTY_36', '__EMPTY_37', '__EMPTY_38', '__EMPTY_39'
-          ], // __EMPTY_27 to __EMPTY_39
-          'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน': [
-            '__EMPTY_51', '__EMPTY_52', '__EMPTY_53', '__EMPTY_54', '__EMPTY_55', '__EMPTY_56', '__EMPTY_57', '__EMPTY_58', '__EMPTY_59', '__EMPTY_60', '__EMPTY_61', '__EMPTY_62', '__EMPTY_63'
-          ], // __EMPTY_51 to __EMPTY_63
-          'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา': [
-            '__EMPTY_77', '__EMPTY_78', '__EMPTY_79', '__EMPTY_80', '__EMPTY_81', '__EMPTY_82', '__EMPTY_83', '__EMPTY_84', '__EMPTY_85', '__EMPTY_86'
-          ], // __EMPTY_77 to __EMPTY_86
-          'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา': [
-            '__EMPTY_101', '__EMPTY_102', '__EMPTY_103', '__EMPTY_104', '__EMPTY_105', '__EMPTY_106', '__EMPTY_107', '__EMPTY_108', '__EMPTY_109', '__EMPTY_110'
-          ], // __EMPTY_101 to __EMPTY_110
-        }
-        : {
-          'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ': [
-            '__EMPTY_25', '__EMPTY_26', '__EMPTY_27', '__EMPTY_28', '__EMPTY_29', '__EMPTY_30', '__EMPTY_31', '__EMPTY_32', '__EMPTY_33', '__EMPTY_34', '__EMPTY_35', '__EMPTY_36', '__EMPTY_37'
-          ], // __EMPTY_25 to __EMPTY_37
-          'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน': [
-            '__EMPTY_49', '__EMPTY_50', '__EMPTY_51', '__EMPTY_52', '__EMPTY_53', '__EMPTY_54', '__EMPTY_55', '__EMPTY_56', '__EMPTY_57', '__EMPTY_58', '__EMPTY_59', '__EMPTY_60', '__EMPTY_61'
-          ], // __EMPTY_49 to __EMPTY_61
-          'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา': [
-            '__EMPTY_75', '__EMPTY_76', '__EMPTY_77', '__EMPTY_78', '__EMPTY_79', '__EMPTY_80', '__EMPTY_81', '__EMPTY_82', '__EMPTY_83', '__EMPTY_84'
-          ], // __EMPTY_75 to __EMPTY_84
-          'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา': [
-            '__EMPTY_99', '__EMPTY_100', '__EMPTY_101', '__EMPTY_102', '__EMPTY_103', '__EMPTY_104', '__EMPTY_105', '__EMPTY_106', '__EMPTY_107', '__EMPTY_108'
-          ], // __EMPTY_99 to __EMPTY_108
-        };
+      ? {
+        'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ': [
+          '__EMPTY_27', '__EMPTY_28', '__EMPTY_29', '__EMPTY_30', '__EMPTY_31', '__EMPTY_32', '__EMPTY_33', '__EMPTY_34', '__EMPTY_35', '__EMPTY_36', '__EMPTY_37', '__EMPTY_38', '__EMPTY_39'
+        ], // __EMPTY_27 to __EMPTY_39
+        'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน': [
+          '__EMPTY_51', '__EMPTY_52', '__EMPTY_53', '__EMPTY_54', '__EMPTY_55', '__EMPTY_56', '__EMPTY_57', '__EMPTY_58', '__EMPTY_59', '__EMPTY_60', '__EMPTY_61', '__EMPTY_62', '__EMPTY_63'
+        ], // __EMPTY_51 to __EMPTY_63
+        'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา': [
+          '__EMPTY_77', '__EMPTY_78', '__EMPTY_79', '__EMPTY_80', '__EMPTY_81', '__EMPTY_82', '__EMPTY_83', '__EMPTY_84', '__EMPTY_85', '__EMPTY_86'
+        ], // __EMPTY_77 to __EMPTY_86
+        'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา': [
+          '__EMPTY_101', '__EMPTY_102', '__EMPTY_103', '__EMPTY_104', '__EMPTY_105', '__EMPTY_106', '__EMPTY_107', '__EMPTY_108', '__EMPTY_109', '__EMPTY_110'
+        ], // __EMPTY_101 to __EMPTY_110
+      }
+      : {
+        'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ': [
+          '__EMPTY_25', '__EMPTY_26', '__EMPTY_27', '__EMPTY_28', '__EMPTY_29', '__EMPTY_30', '__EMPTY_31', '__EMPTY_32', '__EMPTY_33', '__EMPTY_34', '__EMPTY_35', '__EMPTY_36', '__EMPTY_37'
+        ], // __EMPTY_25 to __EMPTY_37
+        'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน': [
+          '__EMPTY_49', '__EMPTY_50', '__EMPTY_51', '__EMPTY_52', '__EMPTY_53', '__EMPTY_54', '__EMPTY_55', '__EMPTY_56', '__EMPTY_57', '__EMPTY_58', '__EMPTY_59', '__EMPTY_60', '__EMPTY_61'
+        ], // __EMPTY_49 to __EMPTY_61
+        'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา': [
+          '__EMPTY_75', '__EMPTY_76', '__EMPTY_77', '__EMPTY_78', '__EMPTY_79', '__EMPTY_80', '__EMPTY_81', '__EMPTY_82', '__EMPTY_83', '__EMPTY_84'
+        ], // __EMPTY_75 to __EMPTY_84
+        'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา': [
+          '__EMPTY_99', '__EMPTY_100', '__EMPTY_101', '__EMPTY_102', '__EMPTY_103', '__EMPTY_104', '__EMPTY_105', '__EMPTY_106', '__EMPTY_107', '__EMPTY_108'
+        ], // __EMPTY_99 to __EMPTY_108
+      };
 
     // วน loop ผ่านทุกประเภทที่เลือก
     const selectedTypes = Array.isArray(form.chargerWiringType) ? form.chargerWiringType : [form.chargerWiringType];
@@ -1648,9 +1714,9 @@ export default function Home(): React.JSX.Element {
     // ฟังก์ชันช่วยในการดึงค่าจากแต่ละประเภท
     const getCableForType = (wiringType: string, chargerName: string, chargerIdx: number): string => {
       const cols = wiringTypeToCols[wiringType];
-      if (!cols) return '';
+    if (!cols) return '';
 
-      let rowNum: number | undefined;
+          let rowNum: number | undefined;
 
       if (chargerInstallationType === 'group') {
         const groupCell = groupChargerToExcelCell[chargerName];
@@ -1658,18 +1724,18 @@ export default function Home(): React.JSX.Element {
         rowNum = groupCell.rowNum;
       } else {
         const cell = chargerToExcelCell[chargerName];
-        if (form.powerAuthority === 'MEA' && cell?.mea) {
-          rowNum = parseInt(cell.mea.replace('C', ''));
-        }
-        if (form.powerAuthority === 'PEA' && cell?.pea) {
-          rowNum = parseInt(cell.pea.replace('C', ''));
-        }
+          if (form.powerAuthority === 'MEA' && cell?.mea) {
+            rowNum = parseInt(cell.mea.replace('C', ''));
+          }
+          if (form.powerAuthority === 'PEA' && cell?.pea) {
+            rowNum = parseInt(cell.pea.replace('C', ''));
+          }
       }
 
       if (!rowNum) return '';
-      const row = excelData.find(r => r.__rowNum__ === rowNum);
+          const row = excelData.find(r => r.__rowNum__ === rowNum);
       if (!row) return '';
-      const value = cols.map(col => row[col]).filter(Boolean).join(' ');
+          const value = cols.map(col => row[col]).filter(Boolean).join(' ');
       return value;
     };
 
@@ -1702,12 +1768,12 @@ export default function Home(): React.JSX.Element {
         rowNum = groupCell.rowNum;
       } else {
         const cell = chargerToExcelCell[form.charger];
-        if (form.powerAuthority === 'MEA' && cell?.mea) {
-          rowNum = parseInt(cell.mea.replace('C', ''));
-        }
-        if (form.powerAuthority === 'PEA' && cell?.pea) {
-          rowNum = parseInt(cell.pea.replace('C', ''));
-        }
+      if (form.powerAuthority === 'MEA' && cell?.mea) {
+        rowNum = parseInt(cell.mea.replace('C', ''));
+      }
+      if (form.powerAuthority === 'PEA' && cell?.pea) {
+        rowNum = parseInt(cell.pea.replace('C', ''));
+      }
       }
 
       if (!rowNum) return [];
@@ -1719,7 +1785,7 @@ export default function Home(): React.JSX.Element {
         .map(wiringType => {
           const cols = wiringTypeToCols[wiringType];
           if (!cols) return '';
-          const value = cols.map(col => row[col]).filter(Boolean).join(' ');
+      const value = cols.map(col => row[col]).filter(Boolean).join(' ');
           return value;
         })
         .filter(Boolean);
@@ -1754,14 +1820,14 @@ export default function Home(): React.JSX.Element {
     // Helper function สำหรับดึงค่า conduit สำหรับแต่ละประเภท
     // return string เดียว (ไม่ใช่ array) เพราะจะรวมผลลัพธ์ภายนอก
     const getConduitForType = (wiringType: string, chargerName: string, chargerIdx: number): string => {
-      let rowNum: number | undefined;
+              let rowNum: number | undefined;
 
       // หา row number
       if (chargerInstallationType === 'group') {
         const groupCell = groupChargerToExcelCell[chargerName];
         if (!groupCell) return '';
         rowNum = groupCell.rowNum;
-      } else {
+        } else {
         const cell = chargerToExcelCell[chargerName];
         if (form.powerAuthority === 'MEA' && cell?.mea) {
           rowNum = parseInt(cell.mea.replace('C', ''));
@@ -1772,7 +1838,7 @@ export default function Home(): React.JSX.Element {
       }
 
       if (!rowNum) return '';
-      const row = excelData.find(r => r.__rowNum__ === rowNum);
+          const row = excelData.find(r => r.__rowNum__ === rowNum);
       if (!row) return '';
 
       // เงื่อนไข MEA
@@ -1787,50 +1853,50 @@ export default function Home(): React.JSX.Element {
           return value ? `${value} นิ้ว` : '';
         }
         if (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน') {
-          // Fields: __EMPTY_68 to __EMPTY_73
-          const cols = ['__EMPTY_68', '__EMPTY_69', '__EMPTY_70', '__EMPTY_71', '__EMPTY_72', '__EMPTY_73'];
-          const value = cols.map(col => row[col]).filter(Boolean).join(' ');
+        // Fields: __EMPTY_68 to __EMPTY_73
+        const cols = ['__EMPTY_68', '__EMPTY_69', '__EMPTY_70', '__EMPTY_71', '__EMPTY_72', '__EMPTY_73'];
+              const value = cols.map(col => row[col]).filter(Boolean).join(' ');
           return value ? `${value} มม.` : '';
         }
         if (wiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา') {
-          // Field: __EMPTY_92
-          const col = '__EMPTY_92';
-          const value = row[col];
+        // Field: __EMPTY_92
+        const col = '__EMPTY_92';
+              const value = row[col];
           return value ? `${value} ซม.` : '';
         }
         if (wiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา') {
-          // Field: __EMPTY_116
-          const col = '__EMPTY_116';
-          const value = row[col];
+        // Field: __EMPTY_116
+        const col = '__EMPTY_116';
+              const value = row[col];
           return value ? `${value} ซม.` : '';
-        }
       }
-      // เงื่อนไข PEA
-      if (form.powerAuthority === 'PEA') {
+    }
+    // เงื่อนไข PEA
+    if (form.powerAuthority === 'PEA') {
         if (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ') {
           // Fields: __EMPTY_43 to __EMPTY_47 (สำหรับ Group Charger)
           // Fields: __EMPTY_42 to __EMPTY_47 (สำหรับ Stand-alone)
           const cols = chargerInstallationType === 'group'
             ? ['__EMPTY_43', '__EMPTY_44', '__EMPTY_45', '__EMPTY_46', '__EMPTY_47']
             : ['__EMPTY_42', '__EMPTY_43', '__EMPTY_44', '__EMPTY_45', '__EMPTY_46', '__EMPTY_47'];
-          const value = cols.map(col => row[col]).filter(Boolean).join(' ');
+              const value = cols.map(col => row[col]).filter(Boolean).join(' ');
           return value ? `${value} นิ้ว` : '';
         }
         if (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน') {
-          // Fields: __EMPTY_66 to __EMPTY_71
-          const cols = ['__EMPTY_66', '__EMPTY_67', '__EMPTY_68', '__EMPTY_69', '__EMPTY_70', '__EMPTY_71'];
-          const value = cols.map(col => row[col]).filter(Boolean).join(' ');
+        // Fields: __EMPTY_66 to __EMPTY_71
+        const cols = ['__EMPTY_66', '__EMPTY_67', '__EMPTY_68', '__EMPTY_69', '__EMPTY_70', '__EMPTY_71'];
+              const value = cols.map(col => row[col]).filter(Boolean).join(' ');
           return value ? `${value} มม.` : '';
         }
         if (wiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา') {
-          // Field: __EMPTY_90
-          const col = '__EMPTY_90';
-          const value = row[col];
+        // Field: __EMPTY_90
+        const col = '__EMPTY_90';
+              const value = row[col];
           return value ? `${value} ซม.` : '';
         }
         if (wiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา') {
-          // Field: __EMPTY_114
-          const col = '__EMPTY_114';
+        // Field: __EMPTY_114
+        const col = '__EMPTY_114';
           const value = row[col];
           return value ? `${value} ซม.` : '';
         }
@@ -1840,10 +1906,10 @@ export default function Home(): React.JSX.Element {
     };
 
     // วน loop ผ่านทุกประเภทที่เลือกและรวมผลลัพธ์
-    if (chargerTypeMode === 'any') {
-      return multiChargers
-        .filter(name => name !== '')
-        .map((chargerName, idx) => {
+        if (chargerTypeMode === 'any') {
+          return multiChargers
+            .filter(name => name !== '')
+            .map((chargerName, idx) => {
           const values = selectedTypes
             .map(wiringType => getConduitForType(wiringType, chargerName, idx))
             .filter(Boolean);
@@ -1856,10 +1922,10 @@ export default function Home(): React.JSX.Element {
           }
 
           return `Charger${idx + 1}: ${values[0]}`;
-        });
-    } else {
+            });
+        } else {
       // Same kW: ทุกเครื่องใช้ row เดียวกัน
-      let rowNum: number | undefined;
+          let rowNum: number | undefined;
 
       if (chargerInstallationType === 'group') {
         const groupCell = groupChargerToExcelCell[form.charger];
@@ -1875,9 +1941,9 @@ export default function Home(): React.JSX.Element {
         }
       }
 
-      if (!rowNum) return [];
-      const row = excelData.find(r => r.__rowNum__ === rowNum);
-      if (!row) return [];
+          if (!rowNum) return [];
+          const row = excelData.find(r => r.__rowNum__ === rowNum);
+          if (!row) return [];
 
       // วน loop ผ่านทุกประเภทที่เลือกและรวมผลลัพธ์
       const allValues = selectedTypes
@@ -1886,7 +1952,7 @@ export default function Home(): React.JSX.Element {
 
       if (allValues.length === 0) return [];
 
-      const numChargers = parseInt(form.numberOfChargers) || 1;
+          const numChargers = parseInt(form.numberOfChargers) || 1;
 
       // ถ้ามีหลายประเภท ให้แสดงแยกกัน
       if (allValues.length > 1) {
@@ -2281,18 +2347,18 @@ export default function Home(): React.JSX.Element {
 
                   {/* ขนาดTerminal - แสดงเฉพาะกรณี Group Charger และมี numberOfTerminals */}
                   {chargerInstallationType === 'group' && form.numberOfTerminals && (
-                    <div className="space-y-3">
-                      <Label className="text-sm font-medium text-gray-700">
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium text-gray-700">
                         ขนาดTerminal
-                      </Label>
+                    </Label>
                       <Select
                         value={form.terminalSize || ''}
                         onValueChange={(value) => setForm(f => ({ ...f, terminalSize: value }))}
                       >
-                        <SelectTrigger className="h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500">
+                      <SelectTrigger className="h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500">
                           <SelectValue placeholder="Select terminal size" />
-                        </SelectTrigger>
-                        <SelectContent>
+                      </SelectTrigger>
+                      <SelectContent>
                           <SelectItem value="300A">300A</SelectItem>
                           <SelectItem value="350A">350A</SelectItem>
                           <SelectItem value="380A">380A</SelectItem>
@@ -2326,47 +2392,49 @@ export default function Home(): React.JSX.Element {
 
                   <Separator />
 
-                  {/* TR to MDB Section */}
+                  {/* TR to MDB Section - กรณี มิเตอร์แรงต่ำ 400 A ใช้ชื่อ "มิเตอร์แรงต่ำ ถึง MDB" และ Wh-Meter to MDB (บนดิน/ใต้ดิน) */}
                   <div className="space-y-4">
                     <div className="space-y-1">
                       <Label className="text-sm font-semibold text-gray-800">
-                        TR to MDB <span className="text-xs text-gray-500 font-normal">(การเดินสาย หม้อแปลง ถึง MDB)</span>
+                        {isLowVoltageMeter400 ? 'มิเตอร์แรงต่ำ ถึง MDB' : 'TR to MDB'} <span className="text-xs text-gray-500 font-normal">{isLowVoltageMeter400 ? '' : '(การเดินสาย หม้อแปลง ถึง MDB)'}</span>
                       </Label>
-                      <p className="text-xs text-gray-500 ml-1">เลือกการเดินสายแยกเป็น 2 ส่วน: TR to Land และ Land to MDB</p>
+                      <p className="text-xs text-gray-500 ml-1">
+                        {isLowVoltageMeter400 ? 'เลือกการเดินสายแยกเป็น 2 ส่วน: Wh-Meter to MDB ( บนดิน ) และ Wh-Meter to MDB ( ใต้ดิน )' : 'เลือกการเดินสายแยกเป็น 2 ส่วน: TR to Land และ Land to MDB'}
+                      </p>
                     </div>
 
-                    {/* TR to Land */}
+                    {/* TR to Land / Wh-Meter to MDB ( บนดิน ) */}
                     <div className="space-y-3 pl-4 border-l-2 border-blue-200">
                       <Label className="text-sm font-medium text-gray-700">
-                        TR to Land <span className="text-xs text-gray-400">(การเดินสาย หม้อแปลง ถึง พื้น)</span>
+                        {isLowVoltageMeter400 ? 'Wh-Meter to MDB ( บนดิน )' : 'TR to Land'} <span className="text-xs text-gray-400">{isLowVoltageMeter400 ? '' : '(การเดินสาย หม้อแปลง ถึง พื้น)'}</span>
                       </Label>
                       <Select value={form.trToLand} onValueChange={(value) => setForm(f => ({ ...f, trToLand: value }))}>
                         <SelectTrigger className="h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500">
-                          <SelectValue placeholder="Select TR to Land wiring type" />
+                          <SelectValue placeholder={isLowVoltageMeter400 ? 'Select wiring type' : 'Select TR to Land wiring type'} />
                         </SelectTrigger>
                         <SelectContent>
-                          {trToLandOptions.map((option) => (
-                            <SelectItem key={option} value={option}>{option}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                          {trToLandOptionsEffective.map((option) => (
+                          <SelectItem key={option} value={option}>{option}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                    {/* Land to MDB */}
+                    {/* Land to MDB / Wh-Meter to MDB ( ใต้ดิน ) */}
                     <div className="space-y-3 pl-4 border-l-2 border-blue-200">
-                      <Label className="text-sm font-medium text-gray-700">
-                        Land to MDB <span className="text-xs text-gray-400">(การเดินสาย พื้น ถึง MDB)</span>
-                      </Label>
+                    <Label className="text-sm font-medium text-gray-700">
+                        {isLowVoltageMeter400 ? 'Wh-Meter to MDB ( ใต้ดิน )' : 'Land to MDB'} <span className="text-xs text-gray-400">{isLowVoltageMeter400 ? '' : '(การเดินสาย พื้น ถึง MDB)'}</span>
+                    </Label>
                       <Select value={form.landToMdb} onValueChange={(value) => setForm(f => ({ ...f, landToMdb: value }))}>
-                        <SelectTrigger className="h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500">
-                          <SelectValue placeholder="Select Land to MDB wiring type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {landToMdbOptions.map((option) => (
-                            <SelectItem key={option} value={option}>{option}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <SelectTrigger className="h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500">
+                          <SelectValue placeholder={isLowVoltageMeter400 ? 'Select wiring type' : 'Select Land to MDB wiring type'} />
+                      </SelectTrigger>
+                      <SelectContent>
+                          {landToMdbOptionsEffective.map((option) => (
+                          <SelectItem key={option} value={option}>{option}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     </div>
                   </div>
 
@@ -2499,6 +2567,10 @@ export default function Home(): React.JSX.Element {
                     numberOfTerminals: form.numberOfTerminals || '',
                     terminalSize: form.terminalSize || '',
                     terminalWiringType: form.terminalWiringType || '',
+                    terminalWireConduit: (() => {
+                      const terminalData = getTerminalWiringData();
+                      return terminalData?.conduitTray || '';
+                    })(),
                     trWiringSize: form.landToMdb ? getLandToMdbWiringSizeCVs() : (form.trToLand ? getTRToLandWiringSizeCVs() : (getTRWiringSizeCVs()[0] || '')),
                     trWireConduit: form.landToMdb ? getLandToMdbWireConduit() : (form.trToLand ? getTRToLandWireConduit() : (getTRWireConduit() || '')),
                     // Legacy MDB summary for backward compatibility
@@ -2601,11 +2673,11 @@ export default function Home(): React.JSX.Element {
                             rowNum = groupCell.rowNum;
                           } else {
                             const cell = chargerToExcelCell[chargerName];
-                            if (form.powerAuthority === 'MEA' && cell?.mea) {
-                              rowNum = parseInt(cell.mea.replace('C', ''));
-                            }
-                            if (form.powerAuthority === 'PEA' && cell?.pea) {
-                              rowNum = parseInt(cell.pea.replace('C', ''));
+                          if (form.powerAuthority === 'MEA' && cell?.mea) {
+                            rowNum = parseInt(cell.mea.replace('C', ''));
+                          }
+                          if (form.powerAuthority === 'PEA' && cell?.pea) {
+                            rowNum = parseInt(cell.pea.replace('C', ''));
                             }
                           }
 
@@ -2691,11 +2763,11 @@ export default function Home(): React.JSX.Element {
                           rowNum = groupCell.rowNum;
                         } else {
                           const cell = chargerToExcelCell[form.charger];
-                          if (form.powerAuthority === 'MEA' && cell?.mea) {
-                            rowNum = parseInt(cell.mea.replace('C', ''));
-                          }
-                          if (form.powerAuthority === 'PEA' && cell?.pea) {
-                            rowNum = parseInt(cell.pea.replace('C', ''));
+                        if (form.powerAuthority === 'MEA' && cell?.mea) {
+                          rowNum = parseInt(cell.mea.replace('C', ''));
+                        }
+                        if (form.powerAuthority === 'PEA' && cell?.pea) {
+                          rowNum = parseInt(cell.pea.replace('C', ''));
                           }
                         }
 
@@ -2994,8 +3066,8 @@ export default function Home(): React.JSX.Element {
                             <div className="font-semibold text-gray-900 flex items-center gap-4">
                               <span>{chargerInstallationType === 'group' ? 'Group Charger' : 'Stand-alone Charger'}{idx + 1}: {multiChargers[idx] || '-'}</span>
                               <span className="text-gray-700 font-normal">
-                                kW: {extractPowerValue(chargerName)} kW
-                              </span>
+                              kW: {extractPowerValue(chargerName)} kW
+                            </span>
                             </div>
                             {selectedTypes.length > 0 && (
                               <div className="mt-2 pt-2 border-t border-gray-200">
@@ -3089,7 +3161,7 @@ export default function Home(): React.JSX.Element {
                                             {wiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' || wiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา'
                                               ? 'Charger Wire tray:'
                                               : 'Charger Wire conduit:'}
-                                          </span>
+                            </span>
                                           <span className="font-semibold text-gray-900 text-sm">{conduitValue}</span>
                                         </div>
                                       )}
@@ -3134,8 +3206,8 @@ export default function Home(): React.JSX.Element {
                           <div className="font-semibold text-gray-900 flex items-center gap-4">
                             <span>{chargerInstallationType === 'group' ? 'Group Charger' : 'Stand-alone Charger'}{idx + 1}: {form.charger}</span>
                             <span className="text-gray-700 font-normal">
-                              ln(100%): {results?.inOfCharger !== undefined ? results.inOfCharger.toFixed(2) : '-'} A
-                            </span>
+                            ln(100%): {results?.inOfCharger !== undefined ? results.inOfCharger.toFixed(2) : '-'} A
+                          </span>
                           </div>
                           {selectedTypes.length > 0 && (
                             <div className="mt-2 pt-2 border-t border-gray-200">
@@ -3229,7 +3301,7 @@ export default function Home(): React.JSX.Element {
                                           {wiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' || wiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา'
                                             ? 'Charger Wire tray:'
                                             : 'Charger Wire conduit:'}
-                                        </span>
+                          </span>
                                         <span className="font-semibold text-gray-900 text-sm">{conduitValue}</span>
                                       </div>
                                     )}
@@ -3264,7 +3336,7 @@ export default function Home(): React.JSX.Element {
                 <Card className="shadow-lg border-0">
                   <CardHeader className="bg-gradient-to-r from-gray-50 to-blue-50 border-b">
                     <CardTitle className="flex items-center gap-2 text-gray-800">
-                      TR to MDB
+                      {form.powerAuthority === 'MEA' && results.kWAllCharger > 0 && results.kWAllCharger <= 280 ? 'มิเตอร์แรงต่ำ ถึง MDB' : 'TR to MDB'}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-6">
@@ -3296,15 +3368,15 @@ export default function Home(): React.JSX.Element {
                           })()}
                         </span>
                       </div>
-                      {/* TR to MDB Section - TR to Land */}
+                      {/* TR to MDB Section - TR to Land / Watt-hour Meter ( บนดิน ) */}
                       {(form.trToLand || form.landToMdb) && (
                         <div className="mt-2 pt-2 border-t border-gray-200">
-                          <div className="text-xs font-semibold text-gray-600 mb-2">TR to MDB (แยกเป็น 2 ส่วน):</div>
+                          <div className="text-xs font-semibold text-gray-600 mb-2">{form.powerAuthority === 'MEA' && results.kWAllCharger > 0 && results.kWAllCharger <= 280 ? 'มิเตอร์แรงต่ำ ถึง MDB (แยกเป็น 2 ส่วน):' : 'TR to MDB (แยกเป็น 2 ส่วน):'}</div>
 
-                          {/* TR to Land Wiring Type */}
+                          {/* TR to Land / Wh-Meter to MDB ( บนดิน ) */}
                           {form.trToLand && (
                             <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg mb-2">
-                              <span className="font-medium text-gray-700 text-sm">TR to Land Wiring Type:</span>
+                              <span className="font-medium text-gray-700 text-sm">{form.powerAuthority === 'MEA' && results.kWAllCharger > 0 && results.kWAllCharger <= 280 ? 'Wh-Meter to MDB ( บนดิน ):': 'TR to Land Wiring Type:'}</span>
                               <span className="font-semibold text-gray-900 text-sm">{form.trToLand}</span>
                             </div>
                           )}
@@ -3317,20 +3389,20 @@ export default function Home(): React.JSX.Element {
                               </span>
                             </div>
                           )}
-                          {/* TR to Land Wire conduit */}
+                          {/* TR to Land / Watt-hour (บนดิน) Wire conduit */}
                           {form.trToLand && form.powerAuthority && getTRToLandWireConduit() && (
                             <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg mb-2">
                               <span className="font-medium text-gray-700 text-sm">
-                                {form.trToLand === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' ? 'TR to Land Wire tray :' : 'TR to Land Wire conduit :'}
+                                {form.trToLand === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' ? (form.powerAuthority === 'MEA' && results.kWAllCharger > 0 && results.kWAllCharger <= 280 ? 'Wh-Meter to MDB ( บนดิน ) Wire tray :' : 'TR to Land Wire tray :') : (form.powerAuthority === 'MEA' && results.kWAllCharger > 0 && results.kWAllCharger <= 280 ? 'Wh-Meter to MDB ( บนดิน ) Wire conduit :' : 'TR to Land Wire conduit :')}
                               </span>
                               <span className="font-semibold text-gray-900 text-sm">{getTRToLandWireConduit()}</span>
                             </div>
                           )}
 
-                          {/* Land to MDB Wiring Type */}
+                          {/* Land to MDB / Wh-Meter to MDB ( ใต้ดิน ) */}
                           {form.landToMdb && (
                             <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg mb-2">
-                              <span className="font-medium text-gray-700 text-sm">Land to MDB Wiring Type:</span>
+                              <span className="font-medium text-gray-700 text-sm">{form.powerAuthority === 'MEA' && results.kWAllCharger > 0 && results.kWAllCharger <= 280 ? 'Wh-Meter to MDB ( ใต้ดิน ):': 'Land to MDB Wiring Type:'}</span>
                               <span className="font-semibold text-gray-900 text-sm">{form.landToMdb}</span>
                             </div>
                           )}
@@ -3343,13 +3415,13 @@ export default function Home(): React.JSX.Element {
                               </span>
                             </div>
                           )}
-                          {/* Land to MDB Wire conduit */}
+                          {/* Land to MDB / Watt-hour (ใต้ดิน) Wire conduit */}
                           {form.landToMdb && form.powerAuthority && getLandToMdbWireConduit() && (
                             <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
                               <span className="font-medium text-gray-700 text-sm">
-                                {form.landToMdb === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' ? 'Land to MDB Wire tray :' :
-                                  form.landToMdb === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน' ? 'Land to MDB Wire conduit :' :
-                                    'Land to MDB Wire conduit :'}
+                                {form.landToMdb === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' ? (form.powerAuthority === 'MEA' && results.kWAllCharger > 0 && results.kWAllCharger <= 280 ? 'Wh-Meter to MDB ( ใต้ดิน ) Wire tray :' : 'Land to MDB Wire tray :') :
+                                  form.landToMdb === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน' ? (form.powerAuthority === 'MEA' && results.kWAllCharger > 0 && results.kWAllCharger <= 280 ? 'Wh-Meter to MDB ( ใต้ดิน ) Wire conduit :' : 'Land to MDB Wire conduit :') :
+                                    (form.powerAuthority === 'MEA' && results.kWAllCharger > 0 && results.kWAllCharger <= 280 ? 'Wh-Meter to MDB ( ใต้ดิน ) Wire conduit :' : 'Land to MDB Wire conduit :')}
                               </span>
                               <span className="font-semibold text-gray-900 text-sm">{getLandToMdbWireConduit()}</span>
                             </div>
@@ -3358,10 +3430,10 @@ export default function Home(): React.JSX.Element {
                       )}
                       {/* TR Wiring Type (backward compatibility) */}
                       {form.trWiringType && !form.trToLand && !form.landToMdb && (
-                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                          <span className="font-medium text-gray-700">TR Wiring Type:</span>
-                          <span className="font-semibold text-gray-900 text-sm">{form.trWiringType}</span>
-                        </div>
+                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <span className="font-medium text-gray-700">TR Wiring Type:</span>
+                        <span className="font-semibold text-gray-900 text-sm">{form.trWiringType}</span>
+                      </div>
                       )}
                       {/* TR Wiring Size (CV) - backward compatibility */}
                       {(form.trWiringType && !form.trToLand && !form.landToMdb && form.powerAuthority && getTRWiringSizeCVs().length > 0) && (
@@ -3422,12 +3494,12 @@ export default function Home(): React.JSX.Element {
                                   rowNum = groupCell.rowNum;
                                 } else {
                                   const cell = chargerToExcelCell[chargerName];
-                                  if (form.powerAuthority === 'MEA' && cell?.mea) {
-                                    rowNum = parseInt(cell.mea.replace('C', ''));
-                                  }
-                                  if (form.powerAuthority === 'PEA' && cell?.pea) {
-                                    rowNum = parseInt(cell.pea.replace('C', ''));
-                                  }
+                                if (form.powerAuthority === 'MEA' && cell?.mea) {
+                                  rowNum = parseInt(cell.mea.replace('C', ''));
+                                }
+                                if (form.powerAuthority === 'PEA' && cell?.pea) {
+                                  rowNum = parseInt(cell.pea.replace('C', ''));
+                                }
                                 }
 
                                 const row = excelData.find(r => r.__rowNum__ === rowNum);
@@ -3502,12 +3574,12 @@ export default function Home(): React.JSX.Element {
                                 }
                               } else {
                                 const cell = chargerToExcelCell[form.charger];
-                                if (form.powerAuthority === 'MEA' && cell?.mea) {
-                                  rowNum = parseInt(cell.mea.replace('C', ''));
-                                }
-                                if (form.powerAuthority === 'PEA' && cell?.pea) {
-                                  rowNum = parseInt(cell.pea.replace('C', ''));
-                                }
+                              if (form.powerAuthority === 'MEA' && cell?.mea) {
+                                rowNum = parseInt(cell.mea.replace('C', ''));
+                              }
+                              if (form.powerAuthority === 'PEA' && cell?.pea) {
+                                rowNum = parseInt(cell.pea.replace('C', ''));
+                              }
                               }
 
                               const row = excelData.find(r => r.__rowNum__ === rowNum);
@@ -3528,13 +3600,29 @@ export default function Home(): React.JSX.Element {
                                   mccbSubs = Array(numChargers).fill(result);
                                 } else {
                                   // สำหรับ Stand-alone: อ่านค่าจากทั้ง 3 คอลัมน์และแสดงพร้อมกัน (ทุก MCCB Sub แสดงเหมือนกัน)
-                                  const values = columns.map(col => {
-                                    let val = (row as any)[col];
-                                    // สำหรับ PEA ถ้าต้องการหา 'MEA. กฟน. 416 V:'
-                                    if (form.powerAuthority === 'PEA' && col === 'MEA. กฟน. 416 V:') {
-                                      // ลองใช้ชื่อคอลัมน์ตรงๆ ก่อน
-                                      if (!val || val === '-') {
-                                        // ถ้าไม่เจอ ให้หาที่มี "กฟน" แต่ไม่มี "24kV" (เพื่อหลีกเลี่ยง MEA. 24kV/416/240V)
+                                const values = columns.map(col => {
+                                  let val = (row as any)[col];
+                                  // สำหรับ PEA ถ้าต้องการหา 'MEA. กฟน. 416 V:'
+                                  if (form.powerAuthority === 'PEA' && col === 'MEA. กฟน. 416 V:') {
+                                    // ลองใช้ชื่อคอลัมน์ตรงๆ ก่อน
+                                    if (!val || val === '-') {
+                                      // ถ้าไม่เจอ ให้หาที่มี "กฟน" แต่ไม่มี "24kV" (เพื่อหลีกเลี่ยง MEA. 24kV/416/240V)
+                                      const keys = Object.keys(row);
+                                      const foundKey = keys.find(k =>
+                                        k.includes('กฟน') &&
+                                        k.includes('416') &&
+                                        k.includes('V') &&
+                                        !k.includes('24kV') &&
+                                        !k.includes('240V')
+                                      );
+                                      if (foundKey) {
+                                        val = (row as any)[foundKey];
+                                        console.log(`[MCCB Sub] Found key: ${foundKey} = ${val}`);
+                                      }
+                                    } else {
+                                      // ถ้าเจอแล้ว ตรวจสอบว่าไม่ใช่ MEA. 24kV/416/240V
+                                      if (typeof val === 'number' && val > 1000) {
+                                        // ถ้าเป็นตัวเลขมากๆ อาจจะเป็นค่าผิด (เช่น 174.95975925537127)
                                         const keys = Object.keys(row);
                                         const foundKey = keys.find(k =>
                                           k.includes('กฟน') &&
@@ -3545,34 +3633,18 @@ export default function Home(): React.JSX.Element {
                                         );
                                         if (foundKey) {
                                           val = (row as any)[foundKey];
-                                          console.log(`[MCCB Sub] Found key: ${foundKey} = ${val}`);
-                                        }
-                                      } else {
-                                        // ถ้าเจอแล้ว ตรวจสอบว่าไม่ใช่ MEA. 24kV/416/240V
-                                        if (typeof val === 'number' && val > 1000) {
-                                          // ถ้าเป็นตัวเลขมากๆ อาจจะเป็นค่าผิด (เช่น 174.95975925537127)
-                                          const keys = Object.keys(row);
-                                          const foundKey = keys.find(k =>
-                                            k.includes('กฟน') &&
-                                            k.includes('416') &&
-                                            k.includes('V') &&
-                                            !k.includes('24kV') &&
-                                            !k.includes('240V')
-                                          );
-                                          if (foundKey) {
-                                            val = (row as any)[foundKey];
-                                            console.log(`[MCCB Sub] Fixed: using ${foundKey} = ${val} instead`);
-                                          }
+                                          console.log(`[MCCB Sub] Fixed: using ${foundKey} = ${val} instead`);
                                         }
                                       }
                                     }
-                                    if (!val || val === '-') val = '-';
-                                    console.log(`[MCCB Sub] Column ${col}:`, val);
-                                    return val;
-                                  }).filter(val => val !== '-');
-                                  const result = values.length > 0 ? `${values.join(' ')} A` : '-';
-                                  const numChargers = parseInt(form.numberOfChargers) || 1;
-                                  mccbSubs = Array(numChargers).fill(result);
+                                  }
+                                  if (!val || val === '-') val = '-';
+                                  console.log(`[MCCB Sub] Column ${col}:`, val);
+                                  return val;
+                                }).filter(val => val !== '-');
+                                const result = values.length > 0 ? `${values.join(' ')} A` : '-';
+                                const numChargers = parseInt(form.numberOfChargers) || 1;
+                                mccbSubs = Array(numChargers).fill(result);
                                 }
                               }
                             }
@@ -3693,6 +3765,13 @@ export default function Home(): React.JSX.Element {
 
                             // ดึงค่า conduit
                             let conduitValue = '';
+                            const firstNonEmpty = (keys: string[]) => {
+                              for (const k of keys) {
+                                const v = (row as any)[k];
+                                if (v !== undefined && v !== null && String(v).trim() !== '') return v;
+                              }
+                              return '';
+                            };
                             if (form.powerAuthority === 'MEA') {
                               if (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ') {
                                 const conduitCols = chargerInstallationType === 'group'
@@ -3705,7 +3784,10 @@ export default function Home(): React.JSX.Element {
                                 const val = conduitCols.map(col => row[col]).filter(Boolean).join(' ');
                                 if (val) conduitValue = `${val} มม.`;
                               } else if (wiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา') {
-                                const val = row['__EMPTY_92'];
+                                // Group/Stand-alone บาง sheet คอลัมน์ขยับ ทำ fallback หลาย key
+                                const val = firstNonEmpty(chargerInstallationType === 'group'
+                                  ? ['__EMPTY_92', '__EMPTY_91', '__EMPTY_93', '__EMPTY_90']
+                                  : ['__EMPTY_92', '__EMPTY_91', '__EMPTY_93', '__EMPTY_90']);
                                 if (val) conduitValue = `${val} ซม.`;
                               } else if (wiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา') {
                                 const val = row['__EMPTY_116'];
@@ -3723,7 +3805,9 @@ export default function Home(): React.JSX.Element {
                                 const val = conduitCols.map(col => row[col]).filter(Boolean).join(' ');
                                 if (val) conduitValue = `${val} มม.`;
                               } else if (wiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา') {
-                                const val = row['__EMPTY_90'];
+                                const val = firstNonEmpty(chargerInstallationType === 'group'
+                                  ? ['__EMPTY_90', '__EMPTY_89', '__EMPTY_91', '__EMPTY_88']
+                                  : ['__EMPTY_90', '__EMPTY_89', '__EMPTY_91', '__EMPTY_88']);
                                 if (val) conduitValue = `${val} ซม.`;
                               } else if (wiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา') {
                                 const val = row['__EMPTY_114'];
@@ -3740,13 +3824,13 @@ export default function Home(): React.JSX.Element {
                                 <div className="flex items-center justify-between mb-2">
                                   <span className="font-medium text-gray-700 text-sm">Charger Wiring Type:</span>
                                   <span className="font-semibold text-gray-900 text-sm">{wiringType}</span>
-                                </div>
+                      </div>
                                 {/* Wiring Cable */}
                                 {cableValue && (
                                   <div className="flex items-center justify-between mb-2">
                                     <span className="font-medium text-gray-700 text-sm">Charger Wiring Cable (CV/THW):</span>
                                     <span className="font-semibold text-gray-900 text-sm">{cableValue}</span>
-                                  </div>
+                          </div>
                                 )}
                                 {/* Wire conduit */}
                                 {conduitValue && (
@@ -3757,9 +3841,9 @@ export default function Home(): React.JSX.Element {
                                         : 'Charger Wire conduit:'}
                                     </span>
                                     <span className="font-semibold text-gray-900 text-sm">{conduitValue}</span>
-                                  </div>
-                                )}
-                              </div>
+                        </div>
+                      )}
+                          </div>
                             );
                           })}
                         </div>

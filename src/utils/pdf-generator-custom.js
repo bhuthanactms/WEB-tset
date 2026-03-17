@@ -266,6 +266,98 @@ export function createCostPDF(jsonData) {
       // Update currentY after table
       const finalY = doc.lastAutoTable.finalY || currentY;
       currentY = finalY + 5; // Add spacing after table
+    } else if (type === 'extra-items') {
+      // Extra items table type - ตาราง 2 คอลัมน์: รายการสินค้า, ราคา
+      const extraItemsColumns = [
+        { header: 'รายการสินค้า', dataKey: 'productName' },
+        { header: 'ราคา', dataKey: 'price' },
+      ];
+
+      const extraItemsTableData = rows.map(row => [
+        row.productName || '',
+        formatCurrency(row.price || 0),
+      ]);
+
+      // คำนวณ Total
+      const totalPrice = rows.reduce((sum, row) => sum + (parseFloat(row.price) || 0), 0);
+
+      // เพิ่มแถว Total
+      extraItemsTableData.push([
+        'Total',
+        formatCurrency(totalPrice),
+      ]);
+
+      autoTable(doc, {
+        startY: currentY,
+        head: [extraItemsColumns.map(col => col.header)],
+        body: extraItemsTableData,
+        theme: 'grid',
+        headStyles: {
+          fillColor: [255, 255, 255],
+          textColor: [0, 0, 0],
+          fontSize: 5, // เท่ากับ 5.ค่าเดินทาง
+          fontStyle: 'bold',
+          halign: 'center',
+          font: 'Sarabun',
+          cellPadding: { top: 1, right: 0.5, bottom: 1, left: 0.5 },
+          minCellHeight: 4,
+          lineWidth: 0.1,
+          lineColor: [0, 0, 0],
+        },
+        bodyStyles: {
+          fontSize: 6, // เท่ากับ 5.ค่าเดินทาง
+          fontStyle: 'normal', // ไม่ต้องตัวหนา
+          font: 'Sarabun',
+          textColor: [0, 0, 0],
+          fillColor: [255, 255, 255],
+          cellPadding: { top: 1, right: 0.5, bottom: 1, left: 0.5 },
+          minCellHeight: 4,
+          lineWidth: 0.1,
+          lineColor: [0, 0, 0],
+        },
+        columnStyles: {
+          0: { halign: 'left', cellWidth: 140 }, // รายการสินค้า
+          1: { halign: 'right', cellWidth: 46 }, // ราคา
+        },
+        margin: { left: 12, right: 12 },
+        styles: {
+          font: 'Sarabun',
+          fontSize: 6, // เท่ากับ 5.ค่าเดินทาง
+          textColor: [0, 0, 0],
+        },
+        didDrawPage: function (data) {
+          const currentPageNum = data.pageNumber;
+          if (currentPageNum > tableStartPage) {
+            const marginTop = data.settings.margin.top || 20;
+            const yPos = Math.max(12, marginTop - 15);
+            doc.setFontSize(9);
+            doc.setTextColor(40);
+            doc.setFont('Sarabun', 'bold');
+            const tableNameText = tablename || `Table ${index + 1}`;
+            doc.text(tableNameText, 14, yPos);
+            continuationStartY = yPos + 10;
+          }
+        },
+        willDrawCell: function (data) {
+          if (continuationStartY !== null && data.pageNumber > tableStartPage) {
+            if (data.row.index === 0 && data.column.index === 0) {
+              if (data.cursor && data.cursor.y !== undefined && data.cursor.y < continuationStartY) {
+                data.cursor.y = continuationStartY;
+              }
+            }
+          }
+          // ทำให้ Total row (แถวสุดท้าย) มี font size เดียวกันกับเนื้อหา
+          // extraItemsTableData.length - 1 คือแถวสุดท้าย (Total row)
+          if (data.row.index === extraItemsTableData.length - 1) {
+            data.cell.styles.fontSize = 6; // เท่ากับ 5.ค่าเดินทาง
+            data.cell.styles.fontStyle = 'normal';
+          }
+        },
+      });
+
+      // Update currentY after table
+      const finalY = doc.lastAutoTable.finalY || currentY;
+      currentY = finalY + 5; // Add spacing after table
     } else if (type === 'cost') {
       // Cost table type - ตารางซ้าย-ขวา ข้างละ 7 แถว (ขยายจาก 6 เป็น 7)
       const costRows = rows.rows || [];
