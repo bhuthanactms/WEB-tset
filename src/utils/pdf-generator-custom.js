@@ -786,6 +786,18 @@ export function createCostPDF(jsonData) {
     doc.setFontSize(10); // เพิ่ม 3 size จาก 7
     leftY += lineHeight;
 
+    // ตัวคูณปรับราคา = x% =
+    const priceAdjustPercent = summary.price_adjust_percent || 0;
+    const priceAdjustText = `ตัวคูณปรับราคา = ${priceAdjustPercent}% = `;
+    const priceAdjustValue = formatCurrency(summary.price_adjust_amount || 0);
+    doc.text(priceAdjustText, leftX, leftY);
+    const priceAdjustValueX = leftX + doc.getTextWidth(priceAdjustText);
+    doc.setFontSize(valueFontSize);
+    doc.text(priceAdjustValue, priceAdjustValueX, leftY);
+    drawDashedUnderline(priceAdjustValueX, leftY, priceAdjustValue, valueFontSize);
+    doc.setFontSize(10);
+    leftY += lineHeight;
+
     // ต้นทุนงานเอกสาร
     const documentText = `ต้นทุนงานเอกสาร = `;
     const documentValue = formatCurrency(summary.document_cost || 0);
@@ -956,7 +968,7 @@ export function createCostPDF(jsonData) {
   }
 
   // Save PDF
-  doc.save('cost-report.pdf');
+  doc.save(jsonData?.filename || 'cost-report.pdf');
 
   return doc;
 }

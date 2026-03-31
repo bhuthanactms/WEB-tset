@@ -450,6 +450,7 @@ function MoreDetailCard(props: any) {
       // Section 3: งานปูน
       mdbConcreteBase,
       chargerConcreteBase,
+      powerCabinetConcreteBase,
       parkingConcreteFloor,
       generalConcreteFloor,
       generalConcreteFloorArea,
@@ -474,6 +475,8 @@ function MoreDetailCard(props: any) {
       // ข้อมูลกำไร% และ CF%
       profitPercent,
       cfPercent,
+      // ตัวคูณปรับราคา (%)
+      priceAdjustPercent,
       // ข้อมูล Extra Cost
       includeDesignCost,
       designCostData,
@@ -704,6 +707,7 @@ function MoreDetailCard(props: any) {
     // Section 3: งานปูน
     if (parsed.mdbConcreteBase !== undefined) setMdbConcreteBase(parsed.mdbConcreteBase);
     if (parsed.chargerConcreteBase !== undefined) setChargerConcreteBase(parsed.chargerConcreteBase);
+    if (parsed.powerCabinetConcreteBase !== undefined) setPowerCabinetConcreteBase(parsed.powerCabinetConcreteBase);
     if (parsed.parkingConcreteFloor !== undefined) setParkingConcreteFloor(parsed.parkingConcreteFloor);
     if (parsed.generalConcreteFloor !== undefined) setGeneralConcreteFloor(parsed.generalConcreteFloor);
     if (parsed.generalConcreteFloorArea !== undefined) setGeneralConcreteFloorArea(parsed.generalConcreteFloorArea);
@@ -733,6 +737,8 @@ function MoreDetailCard(props: any) {
     // โหลดข้อมูลกำไร% และ CF%
     if (parsed.profitPercent !== undefined) setProfitPercent(parsed.profitPercent);
     if (parsed.cfPercent !== undefined) setCfPercent(parsed.cfPercent);
+    // ตัวคูณปรับราคา (%)
+    if (parsed.priceAdjustPercent !== undefined) setPriceAdjustPercent(parsed.priceAdjustPercent);
   };
 
   // Load data from localStorage and server
@@ -851,6 +857,7 @@ function MoreDetailCard(props: any) {
           concreteSelection: parsed.concreteSelection,
           mdbConcreteBase: parsed.mdbConcreteBase,
           chargerConcreteBase: parsed.chargerConcreteBase,
+          powerCabinetConcreteBase: parsed.powerCabinetConcreteBase,
           parkingConcreteFloor: parsed.parkingConcreteFloor,
           generalConcreteFloor: parsed.generalConcreteFloor,
           parkingSlots: parsed.parkingSlots,
@@ -2049,6 +2056,7 @@ function MoreDetailCard(props: any) {
   // Section 3: งานปูน (yes=มี, no=ไม่มี)
   const [mdbConcreteBase, setMdbConcreteBase] = useState(props.mdbConcreteBase || 'no');
   const [chargerConcreteBase, setChargerConcreteBase] = useState(props.chargerConcreteBase || 'no');
+  const [powerCabinetConcreteBase, setPowerCabinetConcreteBase] = useState(props.powerCabinetConcreteBase || 'no');
   const [parkingConcreteFloor, setParkingConcreteFloor] = useState(props.parkingConcreteFloor || 'no');
   const [generalConcreteFloor, setGeneralConcreteFloor] = useState(props.generalConcreteFloor || 'no');
   const [generalConcreteFloorArea, setGeneralConcreteFloorArea] = useState(props.generalConcreteFloorArea || '');
@@ -2378,9 +2386,13 @@ function MoreDetailCard(props: any) {
 
   const parkingSlotsCount = parseCount(parkingSlots, 1);
   const featureChargersCount = parseCount(props.numberOfChargers, 1);
+  const terminalsCount = parseCount(props.numberOfTerminals, 1);
 
-  // 1.1 เสากันชน: จำนวนชิ้น = จำนวนเครื่องชาร์จ × 2
-  const bumperPoleQuantity = featureChargersCount * 2;
+  // 1.1 เสากันชน
+  const isGroupChargerAccessory = props.chargerInstallationType === 'group';
+  // กรณี Group Charger: ให้ยึด "จำนวนช่องจอด" (ไม่คูณ 2)
+  // กรณี Stand-alone: ใช้ จำนวนเครื่องชาร์จ × 2 ตามเดิม
+  const bumperPoleQuantity = isGroupChargerAccessory ? parkingSlotsCount : featureChargersCount * 2;
   const wheelStopQuantity = parkingSlotsCount;
   // 1.2 ถังดับเพลิง+ตู้: จำนวนชิ้น = จำนวนช่องจอด ÷ 4 (ปัดเศษขึ้น)
   const fireExtinguisherQuantity = Math.ceil(parkingSlotsCount / 4);
@@ -2551,9 +2563,24 @@ function MoreDetailCard(props: any) {
       }
     }
 
-    // 3.2 ฐานปูน CHARGER 150 x 150 x 20 ซม. - rowNum: 4, quantity: featureChargersCount
+    // 3.2 ฐานปูน CHARGER 150 x 150 x 20 ซม. - rowNum: 4
+    // Group Charger: อิงจำนวน Terminal
+    // Stand-alone: อิงจำนวน Charger
     if (chargerConcreteBase === 'yes') {
-      const pricing = getConcretePricing(4, featureChargersCount);
+      const qty = props.chargerInstallationType === 'group' ? terminalsCount : featureChargersCount;
+      const pricing = getConcretePricing(4, qty);
+      if (pricing) {
+        totals.material += pricing.materialTotal;
+        totals.labor += pricing.laborTotal;
+        totals.total += pricing.total;
+      }
+    }
+
+    // 3.2.1 ฐานปูน Power Carbinet - แสดง/คำนวณเฉพาะกรณี Group Charger เท่านั้น
+    // ดึงราคาแบบเดียวกับฐานปูน MDB (rowNum: 3)
+    // ถ้ากดมี: อิงจำนวนตาม Charger Details (จำนวนเครื่อง)
+    if (props.chargerInstallationType === 'group' && powerCabinetConcreteBase === 'yes') {
+      const pricing = getConcretePricing(3, featureChargersCount);
       if (pricing) {
         totals.material += pricing.materialTotal;
         totals.labor += pricing.laborTotal;
@@ -2571,9 +2598,14 @@ function MoreDetailCard(props: any) {
       }
     }
 
-    // 3.4 ปูนแท่นสถานี 2 ช่องจอด - rowNum: 6, quantity: featureChargersCount
+    // 3.4 ปูนแท่นสถานี 2 ช่องจอด - rowNum: 6
+    // Group Charger: อิงตามจำนวน Terminal โดยคิดเป็นจำนวน "แท่น 2 ช่องจอด" = ceil(จำนวนTerminal / 2)
+    // Stand-alone: อิงจำนวน Charger
     if (generalConcreteFloor === 'yes') {
-      const pricing = getConcretePricing(6, featureChargersCount);
+      const qty = props.chargerInstallationType === 'group'
+        ? Math.ceil(terminalsCount / 2)
+        : featureChargersCount;
+      const pricing = getConcretePricing(6, qty);
       if (pricing) {
         totals.material += pricing.materialTotal;
         totals.labor += pricing.laborTotal;
@@ -2582,7 +2614,7 @@ function MoreDetailCard(props: any) {
     }
 
     return totals;
-  }, [concreteSelection, mdbConcreteBase, chargerConcreteBase, parkingConcreteFloor, generalConcreteFloor, featureChargersCount, parkingSlotsCount, concreteSheet]);
+  }, [concreteSelection, mdbConcreteBase, chargerConcreteBase, powerCabinetConcreteBase, parkingConcreteFloor, generalConcreteFloor, featureChargersCount, terminalsCount, parkingSlotsCount, concreteSheet, props.chargerInstallationType]);
 
   const paintingTotals = (() => {
     const totals = { material: 0, labor: 0, total: 0 };
@@ -2789,14 +2821,14 @@ function MoreDetailCard(props: any) {
       const item1 = getSignagePricing(5);
       const item2 = getSignagePricing(6);
       if (item1) {
-        totals.material += item1.materialTotal;
-        totals.labor += item1.laborTotal;
-        totals.total += item1.total;
+        totals.material += item1.materialUnit * parkingSlotsCount;
+        totals.labor += item1.laborUnit * parkingSlotsCount;
+        totals.total += item1.totalUnit * parkingSlotsCount;
       }
       if (item2) {
-        totals.material += item2.materialTotal;
-        totals.labor += item2.laborTotal;
-        totals.total += item2.total;
+        totals.material += item2.materialUnit * parkingSlotsCount;
+        totals.labor += item2.laborUnit * parkingSlotsCount;
+        totals.total += item2.totalUnit * parkingSlotsCount;
       }
     } else if (signageStationType === 'eic') {
       // สถานี EIC: 2.1.1-2.1.8 (row 9-15), 2.2.1-2.2.4 (row 19-21) - ลบ row 18 ออก
@@ -4059,6 +4091,8 @@ function MoreDetailCard(props: any) {
   // State สำหรับกำไร% และ CF%
   const [profitPercent, setProfitPercent] = useState<string>('');
   const [cfPercent, setCfPercent] = useState<string>('');
+  // ตัวคูณปรับราคา (%) - คิดจากต้นทุนเบื้องต้น (เหมือน Accessories)
+  const [priceAdjustPercent, setPriceAdjustPercent] = useState<string>('');
 
   const stationTotals = React.useMemo(() => {
     const totals = [
@@ -4196,6 +4230,13 @@ function MoreDetailCard(props: any) {
     return (stationTotal * percentage) / 100;
   }, [stationTotals]);
 
+  // ตัวคูณปรับราคา: ผู้ใช้กรอกเป็น % ของต้นทุนเบื้องต้น (stationTotals.total)
+  const priceAdjustAmount = React.useMemo(() => {
+    const pct = parseFloat(priceAdjustPercent) || 0;
+    if (pct === 0) return 0;
+    return (stationTotals.total * pct) / 100;
+  }, [priceAdjustPercent, stationTotals.total]);
+
   // ต้นทุนงานเอกสาร (บังคับมี)
   const documentCost = 3000;
 
@@ -4204,10 +4245,10 @@ function MoreDetailCard(props: any) {
     return stationTotals.total; // ต้นทุนเบื้องต้น = stationTotals.total
   }, [stationTotals]);
 
-  // ราคารวมสร้างสถานี = ต้นทุนเบื้องต้น + Accessories + ต้นทุนงานเอกสาร + ค่าเดินทาง
+  // ราคารวมสร้างสถานี = ต้นทุนเบื้องต้น + Accessories + ตัวคูณปรับราคา + ต้นทุนงานเอกสาร + ค่าเดินทาง
   const stationTotalWithAccessories = React.useMemo(() => {
-    return baseCost + accessoriesAmount + documentCost + travelTotals.total;
-  }, [baseCost, accessoriesAmount, documentCost, travelTotals]);
+    return baseCost + accessoriesAmount + priceAdjustAmount + documentCost + travelTotals.total;
+  }, [baseCost, accessoriesAmount, priceAdjustAmount, documentCost, travelTotals]);
 
   // คำนวณกำไร% และ CF% (คิดรวมค่าแรงด้วย)
   // กำไร% (5-25%): เอาค่าจาก ราคารวมสร้างสถานี มาคิดได้เลย
@@ -5930,12 +5971,27 @@ function MoreDetailCard(props: any) {
           }
         }
         if (chargerConcreteBase === 'yes') {
-          const pricing = getConcretePricing(4, featureChargersCount);
+          const qty = props.chargerInstallationType === 'group' ? terminalsCount : featureChargersCount;
+          const pricing = getConcretePricing(4, qty);
           if (pricing) {
             products.push({
               type: 'งานปูน',
               code: pricing.row?.__EMPTY || '-',
               productName: getConcreteRowName(4) || 'ฐานปูน CHARGER',
+              materialTotal: pricing.materialTotal,
+              laborTotal: pricing.laborTotal,
+              totalPrice: pricing.total,
+              quantity: pricing.quantity.toString(),
+            });
+          }
+        }
+        if (props.chargerInstallationType === 'group' && powerCabinetConcreteBase === 'yes') {
+          const pricing = getConcretePricing(3, featureChargersCount);
+          if (pricing) {
+            products.push({
+              type: 'งานปูน',
+              code: pricing.row?.__EMPTY || '-',
+              productName: 'ฐานปูน Power Carbinet',
               materialTotal: pricing.materialTotal,
               laborTotal: pricing.laborTotal,
               totalPrice: pricing.total,
@@ -5958,7 +6014,10 @@ function MoreDetailCard(props: any) {
           }
         }
         if (generalConcreteFloor === 'yes') {
-          const pricing = getConcretePricing(6, featureChargersCount);
+          const qty = props.chargerInstallationType === 'group'
+            ? Math.ceil(terminalsCount / 2)
+            : featureChargersCount;
+          const pricing = getConcretePricing(6, qty);
           if (pricing) {
             products.push({
               type: 'งานปูน',
@@ -6813,6 +6872,8 @@ function MoreDetailCard(props: any) {
       // ฝั่งซ้าย
       accessories_percent: accessoriesPercent,
       accessories_amount: accessoriesAmount,
+      price_adjust_percent: parseFloat(priceAdjustPercent) || 0,
+      price_adjust_amount: priceAdjustAmount,
       additional_features_total: additionalFeaturesTotal,
       document_cost: documentCost,
       travel_cost: travelCost,
@@ -14934,8 +14995,110 @@ function MoreDetailCard(props: any) {
                               </Collapsible>
                             )}
 
-
                           </div>
+
+                          {/* 3.1.1 ฐานปูน Power Carbinet (เฉพาะ Group Charger) */}
+
+                          {props.chargerInstallationType === 'group' && (
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-base font-semibold text-gray-800">ฐานปูน Power Carbinet</span>
+                                <div className="flex items-center gap-2">
+                                  <div
+                                    className={`flex items-center space-x-2 px-3 py-1 rounded-lg border cursor-pointer ${powerCabinetConcreteBase === 'yes' ? 'bg-green-100 border-green-300' : 'hover:bg-gray-50'}`}
+                                    onClick={() => setPowerCabinetConcreteBase('yes')}
+                                  >
+                                    <Checkbox
+                                      id="power-cabinet-concrete-base-yes"
+                                      checked={powerCabinetConcreteBase === 'yes'}
+                                      onCheckedChange={(checked) => { if (checked) setPowerCabinetConcreteBase('yes'); }}
+                                      className="border-green-400 data-[state=checked]:bg-green-500"
+                                    />
+                                    <Label htmlFor="power-cabinet-concrete-base-yes" className="font-medium cursor-pointer text-sm">มี</Label>
+                                  </div>
+                                  <div
+                                    className={`flex items-center space-x-2 px-3 py-1 rounded-lg border cursor-pointer ${powerCabinetConcreteBase === 'no' ? 'bg-gray-100 border-gray-300' : 'hover:bg-gray-50'}`}
+                                    onClick={() => setPowerCabinetConcreteBase('no')}
+                                  >
+                                    <Checkbox
+                                      id="power-cabinet-concrete-base-no"
+                                      checked={powerCabinetConcreteBase === 'no'}
+                                      onCheckedChange={(checked) => { if (checked) setPowerCabinetConcreteBase('no'); }}
+                                      className="border-gray-400 data-[state=checked]:bg-gray-500"
+                                    />
+                                    <Label htmlFor="power-cabinet-concrete-base-no" className="font-medium cursor-pointer text-sm">ไม่มี</Label>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {powerCabinetConcreteBase === 'yes' && (
+                                <Collapsible
+                                  open={openItems['power-cabinet-concrete-base']}
+                                  onOpenChange={(open) => setOpenItems(prev => ({ ...prev, 'power-cabinet-concrete-base': open }))}
+                                >
+                                  <div className="bg-gray-50 rounded-lg border border-gray-200">
+                                    <CollapsibleTrigger className="w-full p-3 text-left hover:bg-gray-100 transition-colors rounded-lg">
+                                      <div className="flex items-center justify-between">
+                                        <span className="font-semibold">
+                                          {featureChargersCount} <span className="text-sm">ชิ้น</span>
+                                        </span>
+                                        <div className="flex items-center gap-3">
+                                          {(() => {
+                                            const pricing = getConcretePricing(3, featureChargersCount);
+                                            return pricing ? (
+                                              <span className="font-semibold text-gray-700">
+                                                {pricing.total.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท
+                                              </span>
+                                            ) : null;
+                                          })()}
+                                          <div>
+                                            {openItems['power-cabinet-concrete-base'] ? (
+                                              <ChevronUp className="h-4 w-4 text-gray-600" />
+                                            ) : (
+                                              <ChevronDown className="h-4 w-4 text-gray-600" />
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </CollapsibleTrigger>
+                                    <CollapsibleContent>
+                                      <div className="px-3 pb-3">
+                                        {(() => {
+                                          const pricing = getConcretePricing(3, featureChargersCount);
+                                          if (!pricing) return <div className="text-xs text-red-500 mt-2">ไม่พบข้อมูล</div>;
+                                          return (
+                                            <div className="text-xs space-y-2 mt-2">
+                                              <div><span className="font-medium">รหัส:</span> {pricing.row?.__EMPTY || '-'}</div>
+                                              <div><span className="font-medium">รายการ:</span> {getConcreteRowName(3) || '-'}</div>
+                                              <div className="grid grid-cols-3 gap-2 pt-2 border-t">
+                                                <div>
+                                                  <div className="text-gray-600 mb-1">ราคาค่าของ/ชิ้น:</div>
+                                                  <div className="font-semibold">{pricing.materialUnit.toLocaleString('th-TH')} บาท</div>
+                                                </div>
+                                                <div>
+                                                  <div className="text-gray-600 mb-1">ราคาค่าแรง/ชิ้น:</div>
+                                                  <div className="font-semibold">{pricing.laborUnit.toLocaleString('th-TH')} บาท</div>
+                                                </div>
+                                                <div>
+                                                  <div className="text-gray-600 mb-1">ราคารวม/ชิ้น:</div>
+                                                  <div className="font-semibold">{pricing.totalUnit.toLocaleString('th-TH')} บาท</div>
+                                                </div>
+                                              </div>
+                                              <div className="pt-2 border-t space-y-1">
+                                                <div><span className="font-medium">ค่าของรวม:</span> {pricing.materialTotal.toLocaleString('th-TH')} บาท</div>
+                                                <div><span className="font-medium">ค่าแรงรวม:</span> {pricing.laborTotal.toLocaleString('th-TH')} บาท</div>
+                                                <div><span className="font-medium">ราคารวม:</span> {pricing.total.toLocaleString('th-TH')} บาท</div>
+                                              </div>
+                                            </div>
+                                          );
+                                        })()}
+                                      </div>
+                                    </CollapsibleContent>
+                                  </div>
+                                </Collapsible>
+                              )}
+                            </div>
+                          )}
 
                           {/* 3.2 ฐานปูน CHARGER */}
 
@@ -14980,11 +15143,12 @@ function MoreDetailCard(props: any) {
                                   <CollapsibleTrigger className="w-full p-3 text-left hover:bg-green-100 transition-colors rounded-lg">
                                     <div className="flex items-center justify-between">
                                       <span className="font-semibold">
-                                        {featureChargersCount} <span className="text-sm">ชิ้น</span>
+                                        {(props.chargerInstallationType === 'group' ? terminalsCount : featureChargersCount)} <span className="text-sm">ชิ้น</span>
                                       </span>
                                       <div className="flex items-center gap-3">
                                         {(() => {
-                                          const pricing = getConcretePricing(4, featureChargersCount);
+                                          const qty = props.chargerInstallationType === 'group' ? terminalsCount : featureChargersCount;
+                                          const pricing = getConcretePricing(4, qty);
                                           return pricing ? (
                                             <span className="font-semibold text-green-700">
                                               {pricing.total.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท
@@ -15004,7 +15168,8 @@ function MoreDetailCard(props: any) {
                                   <CollapsibleContent>
                                     <div className="px-3 pb-3">
                                       {(() => {
-                                        const pricing = getConcretePricing(4, featureChargersCount);
+                                        const qty = props.chargerInstallationType === 'group' ? terminalsCount : featureChargersCount;
+                                        const pricing = getConcretePricing(4, qty);
                                         if (!pricing) return <div className="text-xs text-red-500 mt-2">ไม่พบข้อมูล</div>;
                                         return (
                                           <div className="text-xs space-y-2 mt-2">
@@ -15188,11 +15353,12 @@ function MoreDetailCard(props: any) {
                                   <CollapsibleTrigger className="w-full p-3 text-left hover:bg-green-100 transition-colors rounded-lg">
                                     <div className="flex items-center justify-between">
                                       <span className="font-semibold">
-                                        {featureChargersCount} <span className="text-sm">ชิ้น</span>
+                                        {(props.chargerInstallationType === 'group' ? Math.ceil(terminalsCount / 2) : featureChargersCount)} <span className="text-sm">ชิ้น</span>
                                       </span>
                                       <div className="flex items-center gap-3">
                                         {(() => {
-                                          const pricing = getConcretePricing(6, featureChargersCount);
+                                          const qty = props.chargerInstallationType === 'group' ? Math.ceil(terminalsCount / 2) : featureChargersCount;
+                                          const pricing = getConcretePricing(6, qty);
                                           return pricing ? (
                                             <span className="font-semibold text-green-700">
                                               {pricing.total.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท
@@ -15212,7 +15378,8 @@ function MoreDetailCard(props: any) {
                                   <CollapsibleContent>
                                     <div className="px-3 pb-3">
                                       {(() => {
-                                        const pricing = getConcretePricing(6, featureChargersCount);
+                                        const qty = props.chargerInstallationType === 'group' ? Math.ceil(terminalsCount / 2) : featureChargersCount;
+                                        const pricing = getConcretePricing(6, qty);
                                         if (!pricing) return <div className="text-xs text-red-500 mt-2">ไม่พบข้อมูล</div>;
                                         return (
                                           <div className="text-xs space-y-2 mt-2">
@@ -17672,8 +17839,8 @@ function MoreDetailCard(props: any) {
 
           <Separator />
 
-          {/* Accessories และต้นทุนงานเอกสาร */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          {/* Accessories + ตัวคูณปรับราคา + ต้นทุนงานเอกสาร */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div className="p-5 rounded-xl bg-gradient-to-br from-purple-100 via-white to-purple-50 border border-purple-200 text-purple-800 shadow-sm">
               <div className="text-sm text-purple-600 mb-2 font-semibold">Accessories</div>
               <div className="text-2xl font-semibold">{formatCurrency(accessoriesAmount)} บาท</div>
@@ -17691,6 +17858,29 @@ function MoreDetailCard(props: any) {
                     percentage = 5;
                   }
                   return `${percentage}% ของ ราคารวมสร้างสถานี (${formatCurrency(stationTotal)} บาท)`;
+                })()}
+              </div>
+            </div>
+            <div className="p-5 rounded-xl bg-gradient-to-br from-teal-100 via-white to-teal-50 border border-teal-200 text-teal-800 shadow-sm">
+              <div className="text-sm text-teal-700 mb-2 font-semibold">ตัวคูณปรับราคา</div>
+              <div className="mt-3">
+                <Input
+                  id="price-adjust-percent"
+                  type="number"
+                  min="-100"
+                  max="100"
+                  step="0.01"
+                  value={priceAdjustPercent}
+                  onChange={(e) => setPriceAdjustPercent(e.target.value)}
+                  placeholder="เช่น 2.5"
+                  className="w-full bg-white/70"
+                />
+              </div>
+              <div className="text-2xl font-semibold mt-3">{formatCurrency(priceAdjustAmount)} บาท</div>
+              <div className="text-xs text-teal-600 mt-2">
+                {(() => {
+                  const pct = parseFloat(priceAdjustPercent) || 0;
+                  return `${pct}% ของ ต้นทุนเบื้องต้น (${formatCurrency(baseCost)} บาท)`;
                 })()}
               </div>
             </div>
@@ -17717,7 +17907,7 @@ function MoreDetailCard(props: any) {
             <div className="p-5 rounded-xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white shadow-sm">
               <div className="text-sm text-slate-200/80 mb-2">ราคารวมสร้างสถานี</div>
               <div className="text-3xl font-bold tracking-tight">{formatCurrency(stationTotalWithAccessories)} บาท</div>
-              <div className="text-xs text-slate-200/60 mt-2">ต้นทุนเบื้องต้น + Accessories + ต้นทุนงานเอกสาร + ค่าเดินทาง</div>
+              <div className="text-xs text-slate-200/60 mt-2">ต้นทุนเบื้องต้น + Accessories + ตัวคูณปรับราคา + ต้นทุนงานเอกสาร + ค่าเดินทาง</div>
             </div>
           </div>
 
@@ -19349,6 +19539,24 @@ function StationAccessory() {
 
                 // ดึงข้อมูลล่าสุดจาก StationAccessory component
                 const pdfData = getJsonData();
+
+                const normalizeFilenamePart = (value: string) =>
+                  (value || '')
+                    .toString()
+                    .trim()
+                    .replace(/\s+/g, '_')
+                    .replace(/[\\/:*?"<>|]/g, '');
+
+                const headerJobName = (pdfData as any)?.header?.data1 || '';
+                const headerSalesPerson = (pdfData as any)?.header?.data3 || '';
+                const headerDate = (pdfData as any)?.header?.data4 || '';
+                const filename = [
+                  normalizeFilenamePart(headerJobName),
+                  normalizeFilenamePart(headerSalesPerson),
+                  normalizeFilenamePart(headerDate),
+                ].filter(Boolean).join('_') || 'cost-report';
+
+                (pdfData as any).filename = `${filename}.pdf`;
                 console.log('PDF Data:', pdfData); // Debug log
 
                 if (!pdfData) {

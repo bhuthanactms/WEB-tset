@@ -51,6 +51,8 @@ const defaultJsonData = {
         "hiab_days": 0,
         "total_hiab_trips": 0,
         "total_cost": "0",
+        "price_adjust_percent": 0,
+        "price_adjust_amount": "0",
         "travel_cost": "0",
         "profit": 0,
         "profit_amount": "0",
