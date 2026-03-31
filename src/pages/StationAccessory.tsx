@@ -19551,6 +19551,7 @@ function StationAccessory() {
                 const headerSalesPerson = (pdfData as any)?.header?.data3 || '';
                 const headerDate = (pdfData as any)?.header?.data4 || '';
                 const filename = [
+                  normalizeFilenamePart(customerCode || ''),
                   normalizeFilenamePart(headerJobName),
                   normalizeFilenamePart(headerSalesPerson),
                   normalizeFilenamePart(headerDate),
