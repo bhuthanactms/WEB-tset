@@ -1,16 +1,11 @@
-/**
- * Simple authentication utilities with role-based access control.
- * This module provides: login, logout, getCurrentUser, and role management helpers.
- */
+import { supabase, supabaseAdmin } from './supabase'
 
 export type UserRole = 'sales' | 'design' | 'worker' | 'manager' | 'admin'
 
 export interface AuthUser {
-  /** Logged-in username */
+  id: string
   username: string
-  /** User role */
   role: UserRole
-  /** Account enabled status */
   enabled: boolean
 }
 
@@ -19,385 +14,305 @@ export interface UserPermissions {
 }
 
 export interface UserAccount {
+  id: string
+  userId: string
   username: string
-  password: string
   role: UserRole
   enabled: boolean
   permissions?: UserPermissions
-}
-
-// User accounts - 5 users per role
-const USER_ACCOUNTS: UserAccount[] = [
-  // Sales users (5 users)
-  { username: 'Sale_game', password: 'game1234', role: 'sales', enabled: true },
-  { username: 'Sale_Ton', password: 'Ton2345', role: 'sales', enabled: true },
-  { username: 'Sale_Tak', password: 'Tak3456', role: 'sales', enabled: true },
-  { username: 'sale.sp', password: 'Sale001', role: 'sales', enabled: true },
-  { username: 'Technic_A', password: 'tech4567', role: 'sales', enabled: true },
-
-  // Design users (5 users)
-  { username: 'design01', password: 'Design001', role: 'design', enabled: true },
-  { username: 'design02', password: 'Design002', role: 'design', enabled: true },
-  { username: 'design03', password: 'Design003', role: 'design', enabled: true },
-  { username: 'design04', password: 'Design004', role: 'design', enabled: true },
-  { username: 'design05', password: 'Design005', role: 'design', enabled: true },
-
-  // Worker users (5 users)
-  { username: 'worker01', password: 'Worker001', role: 'worker', enabled: true },
-  { username: 'worker02', password: 'Worker002', role: 'worker', enabled: true },
-  { username: 'worker03', password: 'Worker003', role: 'worker', enabled: true },
-  { username: 'worker04', password: 'Worker004', role: 'worker', enabled: true },
-  { username: 'worker05', password: 'Worker005', role: 'worker', enabled: true },
-
-  // Manager users (5 users)
-  { username: 'manager01', password: 'Manager001', role: 'manager', enabled: true },
-  { username: 'manager02', password: 'Manager002', role: 'manager', enabled: true },
-  { username: 'manager03', password: 'Manager003', role: 'manager', enabled: true },
-  { username: 'manager04', password: 'Manager004', role: 'manager', enabled: true },
-  { username: 'manager05', password: 'Manager005', role: 'manager', enabled: true },
-
-  // Admin users (5 users)
-  { username: 'admin01', password: 'Admin001', role: 'admin', enabled: true },
-  { username: 'admin02', password: 'Admin002', role: 'admin', enabled: true },
-  { username: 'admin03', password: 'Admin003', role: 'admin', enabled: true },
-  { username: 'admin04', password: 'Admin004', role: 'admin', enabled: true },
-  { username: 'admin05', password: 'Admin005', role: 'admin', enabled: true },
-]
-
-// Storage keys
-const STORAGE_KEY = 'authUser'
-const USER_MANAGEMENT_KEY = 'userManagement'
-const USER_PERMISSIONS_KEY = 'userPermissions'
-const CUSTOM_USERS_KEY = 'customUsers'
-
-interface UserManagementData {
-  [username: string]: boolean
-}
-
-interface UserPermissionsData {
-  [username: string]: UserPermissions
+  createdAt: string
 }
 
 /**
- * Get user management settings from localStorage
+ * Login ด้วย Supabase Auth
+ * - บันทึก login history
+ * - ดึง role จาก user_profiles
  */
-export function getUserManagement(): Map<string, boolean> {
+export async function login(
+  username: string,
+  password: string
+): Promise<{ ok: boolean; message?: string; user?: AuthUser }> {
+  // Supabase Auth ใช้ email ดังนั้น username จะถูก map เป็น email ภายใน
+  const email = `${username}@internal.app`
+
+  // sign out session เก่าก่อนเสมอ เพื่อบังคับ 1 session ต่อ user
+  await supabase.auth.signOut()
+
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+
+  if (error || !data.user) {
+    return { ok: false, message: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' }
+  }
+
+  // ดึง profile และตรวจสอบ enabled
+  const { data: profile, error: profileError } = await supabase
+    .from('user_profiles')
+    .select('*')
+    .eq('user_id', data.user.id)
+    .single()
+
+  if (profileError || !profile) {
+    await supabase.auth.signOut()
+    return { ok: false, message: 'ไม่พบข้อมูลผู้ใช้' }
+  }
+
+  if (!profile.enabled) {
+    await supabase.auth.signOut()
+    return { ok: false, message: 'บัญชีนี้ถูกระงับ กรุณาติดต่อผู้ดูแลระบบ' }
+  }
+
+  // สร้าง session token ใหม่ และบันทึกลง DB (บังคับ 1 session)
+  const sessionToken = crypto.randomUUID()
+  await supabase
+    .from('user_profiles')
+    .update({ active_session_token: sessionToken })
+    .eq('user_id', data.user.id)
+
+  // เก็บ token ใน localStorage
+  localStorage.setItem('sessionToken', sessionToken)
+
+  // บันทึก login history
+  await supabase.from('login_histories').insert({
+    user_id: data.user.id,
+    username: profile.username,
+    user_agent: navigator.userAgent,
+  })
+
+  return {
+    ok: true,
+    user: {
+      id: data.user.id,
+      username: profile.username,
+      role: profile.role as UserRole,
+      enabled: profile.enabled,
+    },
+  }
+}
+
+/** Logout */
+export async function logout(): Promise<void> {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (session) {
+    // clear session token ใน DB
+    await supabase
+      .from('user_profiles')
+      .update({ active_session_token: null })
+      .eq('user_id', session.user.id)
+  }
+  await supabase.auth.signOut()
+  localStorage.removeItem('sessionToken')
+  localStorage.removeItem('authUser')
+}
+
+/** ดึง current user และตรวจสอบ session token (บังคับ 1 session) */
+export async function getCurrentUser(): Promise<AuthUser | null> {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) return null
+
+  const localToken = localStorage.getItem('sessionToken')
+  if (!localToken) {
+    await supabase.auth.signOut()
+    return null
+  }
+
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('*')
+    .eq('user_id', session.user.id)
+    .single()
+
+  if (!profile || !profile.enabled) {
+    await supabase.auth.signOut()
+    localStorage.removeItem('sessionToken')
+    localStorage.removeItem('authUser')
+    return null
+  }
+
+  // ถ้า token ไม่ตรง แปลว่ามีคนล็อกอินที่อื่น → kick ออก
+  if (profile.active_session_token !== localToken) {
+    await supabase.auth.signOut()
+    localStorage.removeItem('sessionToken')
+    localStorage.removeItem('authUser')
+    return null
+  }
+
+  return {
+    id: session.user.id,
+    username: profile.username,
+    role: profile.role as UserRole,
+    enabled: profile.enabled,
+  }
+}
+
+/** ดึง current user แบบ sync จาก localStorage (ใช้สำหรับ initial render) */
+export function getCurrentUserSync(): AuthUser | null {
   try {
-    const stored = localStorage.getItem(USER_MANAGEMENT_KEY)
-    if (!stored) return new Map()
-    const data: UserManagementData = JSON.parse(stored)
-    return new Map(Object.entries(data))
+    const raw = localStorage.getItem('authUser')
+    if (!raw) return null
+    return JSON.parse(raw) as AuthUser
   } catch {
-    return new Map()
+    return null
   }
 }
 
-/**
- * Save user management settings to localStorage
- */
-export function saveUserManagement(management: Map<string, boolean>): void {
+/** บันทึก user ลง localStorage สำหรับ sync access */
+export function cacheUser(user: AuthUser | null): void {
   try {
-    const data = Object.fromEntries(management)
-    localStorage.setItem(USER_MANAGEMENT_KEY, JSON.stringify(data))
-  } catch {
-    // ignore storage errors
-  }
-}
-
-/**
- * Get user permissions from localStorage
- */
-export function getUserPermissions(): Map<string, UserPermissions> {
-  try {
-    const stored = localStorage.getItem(USER_PERMISSIONS_KEY)
-    if (!stored) return new Map()
-    const data: UserPermissionsData = JSON.parse(stored)
-    return new Map(Object.entries(data))
-  } catch {
-    return new Map()
-  }
-}
-
-/**
- * Save user permissions to localStorage
- */
-export function saveUserPermissions(permissions: Map<string, UserPermissions>): void {
-  try {
-    const data = Object.fromEntries(permissions)
-    localStorage.setItem(USER_PERMISSIONS_KEY, JSON.stringify(data))
-  } catch {
-    // ignore storage errors
-  }
-}
-
-/**
- * Get custom users from localStorage
- */
-function getCustomUsers(): UserAccount[] {
-  try {
-    const stored = localStorage.getItem(CUSTOM_USERS_KEY)
-    if (!stored) return []
-    return JSON.parse(stored) as UserAccount[]
-  } catch {
-    return []
-  }
-}
-
-/**
- * Save custom users to localStorage
- */
-function saveCustomUsers(users: UserAccount[]): void {
-  try {
-    localStorage.setItem(CUSTOM_USERS_KEY, JSON.stringify(users))
-  } catch {
-    // ignore storage errors
-  }
-}
-
-/**
- * Create a new user account (ADMIN only)
- */
-export function createUserAccount(username: string, password: string, role: UserRole): { ok: boolean; message?: string } {
-  // Check if username already exists
-  const allAccounts = getAllUserAccounts()
-  if (allAccounts.some(acc => acc.username === username)) {
-    return { ok: false, message: 'Username already exists' }
-  }
-
-  // Create new user
-  const newUser: UserAccount = {
-    username,
-    password,
-    role,
-    enabled: true,
-    permissions: {}
-  }
-
-  // Add to custom users
-  const customUsers = getCustomUsers()
-  customUsers.push(newUser)
-  saveCustomUsers(customUsers)
-
-  return { ok: true }
-}
-
-/**
- * Delete a custom user account (ADMIN only)
- */
-export function deleteUserAccount(username: string): { ok: boolean; message?: string } {
-  const customUsers = getCustomUsers()
-  const filtered = customUsers.filter((u: UserAccount) => u.username !== username)
-
-  if (filtered.length === customUsers.length) {
-    return { ok: false, message: 'User not found' }
-  }
-
-  saveCustomUsers(filtered)
-
-  // Also remove from management and permissions
-  const management = getUserManagement()
-  management.delete(username)
-  saveUserManagement(management)
-
-  const permissions = getUserPermissions()
-  permissions.delete(username)
-  saveUserPermissions(permissions)
-
-  return { ok: true }
-}
-
-/**
- * Get all user accounts (including custom users)
- */
-export function getAllUserAccounts(): UserAccount[] {
-  const management = getUserManagement()
-  const permissions = getUserPermissions()
-  const customUsers = getCustomUsers()
-
-  // Combine default and custom users
-  const allAccounts = [...USER_ACCOUNTS, ...customUsers]
-
-  return allAccounts.map(account => ({
-    ...account,
-    enabled: management.get(account.username) ?? account.enabled,
-    permissions: permissions.get(account.username) || {}
-  }))
-}
-
-/**
- * Update user account enabled status
- */
-export function updateUserAccount(username: string, enabled: boolean): void {
-  const management = getUserManagement()
-  management.set(username, enabled)
-  saveUserManagement(management)
-}
-
-/**
- * Update user permission
- */
-export function updateUserPermission(username: string, permission: keyof UserPermissions, value: boolean): void {
-  const permissions = getUserPermissions()
-  const userPerms = permissions.get(username) || {}
-  userPerms[permission] = value
-  permissions.set(username, userPerms)
-  saveUserPermissions(permissions)
-}
-
-/**
- * Get user permission
- */
-export function getUserPermission(username: string, permission: keyof UserPermissions): boolean | undefined {
-  const permissions = getUserPermissions()
-  return permissions.get(username)?.[permission]
-}
-
-/**
- * Attempts to authenticate the user against the user accounts.
- * On success, persists the user in localStorage.
- */
-export function login(username: string, password: string): { ok: boolean; message?: string; user?: AuthUser } {
-  const management = getUserManagement()
-  const customUsers = getCustomUsers()
-
-  // Check in default accounts first
-  let account = USER_ACCOUNTS.find(
-    (u) => u.username === username && u.password === password
-  )
-
-  // If not found, check custom users
-  if (!account) {
-    account = customUsers.find(
-      (u) => u.username === username && u.password === password
-    )
-  }
-
-  if (!account) {
-    return { ok: false, message: 'Invalid username or password.' }
-  }
-
-  // Check if account is enabled
-  const isEnabled = management.get(username) ?? account.enabled
-  if (!isEnabled) {
-    return { ok: false, message: 'This account has been disabled. Please contact your manager.' }
-  }
-
-  const user: AuthUser = {
-    username: account.username,
-    role: account.role,
-    enabled: isEnabled
-  }
-
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(user))
-  } catch {
-    // ignore storage errors
-  }
-
-  return { ok: true, user }
-}
-
-/** Removes the current authenticated user from storage. */
-export function logout(): void {
-  try {
-    localStorage.removeItem(STORAGE_KEY)
+    if (user) {
+      localStorage.setItem('authUser', JSON.stringify(user))
+    } else {
+      localStorage.removeItem('authUser')
+    }
   } catch {
     // ignore
   }
 }
 
-/** Returns the authenticated user from storage, or null if none. */
-export function getCurrentUser(): AuthUser | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) {
-      console.log('⚠️ getCurrentUser: No user in localStorage')
-      return null
-    }
-    const user = JSON.parse(raw) as AuthUser
-    console.log('👤 getCurrentUser:', user)
-    return user
-  } catch (error) {
-    console.error('❌ getCurrentUser error:', error)
-    return null
-  }
-}
-
-/** Returns true if a user is currently authenticated. */
 export function isAuthenticated(): boolean {
-  return getCurrentUser() !== null
+  return getCurrentUserSync() !== null
 }
 
-/** Check if user has permission to access a feature */
-export function hasPermission(user: AuthUser | null, requiredRole: UserRole | UserRole[]): boolean {
-  if (!user) return false
-  if (!user.enabled) return false
+// ---- Admin: จัดการ User ----
 
+/** สร้าง user ใหม่ (Admin only) */
+export async function createUserAccount(
+  username: string,
+  password: string,
+  role: UserRole
+): Promise<{ ok: boolean; message?: string }> {
+  const email = `${username}@internal.app`
+
+  const { data, error } = await supabaseAdmin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  })
+
+  if (error || !data.user) {
+    return { ok: false, message: error?.message || 'สร้างผู้ใช้ไม่สำเร็จ' }
+  }
+
+  const { error: profileError } = await supabaseAdmin.from('user_profiles').insert({
+    user_id: data.user.id,
+    username,
+    role,
+    enabled: true,
+    permissions: {},
+  })
+
+  if (profileError) {
+    await supabaseAdmin.auth.admin.deleteUser(data.user.id)
+    return { ok: false, message: 'สร้าง profile ไม่สำเร็จ' }
+  }
+
+  return { ok: true }
+}
+
+/** ลบ user (Admin only) */
+export async function deleteUserAccount(
+  userId: string
+): Promise<{ ok: boolean; message?: string }> {
+  const { error } = await supabaseAdmin.auth.admin.deleteUser(userId)
+  if (error) return { ok: false, message: error.message }
+  return { ok: true }
+}
+
+/** ดึง user ทั้งหมด (Admin only) */
+export async function getAllUserAccounts(): Promise<UserAccount[]> {
+  const { data, error } = await supabaseAdmin
+    .from('user_profiles')
+    .select('*')
+    .order('created_at', { ascending: true })
+
+  if (error || !data) return []
+
+  return data.map((p) => ({
+    id: p.id,
+    userId: p.user_id,
+    username: p.username,
+    role: p.role as UserRole,
+    enabled: p.enabled,
+    permissions: p.permissions || {},
+    createdAt: p.created_at,
+  }))
+}
+
+/** เปิด/ปิด user (Admin only) */
+export async function updateUserEnabled(userId: string, enabled: boolean): Promise<void> {
+  await supabaseAdmin.from('user_profiles').update({ enabled }).eq('user_id', userId)
+}
+
+/** อัปเดต role (Admin only) */
+export async function updateUserRole(userId: string, role: UserRole): Promise<void> {
+  await supabaseAdmin.from('user_profiles').update({ role }).eq('user_id', userId)
+}
+
+/** อัปเดต permission (Admin only) */
+export async function updateUserPermission(
+  userId: string,
+  permission: keyof UserPermissions,
+  value: boolean
+): Promise<void> {
+  const { data } = await supabaseAdmin
+    .from('user_profiles')
+    .select('permissions')
+    .eq('user_id', userId)
+    .single()
+
+  const permissions = { ...(data?.permissions || {}), [permission]: value }
+  await supabaseAdmin.from('user_profiles').update({ permissions }).eq('user_id', userId)
+}
+
+/** ดึง login history (Admin only) */
+export async function getLoginHistory(userId?: string) {
+  let query = supabaseAdmin
+    .from('login_histories')
+    .select('*')
+    .order('logged_in_at', { ascending: false })
+    .limit(100)
+
+  if (userId) query = query.eq('user_id', userId)
+
+  const { data } = await query
+  return data || []
+}
+
+// ---- Permission Helpers ----
+
+export function hasPermission(user: AuthUser | null, requiredRole: UserRole | UserRole[]): boolean {
+  if (!user || !user.enabled) return false
   const roles = Array.isArray(requiredRole) ? requiredRole : [requiredRole]
   return roles.includes(user.role)
 }
 
-/** Check if user can access Station Accessory page */
-export function canAccessStationAccessory(user: AuthUser | null): boolean {
-  if (!user) {
-    console.log('❌ canAccessStationAccessory: No user')
-    return false
-  }
-  if (!user.enabled) {
-    console.log('❌ canAccessStationAccessory: User disabled')
-    return false
-  }
-
-  // Sales, Manager, and Admin can always access
-  if (user.role === 'sales' || user.role === 'manager' || user.role === 'admin') {
-    console.log('✅ canAccessStationAccessory: Allowed for role:', user.role)
-    return true
-  }
-
-  // Check custom permission for other roles (Design, Worker)
-  const customPermission = getUserPermission(user.username, 'canAccessStationAccessory')
-  console.log('🔍 canAccessStationAccessory: Custom permission:', customPermission, 'for role:', user.role)
-  return customPermission === true
-}
-
-/** Check if user can edit (not read-only) */
 export function canEdit(user: AuthUser | null): boolean {
-  if (!user) return false
-  if (!user.enabled) return false
-
-  // Worker and Design are read-only (cannot edit, save, or delete)
+  if (!user || !user.enabled) return false
   return user.role !== 'worker' && user.role !== 'design'
 }
 
-/** Check if user can delete history */
 export function canDeleteHistory(user: AuthUser | null): boolean {
-  if (!user) return false
-  if (!user.enabled) return false
-
-  // Only Sales, Manager, and Admin can delete history
+  if (!user || !user.enabled) return false
   return user.role === 'sales' || user.role === 'manager' || user.role === 'admin'
 }
 
-/** Check if user can save/edit history */
 export function canSaveHistory(user: AuthUser | null): boolean {
-  if (!user) return false
-  if (!user.enabled) return false
-
-  // Design and Worker cannot save/edit history
+  if (!user || !user.enabled) return false
   return user.role !== 'design' && user.role !== 'worker'
 }
 
-/** Check if user is Manager */
 export function isManager(user: AuthUser | null): boolean {
   return user?.role === 'manager' && user?.enabled === true
 }
 
-/** Check if user is Admin */
 export function isAdmin(user: AuthUser | null): boolean {
   return user?.role === 'admin' && user?.enabled === true
 }
 
-/** Check if user is Admin or Manager */
 export function isAdminOrManager(user: AuthUser | null): boolean {
   return isAdmin(user) || isManager(user)
+}
+
+export function canAccessStationAccessory(user: AuthUser | null): boolean {
+  if (!user || !user.enabled) return false
+  return user.role === 'sales' || user.role === 'manager' || user.role === 'admin'
 }

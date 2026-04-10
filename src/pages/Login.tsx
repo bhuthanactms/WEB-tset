@@ -8,31 +8,34 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { login } from '@/utils/auth'
+import { login, cacheUser } from '@/utils/auth'
 import { Lock, LogIn, Zap } from 'lucide-react'
 
-/** Credentials form state */
 interface LoginForm {
   username: string
   password: string
 }
 
-/**
- * Login component provides basic demo authentication.
- */
 export default function Login() {
   const [form, setForm] = useState<LoginForm>({ username: '', password: '' })
   const [error, setError] = useState<string>('')
+  const [loading, setLoading] = useState(false)
 
-  /** Attempts login and redirects to home on success. */
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    const res = login(form.username.trim(), form.password)
+    setLoading(true)
+
+    const res = await login(form.username.trim(), form.password)
+
+    setLoading(false)
+
     if (!res.ok) {
       setError(res.message || 'Unable to login. Please try again.')
       return
     }
+
+    cacheUser(res.user!)
     window.location.hash = '#/'
   }
 
@@ -113,11 +116,12 @@ export default function Login() {
 
                 <Button
                   type="submit"
-                  className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white py-4 text-lg font-semibold shadow-lg"
+                  disabled={loading}
+                  className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white py-4 text-lg font-semibold shadow-lg disabled:opacity-60"
                   size="lg"
                 >
                   <LogIn className="h-5 w-5 mr-2" />
-                  Sign in
+                  {loading ? 'กำลังเข้าสู่ระบบ...' : 'Sign in'}
                 </Button>
               </form>
             </CardContent>

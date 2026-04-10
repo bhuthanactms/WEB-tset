@@ -7,6 +7,41 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ข้อมูล User Profile (เชื่อมกับ Supabase Auth)
+model UserProfile {
+  id          String    @id @default(uuid())
+  userId      String    @unique @map("user_id") // Supabase Auth user id
+  username    String    @unique @db.VarChar(100)
+  role        String    @db.VarChar(50) // 'sales' | 'design' | 'worker' | 'manager' | 'admin'
+  enabled             Boolean   @default(true)
+  permissions         Json?     // { canAccessStationAccessory: boolean }
+  activeSessionToken  String?   @map("active_session_token") // บังคับ 1 session
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  loginHistory LoginHistory[]
+
+  @@map("user_profiles")
+  @@index([userId])
+  @@index([username])
+}
+
+// ประวัติการ Login
+model LoginHistory {
+  id          Int       @id @default(autoincrement())
+  userId      String    @map("user_id")
+  username    String    @db.VarChar(100)
+  ipAddress   String?   @map("ip_address") @db.VarChar(50)
+  userAgent   String?   @map("user_agent") @db.Text
+  loggedInAt  DateTime  @default(now()) @map("logged_in_at")
+
+  userProfile UserProfile @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@map("login_histories")
+  @@index([userId])
+  @@index([loggedInAt(sort: Desc)])
+}
+
 // ตารางหลักของลูกค้า
 model Customer {
   id          Int       @id @default(autoincrement())

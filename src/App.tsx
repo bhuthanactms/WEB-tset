@@ -1,6 +1,7 @@
 import { HashRouter, Route, Routes } from 'react-router'
 import HomePage from './pages/Home'
 import LoginPage from './pages/Login'
+import AdminUsersPage from './pages/AdminUsers'
 import AppHeader from './components/layout/AppHeader'
 import { isAuthenticated } from '@/utils/auth'
 import React, { useEffect, useState } from 'react'
@@ -47,6 +48,14 @@ export default function App() {
           }
         />
         <Route path="/login" element={<LoginPage />} />
+        <Route
+          path="/admin/users"
+          element={
+            <RequireAuth>
+              <AdminUsersPage />
+            </RequireAuth>
+          }
+        />
         {/* เพิ่ม Route สำหรับ StationAccessory */}
         <Route
           path="/station-accessory"
