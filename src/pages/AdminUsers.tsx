@@ -61,12 +61,6 @@ export default function AdminUsers() {
   const [createLoading, setCreateLoading] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<UserAccount | null>(null)
 
-  // Redirect ถ้าไม่ใช่ admin
-  useEffect(() => {
-    if (!currentUser || currentUser.role !== 'admin') {
-      window.location.hash = '#/'
-    }
-  }, [])
 
   const loadData = async () => {
     setLoading(true)
@@ -120,8 +114,6 @@ export default function AdminUsers() {
     await updateUserPermission(user.userId, 'canAccessStationAccessory', enabled)
     loadData()
   }
-
-  if (!currentUser || currentUser.role !== 'admin') return null
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">

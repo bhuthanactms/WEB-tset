@@ -3,25 +3,18 @@ import HomePage from './pages/Home'
 import LoginPage from './pages/Login'
 import AdminUsersPage from './pages/AdminUsers'
 import AppHeader from './components/layout/AppHeader'
-import { isAuthenticated } from '@/utils/auth'
+import { isAuthenticated, getCurrentUserSync } from '@/utils/auth'
 import React, { useEffect, useState } from 'react'
 import StationAccessory from './pages/StationAccessory'
 
-/**
- * RequireAuth - guards child content. If not authenticated, redirects to /login.
- * Uses hash navigation directly to comply with current router constraints.
- */
+// Guard: ต้อง login ก่อน
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const [authed, setAuthed] = useState<boolean>(isAuthenticated())
 
   useEffect(() => {
-    if (!authed) {
-      // Redirect to login if not authenticated
-      window.location.hash = '#/login'
-    }
+    if (!authed) window.location.hash = '#/login'
   }, [authed])
 
-  // Re-check auth on hash changes (basic sync)
   useEffect(() => {
     const onHash = () => setAuthed(isAuthenticated())
     window.addEventListener('hashchange', onHash)
@@ -29,6 +22,26 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   }, [])
 
   if (!authed) return null
+  return <>{children}</>
+}
+
+// Guard: ต้องไม่ใช่ worker หรือ design (redirect กลับ home)
+function RequireStationAccess({ children }: { children: React.ReactNode }) {
+  const user = getCurrentUserSync()
+  if (user?.role === 'worker' || user?.role === 'design') {
+    window.location.hash = '#/'
+    return null
+  }
+  return <>{children}</>
+}
+
+// Guard: ต้องเป็น admin เท่านั้น
+function RequireAdmin({ children }: { children: React.ReactNode }) {
+  const user = getCurrentUserSync()
+  if (user?.role !== 'admin') {
+    window.location.hash = '#/'
+    return null
+  }
   return <>{children}</>
 }
 
@@ -52,16 +65,19 @@ export default function App() {
           path="/admin/users"
           element={
             <RequireAuth>
-              <AdminUsersPage />
+              <RequireAdmin>
+                <AdminUsersPage />
+              </RequireAdmin>
             </RequireAuth>
           }
         />
-        {/* เพิ่ม Route สำหรับ StationAccessory */}
         <Route
           path="/station-accessory"
           element={
             <RequireAuth>
-              <StationAccessory />
+              <RequireStationAccess>
+                <StationAccessory />
+              </RequireStationAccess>
             </RequireAuth>
           }
         />

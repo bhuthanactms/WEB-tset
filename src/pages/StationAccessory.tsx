@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { Zap, Car, Paintbrush, Shield, Home, Wrench, MapPin, ChevronDown, ChevronUp, Box, Package, Settings, Ruler, Printer, Save, FolderOpen, Trash2, Calculator, Cable, DollarSign } from 'lucide-react'
 
 import { useLocation, useNavigate } from 'react-router-dom'
-import { getCurrentUser, canAccessStationAccessory, canSaveHistory } from '@/utils/auth'
+import { getCurrentUserSync as getCurrentUser, canSaveHistory } from '@/utils/auth'
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
@@ -4177,6 +4177,7 @@ function MoreDetailCard(props: any) {
       laborTotal: number;
       totalPrice: number;
       quantity?: string;
+      sortKey?: string;
     }> = [];
 
     if (sectionKey === 'transformer') {
@@ -18453,15 +18454,6 @@ function StationAccessory() {
     setSaveFormDataHandler(() => handler);
   }, []);
 
-  // Check access permission
-  useEffect(() => {
-    const user = getCurrentUser();
-    if (!canAccessStationAccessory(user)) {
-      alert('⚠️ No Permission\nคุณไม่มีสิทธิ์เข้าถึงหน้านี้');
-      navigate('/', { replace: true });
-      return;
-    }
-  }, [navigate]);
 
   const normalizeHomeDataPayload = useCallback((raw: any) => {
     if (!raw) return null;

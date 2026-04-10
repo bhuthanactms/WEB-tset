@@ -16,7 +16,7 @@ import { Calculator, Zap, Battery, Settings, Cable, Save, FolderOpen, Trash2 } f
 import axios from 'axios'
 import * as XLSX from 'xlsx'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { getCurrentUser, canAccessStationAccessory, canSaveHistory } from '@/utils/auth'
+import { getCurrentUserSync as getCurrentUser, canAccessStationAccessory, canSaveHistory } from '@/utils/auth'
 
 /** Form state interface */
 interface CalculatorForm {

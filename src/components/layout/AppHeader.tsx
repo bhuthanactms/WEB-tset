@@ -4,11 +4,11 @@
  * Displays user info, navigation buttons, and signout functionality
  */
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { User, LogOut, ArrowLeft, ArrowRight, Menu, Search, X, Home, Users, Settings } from 'lucide-react'
-import { getCurrentUser, logout, isManager, isAdmin, isAdminOrManager, canEdit, canDeleteHistory, canSaveHistory, getAllUserAccounts, updateUserAccount, updateUserPermission, createUserAccount, deleteUserAccount, UserAccount, UserRole } from '@/utils/auth'
+import { User, LogOut, ArrowLeft, ArrowRight, Menu, Search, Home, Users, Settings } from 'lucide-react'
+import { getCurrentUserSync, logout, isAdmin, canDeleteHistory, canSaveHistory } from '@/utils/auth'
 import {
   Sheet,
   SheetContent,
@@ -18,9 +18,6 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet'
 import { Input } from '@/components/ui/input'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Label } from '@/components/ui/label'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Trash2 } from 'lucide-react'
 
@@ -38,24 +35,13 @@ interface SavedHistory {
 }
 
 export default function AppHeader(): React.JSX.Element {
-  const currentUser = getCurrentUser()
+  const currentUser = getCurrentUserSync()
   const navigate = useNavigate()
   const location = useLocation()
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
-  const [isUserManagementOpen, setIsUserManagementOpen] = useState(false)
-  const [isCreateUserOpen, setIsCreateUserOpen] = useState(false)
   const [history, setHistory] = useState<SavedHistory[]>([])
   const [searchTerm, setSearchTerm] = useState('')
-  const [userAccounts, setUserAccounts] = useState<UserAccount[]>([])
 
-  // Create user form state
-  const [newUsername, setNewUsername] = useState('')
-  const [newPassword, setNewPassword] = useState('')
-  const [newRole, setNewRole] = useState<UserRole>('sales')
-
-  // Use useMemo to stabilize currentUser reference
-  const currentUserId = React.useMemo(() => currentUser?.username || null, [currentUser?.username])
-  const isAdminOrManagerUser = React.useMemo(() => isAdminOrManager(currentUser), [currentUser?.username, currentUser?.role])
 
   // Use useCallback to memoize loadHistory function to prevent infinite loops
   const loadHistory = React.useCallback(() => {
@@ -151,13 +137,10 @@ export default function AppHeader(): React.JSX.Element {
 
   useEffect(() => {
     loadHistory()
-    if (isAdminOrManagerUser) {
-      setUserAccounts(getAllUserAccounts())
-    }
-  }, [loadHistory, isAdminOrManagerUser])
+  }, [loadHistory])
 
-  const handleSignOut = () => {
-    logout()
+  const handleSignOut = async () => {
+    await logout()
     window.location.hash = '#/login'
   }
 
@@ -368,18 +351,15 @@ export default function AppHeader(): React.JSX.Element {
               <SheetHeader>
                 <SheetTitle className="flex items-center justify-between">
                   <span>ประวัติการบันทึก</span>
-                  {isAdminOrManager(currentUser) && (
+                  {isAdmin(currentUser) && (
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => {
-                        setIsUserManagementOpen(true)
-                        setUserAccounts(getAllUserAccounts())
-                      }}
+                      onClick={() => { window.location.hash = '#/admin/users' }}
                       className="ml-2"
                     >
                       <Users className="h-4 w-4 mr-1" />
-                      User Management
+                      จัดการ User
                     </Button>
                   )}
                 </SheetTitle>
@@ -464,260 +444,6 @@ export default function AppHeader(): React.JSX.Element {
             </SheetContent>
           </Sheet>
 
-          {/* User Management Sheet for Manager */}
-          {isAdminOrManager(currentUser) && (
-            <Sheet open={isUserManagementOpen} onOpenChange={setIsUserManagementOpen}>
-              <SheetContent side="left" className="w-[500px] sm:w-[600px]">
-                <SheetHeader>
-                  <SheetTitle>User Management</SheetTitle>
-                  <SheetDescription>
-                    จัดการการเข้าถึงของผู้ใช้ (Sales, Design, Worker)
-                  </SheetDescription>
-                </SheetHeader>
-                <div className="mt-4">
-                  <div className="space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
-                    <div className="space-y-3">
-                      <div className="font-semibold text-lg">Sales Users</div>
-                      {userAccounts.filter(u => u.role === 'sales').map((account) => (
-                        <div key={account.username} className="p-3 border rounded-lg space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <div className="font-medium">{account.username}</div>
-                              <div className="text-sm text-gray-500">Role: {account.role}</div>
-                            </div>
-                            <div className="flex flex-col items-end gap-2">
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-gray-600">Enabled</span>
-                                <Checkbox
-                                  checked={account.enabled}
-                                  onCheckedChange={(checked) => {
-                                    updateUserAccount(account.username, checked === true)
-                                    setUserAccounts(getAllUserAccounts())
-                                  }}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <Separator />
-                    <div className="space-y-3">
-                      <div className="font-semibold text-lg">Design Users</div>
-                      {userAccounts.filter(u => u.role === 'design').map((account) => (
-                        <div key={account.username} className="p-3 border rounded-lg space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <div className="font-medium">{account.username}</div>
-                              <div className="text-sm text-gray-500">Role: {account.role}</div>
-                            </div>
-                            <div className="flex flex-col items-end gap-2">
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-gray-600">Enabled</span>
-                                <Checkbox
-                                  checked={account.enabled}
-                                  onCheckedChange={(checked) => {
-                                    updateUserAccount(account.username, checked === true)
-                                    setUserAccounts(getAllUserAccounts())
-                                  }}
-                                />
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-gray-600">Access Station Accessory</span>
-                                <Checkbox
-                                  checked={account.permissions?.canAccessStationAccessory || false}
-                                  onCheckedChange={(checked) => {
-                                    updateUserPermission(account.username, 'canAccessStationAccessory', checked === true)
-                                    setUserAccounts(getAllUserAccounts())
-                                  }}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <Separator />
-                    <div className="space-y-3">
-                      <div className="font-semibold text-lg">Worker Users</div>
-                      {userAccounts.filter(u => u.role === 'worker').map((account) => (
-                        <div key={account.username} className="p-3 border rounded-lg space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <div className="font-medium">{account.username}</div>
-                              <div className="text-sm text-gray-500">Role: {account.role}</div>
-                            </div>
-                            <div className="flex flex-col items-end gap-2">
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-gray-600">Enabled</span>
-                                <Checkbox
-                                  checked={account.enabled}
-                                  onCheckedChange={(checked) => {
-                                    updateUserAccount(account.username, checked === true)
-                                    setUserAccounts(getAllUserAccounts())
-                                  }}
-                                />
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-gray-600">Access Station Accessory</span>
-                                <Checkbox
-                                  checked={account.permissions?.canAccessStationAccessory || false}
-                                  onCheckedChange={(checked) => {
-                                    updateUserPermission(account.username, 'canAccessStationAccessory', checked === true)
-                                    setUserAccounts(getAllUserAccounts())
-                                  }}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </SheetContent>
-            </Sheet>
-          )}
-
-          {/* Create User Sheet for ADMIN */}
-          {isAdmin(currentUser) && (
-            <Sheet open={isCreateUserOpen} onOpenChange={setIsCreateUserOpen}>
-              <SheetContent side="right" className="w-[400px] sm:w-[500px]">
-                <SheetHeader>
-                  <SheetTitle>สร้าง User ใหม่</SheetTitle>
-                  <SheetDescription>
-                    สร้าง user account ใหม่พร้อมกำหนด role
-                  </SheetDescription>
-                </SheetHeader>
-                <div className="mt-6 space-y-4">
-                  <div>
-                    <Label htmlFor="new-username">Username</Label>
-                    <Input
-                      id="new-username"
-                      value={newUsername}
-                      onChange={(e) => setNewUsername(e.target.value)}
-                      placeholder="กรอก username"
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="new-password">Password</Label>
-                    <Input
-                      id="new-password"
-                      type="password"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="กรอก password"
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="new-role">Role</Label>
-                    <Select value={newRole} onValueChange={(value) => setNewRole(value as UserRole)}>
-                      <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="เลือก role" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="sales">Sales</SelectItem>
-                        <SelectItem value="design">Design</SelectItem>
-                        <SelectItem value="worker">Worker</SelectItem>
-                        <SelectItem value="manager">Manager</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex gap-2 pt-4">
-                    <Button
-                      onClick={() => {
-                        if (!newUsername.trim() || !newPassword.trim()) {
-                          alert('⚠️ กรุณากรอก username และ password')
-                          return
-                        }
-                        const result = createUserAccount(newUsername.trim(), newPassword, newRole)
-                        if (result.ok) {
-                          alert('✅ สร้าง user สำเร็จ!')
-                          setUserAccounts(getAllUserAccounts())
-                          setIsCreateUserOpen(false)
-                          setNewUsername('')
-                          setNewPassword('')
-                          setNewRole('sales')
-                        } else {
-                          alert(`❌ ${result.message || 'เกิดข้อผิดพลาดในการสร้าง user'}`)
-                        }
-                      }}
-                      className="flex-1"
-                    >
-                      สร้าง User
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setIsCreateUserOpen(false)
-                        setNewUsername('')
-                        setNewPassword('')
-                        setNewRole('sales')
-                      }}
-                    >
-                      ยกเลิก
-                    </Button>
-                  </div>
-
-                  {/* Show custom users list with delete option */}
-                  <div className="mt-6">
-                    <div className="font-semibold mb-3">Custom Users (ที่สร้างเอง)</div>
-                    <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                      {userAccounts.filter(u => {
-                        // Check if user is in custom users (not in default USER_ACCOUNTS)
-                        const defaultUsernames = ['Sale_game', 'Sale_Ton', 'Sale_Tak', 'sale.sp', 'Technic_A',
-                          'design01', 'design02', 'design03', 'design04', 'design05',
-                          'worker01', 'worker02', 'worker03', 'worker04', 'worker05',
-                          'manager01', 'manager02', 'manager03', 'manager04', 'manager05',
-                          'admin01', 'admin02', 'admin03', 'admin04', 'admin05']
-                        return !defaultUsernames.includes(u.username)
-                      }).map((account) => (
-                        <div key={account.username} className="flex items-center justify-between p-2 border rounded-lg">
-                          <div>
-                            <div className="font-medium">{account.username}</div>
-                            <div className="text-xs text-gray-500">Role: {account.role}</div>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                            onClick={() => {
-                              if (confirm(`คุณต้องการลบ user "${account.username}" หรือไม่?`)) {
-                                const result = deleteUserAccount(account.username)
-                                if (result.ok) {
-                                  alert('✅ ลบ user สำเร็จ!')
-                                  setUserAccounts(getAllUserAccounts())
-                                } else {
-                                  alert(`❌ ${result.message || 'เกิดข้อผิดพลาดในการลบ user'}`)
-                                }
-                              }
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                      {userAccounts.filter(u => {
-                        const defaultUsernames = ['Sale_game', 'Sale_Ton', 'Sale_Tak', 'sale.sp', 'Technic_A',
-                          'design01', 'design02', 'design03', 'design04', 'design05',
-                          'worker01', 'worker02', 'worker03', 'worker04', 'worker05',
-                          'manager01', 'manager02', 'manager03', 'manager04', 'manager05',
-                          'admin01', 'admin02', 'admin03', 'admin04', 'admin05']
-                        return !defaultUsernames.includes(u.username)
-                      }).length === 0 && (
-                          <div className="text-sm text-gray-500 text-center py-4">
-                            ยังไม่มี custom users
-                          </div>
-                        )}
-                    </div>
-                  </div>
-                </div>
-              </SheetContent>
-            </Sheet>
-          )}
 
           <Button variant="outline" size="sm" onClick={handleBack}>
             <ArrowLeft className="h-4 w-4" />
@@ -739,14 +465,9 @@ export default function AppHeader(): React.JSX.Element {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  setIsCreateUserOpen(true)
-                  setNewUsername('')
-                  setNewPassword('')
-                  setNewRole('sales')
-                }}
+                onClick={() => { window.location.hash = '#/admin/users' }}
                 className="bg-gray-100 hover:bg-gray-200"
-                title="สร้าง User ใหม่"
+                title="จัดการ User"
               >
                 <Settings className="h-4 w-4" />
               </Button>
