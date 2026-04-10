@@ -44,23 +44,43 @@ interface CalculatorResults {
  * Home component - Main EV Station Calculator interface
  */
 export default function Home(): React.JSX.Element {
-  // เพิ่ม state สำหรับประเภทการเลือก Charger Type
-  const [chargerInstallationType, setChargerInstallationType] = useState<'stand-alone' | 'group'>('stand-alone');
-  const [chargerTypeMode, setChargerTypeMode] = useState<'same' | 'any'>('same');
-  const [multiChargers, setMultiChargers] = useState<string[]>([]);
-
-  const [form, setForm] = useState<CalculatorForm>({
+  const createEmptyForm = (): CalculatorForm => ({
     powerAuthority: '' as any,
     charger: '',
     numberOfChargers: '',
     trWiringType: '',
-    chargerWiringType: [], // เปลี่ยนเป็น array
+    chargerWiringType: [],
     trToLand: '',
     landToMdb: '',
     numberOfTerminals: '',
     terminalSize: '',
     terminalWiringType: ''
-  });
+  })
+
+  const sanitizeNonNegativeString = (value: unknown): string => {
+    if (value === null || value === undefined || value === '') return ''
+    const raw = String(value)
+    const parsed = Number(raw)
+    if (!Number.isFinite(parsed)) return raw
+    return parsed < 0 ? '0' : raw
+  }
+
+  const normalizeLoadedForm = (rawForm: any): CalculatorForm => ({
+    ...createEmptyForm(),
+    ...(rawForm || {}),
+    chargerWiringType: Array.isArray(rawForm?.chargerWiringType)
+      ? rawForm.chargerWiringType
+      : (rawForm?.chargerWiringType ? [rawForm.chargerWiringType] : []),
+    numberOfChargers: sanitizeNonNegativeString(rawForm?.numberOfChargers),
+    numberOfTerminals: sanitizeNonNegativeString(rawForm?.numberOfTerminals)
+  })
+
+  // เพิ่ม state สำหรับประเภทการเลือก Charger Type
+  const [chargerInstallationType, setChargerInstallationType] = useState<'stand-alone' | 'group'>('stand-alone');
+  const [chargerTypeMode, setChargerTypeMode] = useState<'same' | 'any'>('same');
+  const [multiChargers, setMultiChargers] = useState<string[]>([]);
+
+  const [form, setForm] = useState<CalculatorForm>(createEmptyForm());
 
   const [results, setResults] = useState<CalculatorResults | null>(null)
   const [excelData, setExcelData] = useState<any[]>([]);
@@ -82,21 +102,11 @@ export default function Home(): React.JSX.Element {
       console.log('🔄 Resetting form...')
       // ลบข้อมูลปัจจุบันใน localStorage (แต่ไม่ลบประวัติการบันทึก)
       localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem('ev_station_accessory_form_data');
       // ลบ flag ที่บอกว่าโหลดจากประวัติ
       sessionStorage.removeItem('loaded_from_history');
       // Reset form state
-      setForm({
-        powerAuthority: '' as any,
-        charger: '',
-        numberOfChargers: '',
-        trWiringType: '',
-        chargerWiringType: [], // เปลี่ยนเป็น array
-        trToLand: '',
-        landToMdb: '',
-        numberOfTerminals: '',
-        terminalSize: '',
-        terminalWiringType: ''
-      });
+      setForm(createEmptyForm());
       setResults(null);
       setCustomerCode('');
       setChargerInstallationType('stand-alone');
@@ -126,13 +136,7 @@ export default function Home(): React.JSX.Element {
 
       // โหลดข้อมูลทั้งหมด
       if (loadData.form) {
-        // แปลง chargerWiringType จาก string เป็น array ถ้าเป็น string (backward compatibility)
-        const normalizedForm = {
-          ...loadData.form,
-          chargerWiringType: Array.isArray(loadData.form.chargerWiringType)
-            ? loadData.form.chargerWiringType
-            : (loadData.form.chargerWiringType ? [loadData.form.chargerWiringType] : [])
-        };
+        const normalizedForm = normalizeLoadedForm(loadData.form);
         setForm(normalizedForm);
         console.log('✅ Set form:', normalizedForm);
       }
@@ -179,13 +183,7 @@ export default function Home(): React.JSX.Element {
         try {
           const parsed = JSON.parse(savedData);
           if (parsed.form) {
-            // แปลง chargerWiringType จาก string เป็น array ถ้าเป็น string (backward compatibility)
-            const normalizedForm = {
-              ...parsed.form,
-              chargerWiringType: Array.isArray(parsed.form.chargerWiringType)
-                ? parsed.form.chargerWiringType
-                : (parsed.form.chargerWiringType ? [parsed.form.chargerWiringType] : [])
-            };
+            const normalizedForm = normalizeLoadedForm(parsed.form);
             setForm(normalizedForm);
             console.log('✅ Set form from localStorage:', normalizedForm);
           }
@@ -230,36 +228,6 @@ export default function Home(): React.JSX.Element {
       } else {
         // ถ้าไม่มีข้อมูลใน localStorage ให้ล้าง flag
         sessionStorage.removeItem('loaded_from_history');
-      }
-    } else {
-      // โหลดจาก localStorage เฉพาะเมื่อไม่ได้โหลดจากประวัติ
-      const savedData = localStorage.getItem(STORAGE_KEY);
-      if (savedData) {
-        try {
-          const parsed = JSON.parse(savedData);
-          if (parsed.form) {
-            // แปลง chargerWiringType จาก string เป็น array ถ้าเป็น string (backward compatibility)
-            const normalizedForm = {
-              ...parsed.form,
-              chargerWiringType: Array.isArray(parsed.form.chargerWiringType)
-                ? parsed.form.chargerWiringType
-                : (parsed.form.chargerWiringType ? [parsed.form.chargerWiringType] : [])
-            };
-            setForm(normalizedForm);
-          }
-          if (parsed.chargerInstallationType) setChargerInstallationType(parsed.chargerInstallationType);
-          if (parsed.chargerTypeMode) setChargerTypeMode(parsed.chargerTypeMode);
-          if (parsed.multiChargers) setMultiChargers(parsed.multiChargers);
-          if (parsed.customerCode) setCustomerCode(parsed.customerCode);
-          // โหลด results ถ้ามี
-          if (parsed.results) {
-            setResults(parsed.results);
-            console.log('✅ Loaded results from saved data:', parsed.results);
-          }
-          console.log('✅ Loaded saved data from localStorage');
-        } catch (error) {
-          console.error('❌ Error loading saved data:', error);
-        }
       }
     }
   }, [location.pathname, location.state]);
@@ -488,13 +456,7 @@ export default function Home(): React.JSX.Element {
       try {
         const parsed = JSON.parse(savedData);
         if (parsed.form) {
-          // แปลง chargerWiringType จาก string เป็น array ถ้าเป็น string (backward compatibility)
-          const normalizedForm = {
-            ...parsed.form,
-            chargerWiringType: Array.isArray(parsed.form.chargerWiringType)
-              ? parsed.form.chargerWiringType
-              : (parsed.form.chargerWiringType ? [parsed.form.chargerWiringType] : [])
-          };
+          const normalizedForm = normalizeLoadedForm(parsed.form);
           setForm(normalizedForm);
         }
         if (parsed.chargerInstallationType) setChargerInstallationType(parsed.chargerInstallationType);
@@ -535,15 +497,7 @@ export default function Home(): React.JSX.Element {
       localStorage.removeItem(STORAGE_KEY);
       sessionStorage.removeItem('loaded_from_history');
       // ล้าง form state ด้วย
-      setForm({
-        powerAuthority: '' as any,
-        charger: '',
-        numberOfChargers: '',
-        trWiringType: '',
-        chargerWiringType: [], // เปลี่ยนเป็น array
-        trToLand: '',
-        landToMdb: ''
-      });
+      setForm(createEmptyForm());
       setResults(null);
       setCustomerCode('');
       setChargerInstallationType('stand-alone');
@@ -941,7 +895,7 @@ export default function Home(): React.JSX.Element {
     // Convert Google Sheets sharing URL to direct download URL
     const googleSheetsUrl = 'https://docs.google.com/spreadsheets/d/1yxZvBr0O9ZzFpQCgBeZIcQrKGq_x2wQz/edit?usp=sharing&ouid=111737986991833013743&rtpof=true&sd=true';
     const fileId = googleSheetsUrl.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1];
-    const excelFileUrl = `https://docs.google.com/spreadsheets/d/${fileId}/export?format=xlsx&usp=sharing`;
+    const excelFileUrl = `https://docs.google.com/spreadsheets/d/${fileId}/export?format=xlsx&usp=sharing&t=${Date.now()}`;
 
     console.log('🔄 กำลังโหลดข้อมูลจาก Google Sheets...');
     console.log('📄 Google Sheets URL:', googleSheetsUrl);
@@ -949,7 +903,13 @@ export default function Home(): React.JSX.Element {
     console.log('🆔 File ID:', fileId);
 
     try {
-      const response = await axios.get(excelFileUrl, { responseType: 'arraybuffer' });
+      const response = await axios.get(excelFileUrl, {
+        responseType: 'arraybuffer',
+        headers: {
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache'
+        }
+      });
       console.log('✅ ดาวน์โหลดข้อมูลสำเร็จ, ขนาด:', response.data.byteLength, 'bytes');
 
       const workbook = XLSX.read(response.data, { type: 'array' });

@@ -137,55 +137,8 @@ export default function AppHeader(): React.JSX.Element {
         }
       })
 
-      // Load current data keys (key format: ev_calculator_form_data or ev_station_accessory_form_data) - ไม่มี timestamp
-      const currentHomeData = localStorage.getItem('ev_calculator_form_data')
-      const currentStationData = localStorage.getItem('ev_station_accessory_form_data')
-
-      if (currentHomeData) {
-        try {
-          const data = JSON.parse(currentHomeData)
-          if (data.customerCode) {
-            const existing = historyMap.get(data.customerCode)
-            if (!existing) {
-              historyMap.set(data.customerCode, {
-                customerCode: data.customerCode,
-                page: 'home',
-                data: data,
-                homeData: data,
-                savedAt: data.savedAt || new Date().toISOString()
-              })
-            } else if (!existing.homeData || new Date(data.savedAt || 0).getTime() > new Date(existing.savedAt).getTime()) {
-              existing.homeData = data
-              if (existing.stationData) existing.page = 'combined'
-            }
-          }
-        } catch (e) {
-          // Skip invalid entries
-        }
-      }
-
-      if (currentStationData) {
-        try {
-          const data = JSON.parse(currentStationData)
-          if (data.customerCode) {
-            const existing = historyMap.get(data.customerCode)
-            if (!existing) {
-              historyMap.set(data.customerCode, {
-                customerCode: data.customerCode,
-                page: 'station-accessory',
-                data: data,
-                stationData: data,
-                savedAt: data.savedAt || new Date().toISOString()
-              })
-            } else if (!existing.stationData || new Date(data.savedAt || 0).getTime() > new Date(existing.savedAt).getTime()) {
-              existing.stationData = data
-              if (existing.homeData) existing.page = 'combined'
-            }
-          }
-        } catch (e) {
-          // Skip invalid entries
-        }
-      }
+      // ไม่รวม current draft (key หลักที่ไม่มี timestamp) ในรายการ history
+      // เพื่อให้ popup Save/Load แสดงเฉพาะรายการที่ผู้ใช้กดบันทึกจริง
 
       // Convert map to array and sort by savedAt (newest first)
       const historyItems = Array.from(historyMap.values())

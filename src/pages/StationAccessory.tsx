@@ -74,6 +74,55 @@ function MoreDetailCard(props: any) {
     return isNaN(parsed) ? 0 : parsed;
   };
 
+  const calculateBracketQuantity = (distance: number): number => {
+    if (!distance || distance <= 0) return 0;
+    const divided = distance / 1.2;
+    const fractional = divided - Math.floor(divided);
+    return fractional < 0.5 ? Math.floor(divided) : Math.ceil(divided);
+  };
+
+  const sanitizeNonNegativeValue = (value: any) => {
+    if (value === undefined || value === null || value === '') return value;
+    const parsed = parseFloat(String(value));
+    if (Number.isNaN(parsed)) return value;
+    if (parsed < 0) return typeof value === 'number' ? 0 : '0';
+    return value;
+  };
+
+  const sanitizeNonNegativeArray = (values: any) => (
+    Array.isArray(values) ? values.map((value) => sanitizeNonNegativeValue(value)) : values
+  );
+
+  const sanitizeLoadedStationData = (raw: any) => {
+    const parsed = { ...(raw || {}) };
+    const nonNegativeFields = [
+      'trDistance', 'trToLandDistance', 'landToMdbDistance',
+      'lowVoltageDistance2', 'lowVoltageDistance3', 'highVoltageDistance',
+      'parkingSlots', 'roofCoverWidth', 'roofCoverLength', 'roofCoverM2',
+      'mdbRoofWidth', 'mdbRoofLength', 'mdbRoofM2',
+      'travelDistance', 'installationTravelDistance',
+      'routerCableDistance', 'cctvCableDistance', 'lightingCableDistance',
+      'generalConcreteFloorArea',
+      'excavation30cm', 'excavation60cm', 'excavation10cm', 'excavation20cm',
+      'excavation30cmFloor', 'excavationLevel', 'excavationFill',
+      'profitPercent', 'cfPercent', 'priceAdjustPercent'
+    ];
+
+    nonNegativeFields.forEach((field) => {
+      if (field in parsed) {
+        parsed[field] = sanitizeNonNegativeValue(parsed[field]);
+      }
+    });
+
+    parsed.chargerLineDistances = sanitizeNonNegativeArray(parsed.chargerLineDistances);
+    parsed.terminalLineDistances = sanitizeNonNegativeArray(parsed.terminalLineDistances);
+    if ('terminalDistance' in parsed) {
+      parsed.terminalDistance = sanitizeNonNegativeValue(parsed.terminalDistance);
+    }
+
+    return parsed;
+  };
+
   // ฟังก์ชันดึงจำนวนชุดจาก MCCB Sub string (เช่น "450A (2ชุด)" → 2)
   const extractSetCount = (mccbSubValue: string): number => {
     const match = mccbSubValue.match(/\((\d+)ชุด\)/);
@@ -307,61 +356,7 @@ function MoreDetailCard(props: any) {
       savedAt: new Date().toISOString()
     };
 
-    console.log('📦 Created homeDataParsed from props:', homeDataParsed);
-
-    // ตรวจสอบว่ามีข้อมูลใน localStorage หรือไม่ (ถ้ามีและรหัสลูกค้าตรงกัน อาจจะใช้ข้อมูลจาก localStorage แทน)
-    const homeDataKey = 'ev_calculator_form_data';
-    const homeData = localStorage.getItem(homeDataKey);
-    if (homeData) {
-      try {
-        const savedHomeData = JSON.parse(homeData);
-        // ถ้ารหัสลูกค้าตรงกันและมีข้อมูลครบถ้วนกว่า ให้ใช้ข้อมูลจาก localStorage
-        if (savedHomeData.customerCode === customerCode.trim() && savedHomeData.form && savedHomeData.form.charger) {
-          console.log('📦 Using saved homeData from localStorage (has charger info)');
-          // รวมข้อมูลจาก localStorage กับ props (ให้ props มีความสำคัญสูงกว่า)
-          // แปลง chargerWiringType จาก string เป็น array ถ้าเป็น string (backward compatibility)
-          const normalizedForm = savedHomeData.form ? {
-            ...savedHomeData.form,
-            chargerWiringType: Array.isArray(savedHomeData.form.chargerWiringType)
-              ? savedHomeData.form.chargerWiringType
-              : (savedHomeData.form.chargerWiringType ? [savedHomeData.form.chargerWiringType] : []),
-            // ถ้า props มีข้อมูล ให้ใช้จาก props แทน (เพราะอาจเป็นข้อมูลล่าสุด)
-            trToLand: props.trToLand || savedHomeData.form.trToLand || savedHomeData.trToLand || '',
-            landToMdb: props.landToMdb || savedHomeData.form.landToMdb || savedHomeData.landToMdb || ''
-          } : savedHomeData.form;
-
-          homeDataParsed = {
-            ...savedHomeData,
-            form: normalizedForm,
-            // ถ้า props มีข้อมูล ให้ใช้จาก props แทน (เพราะอาจเป็นข้อมูลล่าสุด)
-            transformer: props.transformer || savedHomeData.transformer || '',
-            trWiringSize: props.trWiringSize || savedHomeData.trWiringSize || '',
-            trWireConduit: props.trWireConduit || savedHomeData.trWireConduit || '',
-            mdb: props.mdb || savedHomeData.mdb || '',
-            mdbMainAt: props.mdbMainAt || savedHomeData.mdbMainAt || '',
-            mdbMainAf: props.mdbMainAf || savedHomeData.mdbMainAf || '',
-            mdbSubs: props.mdbSubs || savedHomeData.mdbSubs || [],
-            mdbLighting: props.mdbLighting || savedHomeData.mdbLighting || '',
-            mdbCommu: props.mdbCommu || savedHomeData.mdbCommu || '',
-            chargerSummary: props.chargerSummary || savedHomeData.chargerSummary || [],
-            chargerWiringCable: props.chargerWiringCable || savedHomeData.chargerWiringCable || '',
-            chargerWireConduit: props.chargerWireConduit || savedHomeData.chargerWireConduit || '',
-            chargerWiringCableAll: props.chargerWiringCableAll || savedHomeData.chargerWiringCableAll || [],
-            chargerWireConduitAll: props.chargerWireConduitAll || savedHomeData.chargerWireConduitAll || [],
-            chargerDistance: props.chargerDistance || savedHomeData.chargerDistance || 0,
-            trDistance: props.trDistance || savedHomeData.trDistance || 0,
-            savedAt: new Date().toISOString()
-          };
-        } else {
-          console.log('📦 Using homeDataParsed from props (localStorage data incomplete or different customer)');
-        }
-      } catch (e) {
-        console.error('Error parsing home data:', e);
-        console.log('📦 Using homeDataParsed from props (error parsing localStorage)');
-      }
-    } else {
-      console.log('📦 Using homeDataParsed from props (no localStorage data)');
-    }
+    console.log('📦 Created homeDataParsed from props only:', homeDataParsed);
 
     // ข้อมูล StationAccessory - บันทึกทุก state
     const stationData = {
@@ -599,6 +594,7 @@ function MoreDetailCard(props: any) {
 
   // Helper function to load parsed data into state
   const loadParsedDataIntoState = (parsed: any) => {
+    parsed = sanitizeLoadedStationData(parsed);
     // โหลดข้อมูลพื้นฐาน
     if (parsed.customerCode) setCustomerCode(parsed.customerCode);
     if (parsed.trDistance !== undefined) setTrDistance(parsed.trDistance);
@@ -802,134 +798,12 @@ function MoreDetailCard(props: any) {
     }
   };
 
-  // Load saved data on mount
+  // โหลดข้อมูลเริ่มต้นเฉพาะตอนมีการส่งมาจาก navigation/history อย่างชัดเจน
   useEffect(() => {
-    console.log('🔍 MoreDetailCard mount - Loading saved data...');
-
-    // โหลดข้อมูลจาก localStorage ก่อน (เพื่อใช้เป็น fallback)
-    const savedData = localStorage.getItem(STORAGE_KEY);
-    if (savedData) {
-      try {
-        const parsed = JSON.parse(savedData);
-        console.log('📂 Found saved data in localStorage:', parsed);
-
-        // โหลดข้อมูลพื้นฐาน
-        if (parsed.customerCode) {
-          setCustomerCode(parsed.customerCode);
-          console.log('✅ Loaded customerCode from localStorage:', parsed.customerCode);
-
-          // พยายามโหลดจากเซิร์ฟเวอร์หลังจากได้ customerCode แล้ว
-          (async () => {
-            try {
-              console.log('🌐 Attempting to load data from server for customer:', parsed.customerCode);
-              const response = await axios.get(`${API_BASE_URL}/load-data/${encodeURIComponent(parsed.customerCode.trim())}`);
-
-              if (response.data.success && response.data.data) {
-                const serverData = response.data.data;
-                console.log('✅ Loaded data from server on mount:', serverData);
-
-                // โหลดข้อมูลจาก server (จะทับข้อมูลจาก localStorage ถ้ามีข้อมูลใหม่กว่า)
-                if (serverData.stationAccessory) {
-                  loadParsedDataIntoState(serverData.stationAccessory);
-                  // อัพเดท localStorage ด้วยข้อมูลจาก server
-                  localStorage.setItem(STORAGE_KEY, JSON.stringify(serverData.stationAccessory));
-                } else {
-                  loadParsedDataIntoState(serverData);
-                  localStorage.setItem(STORAGE_KEY, JSON.stringify(serverData));
-                }
-              }
-            } catch (serverError: any) {
-              console.warn('⚠️ Failed to load from server on mount, using localStorage data:', serverError.message);
-              // ใช้ข้อมูลจาก localStorage ที่โหลดไว้แล้ว
-              loadParsedDataIntoState(parsed);
-            }
-          })();
-        } else {
-          // ถ้าไม่มี customerCode ใน localStorage ให้โหลดข้อมูลตามปกติ
-          loadParsedDataIntoState(parsed);
-        }
-
-        console.log('✅ Loaded all saved data from localStorage');
-        console.log('🔍 Debug - Loaded values:', {
-          highVoltageSystem: parsed.highVoltageSystem,
-          transformerType: parsed.transformerType,
-          highVoltageDistance: parsed.highVoltageDistance,
-          concreteSelection: parsed.concreteSelection,
-          mdbConcreteBase: parsed.mdbConcreteBase,
-          chargerConcreteBase: parsed.chargerConcreteBase,
-          powerCabinetConcreteBase: parsed.powerCabinetConcreteBase,
-          parkingConcreteFloor: parsed.parkingConcreteFloor,
-          generalConcreteFloor: parsed.generalConcreteFloor,
-          parkingSlots: parsed.parkingSlots,
-          travelCostResult: parsed.travelCostResult,
-          travelType: parsed.travelType,
-          travelDistance: parsed.travelDistance
-        });
-
-        // Force re-render to trigger useMemo recalculation
-        // Use setTimeout to ensure all state updates are complete
-        setTimeout(() => {
-          // Recalculate travel cost after loading data
-          if (parsed.travelType === 'construction' && parsed.travelDistance) {
-            console.log('🔄 Recalculating travel cost (construction)');
-            calculateTravelCost();
-          } else if (parsed.travelType === 'installation') {
-            console.log('🔄 Recalculating travel cost (installation)');
-            calculateInstallationTravelCost();
-          }
-
-          // Force state update to trigger useMemo recalculation for highVoltageTotals and concreteTotals
-          // This ensures that useMemo dependencies are re-evaluated after loading
-          // Always update state even if value is the same to trigger useMemo recalculation
-          if (parsed.highVoltageSystem !== undefined) {
-            console.log('🔄 Setting highVoltageSystem:', parsed.highVoltageSystem);
-            setHighVoltageSystem(parsed.highVoltageSystem);
-          }
-          if (parsed.transformerType !== undefined) {
-            console.log('🔄 Setting transformerType:', parsed.transformerType);
-            setTransformerType(parsed.transformerType);
-          }
-          if (parsed.highVoltageDistance !== undefined) {
-            console.log('🔄 Setting highVoltageDistance:', parsed.highVoltageDistance);
-            setHighVoltageDistance(parsed.highVoltageDistance);
-          }
-          if (parsed.concreteSelection !== undefined) {
-            console.log('🔄 Setting concreteSelection:', parsed.concreteSelection);
-            setConcreteSelection(parsed.concreteSelection);
-          }
-          // Force update concrete work states to trigger concreteTotals recalculation
-          if (parsed.mdbConcreteBase !== undefined) {
-            console.log('🔄 Setting mdbConcreteBase:', parsed.mdbConcreteBase);
-            setMdbConcreteBase(parsed.mdbConcreteBase);
-          }
-          if (parsed.chargerConcreteBase !== undefined) {
-            console.log('🔄 Setting chargerConcreteBase:', parsed.chargerConcreteBase);
-            setChargerConcreteBase(parsed.chargerConcreteBase);
-          }
-          if (parsed.parkingConcreteFloor !== undefined) {
-            console.log('🔄 Setting parkingConcreteFloor:', parsed.parkingConcreteFloor);
-            setParkingConcreteFloor(parsed.parkingConcreteFloor);
-          }
-          if (parsed.generalConcreteFloor !== undefined) {
-            console.log('🔄 Setting generalConcreteFloor:', parsed.generalConcreteFloor);
-            setGeneralConcreteFloor(parsed.generalConcreteFloor);
-          }
-          if (parsed.parkingSlots !== undefined) {
-            console.log('🔄 Setting parkingSlots:', parsed.parkingSlots);
-            setParkingSlots(parsed.parkingSlots);
-          }
-          if (parsed.travelCostResult !== undefined) {
-            console.log('🔄 Setting travelCostResult:', parsed.travelCostResult);
-            setTravelCostResult(parsed.travelCostResult);
-          }
-        }, 300);
-      } catch (error) {
-        console.error('❌ Error loading saved data:', error);
-      }
-    } else {
-      console.log('⚠️ No saved data found in localStorage');
-    }
-  }, []); // Run once on mount
+    if (!props.initialStationData) return;
+    console.log('📦 Applying initial station data from props:', props.initialStationData);
+    loadParsedDataIntoState(props.initialStationData);
+  }, [props.initialStationData]);
 
   // Send saveFormData handler to parent component
   // Use ref to avoid infinite loop - only call when onSaveFormDataReady changes
@@ -3335,26 +3209,23 @@ function MoreDetailCard(props: any) {
               const row = sheet.find((r: any) => r.__rowNum__ === rowNum);
 
               if (row) {
-                let multiplier, materialUnit, laborUnit, totalUnit;
+                let materialUnit, laborUnit, totalUnit;
 
                 if (conduitType === 'RSC') {
-                  // RSC: ใช้ __EMPTY_27 เป็นตัวคูณ, __EMPTY_34 เป็นรายการ, __EMPTY_28 เป็นค่าของ, __EMPTY_30 เป็นค่าแรงรวม, __EMPTY_32 เป็นราคารวม
-                  multiplier = parsePrice(row.__EMPTY_27 || 1);
                   materialUnit = parsePrice(row.__EMPTY_28 || 0);
                   laborUnit = parsePrice(row.__EMPTY_30 || 0);
                   totalUnit = parsePrice(row.__EMPTY_32 || 0);
                 } else {
-                  // IMC: ใช้ __EMPTY_28 เป็นตัวคูณ, __EMPTY_35 เป็นรายการ, __EMPTY_29 เป็นค่าของ, __EMPTY_31 เป็นค่าแรงรวม, __EMPTY_33 เป็นราคารวม
-                  multiplier = parsePrice(row.__EMPTY_28 || 1);
                   materialUnit = parsePrice(row.__EMPTY_29 || 0);
                   laborUnit = parsePrice(row.__EMPTY_31 || 0);
                   totalUnit = parsePrice(row.__EMPTY_33 || 0);
                 }
 
-                if (multiplier > 0 && (materialUnit > 0 || laborUnit > 0 || totalUnit > 0)) {
-                  materialTotal += materialUnit * multiplier;
-                  laborTotal += laborUnit * multiplier;
-                  totalPrice += totalUnit * multiplier;
+                const quantity = calculateBracketQuantity(trToLandInputDistance);
+                if (quantity > 0 && (materialUnit > 0 || laborUnit > 0 || totalUnit > 0)) {
+                  materialTotal += materialUnit * quantity;
+                  laborTotal += laborUnit * quantity;
+                  totalPrice += totalUnit * quantity;
                 }
               }
             }
@@ -3415,26 +3286,23 @@ function MoreDetailCard(props: any) {
               const row = sheet.find((r: any) => r.__rowNum__ === rowNum);
 
               if (row) {
-                let multiplier, materialUnit, laborUnit, totalUnit;
+                let materialUnit, laborUnit, totalUnit;
 
                 if (conduitType === 'RSC') {
-                  // RSC: ใช้ __EMPTY_27 เป็นตัวคูณ, __EMPTY_34 เป็นรายการ, __EMPTY_28 เป็นค่าของ, __EMPTY_30 เป็นค่าแรงรวม, __EMPTY_32 เป็นราคารวม
-                  multiplier = parsePrice(row.__EMPTY_27 || 1);
                   materialUnit = parsePrice(row.__EMPTY_28 || 0);
                   laborUnit = parsePrice(row.__EMPTY_30 || 0);
                   totalUnit = parsePrice(row.__EMPTY_32 || 0);
                 } else {
-                  // IMC: ใช้ __EMPTY_28 เป็นตัวคูณ, __EMPTY_35 เป็นรายการ, __EMPTY_29 เป็นค่าของ, __EMPTY_31 เป็นค่าแรงรวม, __EMPTY_33 เป็นราคารวม
-                  multiplier = parsePrice(row.__EMPTY_28 || 1);
                   materialUnit = parsePrice(row.__EMPTY_29 || 0);
                   laborUnit = parsePrice(row.__EMPTY_31 || 0);
                   totalUnit = parsePrice(row.__EMPTY_33 || 0);
                 }
 
-                if (multiplier > 0 && (materialUnit > 0 || laborUnit > 0 || totalUnit > 0)) {
-                  materialTotal += materialUnit * multiplier;
-                  laborTotal += laborUnit * multiplier;
-                  totalPrice += totalUnit * multiplier;
+                const quantity = calculateBracketQuantity(landToMdbInputDistance);
+                if (quantity > 0 && (materialUnit > 0 || laborUnit > 0 || totalUnit > 0)) {
+                  materialTotal += materialUnit * quantity;
+                  laborTotal += laborUnit * quantity;
+                  totalPrice += totalUnit * quantity;
                 }
               }
             }
@@ -3495,27 +3363,23 @@ function MoreDetailCard(props: any) {
             const row = sheet.find((r: any) => r.__rowNum__ === rowNum);
 
             if (row) {
-              let multiplier, materialUnit, laborUnit, totalUnit;
+              let materialUnit, laborUnit, totalUnit;
 
               if (conduitType === 'RSC') {
-                // RSC: ใช้ __EMPTY_27 เป็นตัวคูณ, __EMPTY_34 เป็นรายการ, __EMPTY_28 เป็นค่าของ, __EMPTY_30 เป็นค่าแรงรวม, __EMPTY_32 เป็นราคารวม
-                multiplier = parsePrice(row.__EMPTY_27 || 1);
                 materialUnit = parsePrice(row.__EMPTY_28 || 0);
                 laborUnit = parsePrice(row.__EMPTY_30 || 0);
                 totalUnit = parsePrice(row.__EMPTY_32 || 0);
               } else {
-                // IMC: ใช้ __EMPTY_28 เป็นตัวคูณ, __EMPTY_35 เป็นรายการ, __EMPTY_29 เป็นค่าของ, __EMPTY_31 เป็นค่าแรงรวม, __EMPTY_33 เป็นราคารวม
-                multiplier = parsePrice(row.__EMPTY_28 || 1);
                 materialUnit = parsePrice(row.__EMPTY_29 || 0);
                 laborUnit = parsePrice(row.__EMPTY_31 || 0);
                 totalUnit = parsePrice(row.__EMPTY_33 || 0);
               }
 
-              // เพิ่มราคา "เหล็กเท้าแขนสามเหลี่ยมรับท่อ" เข้าไปในราคารวม
-              if (multiplier > 0 && (materialUnit > 0 || laborUnit > 0 || totalUnit > 0)) {
-                materialTotal += materialUnit * multiplier;
-                laborTotal += laborUnit * multiplier;
-                totalPrice += totalUnit * multiplier;
+              const quantity = calculateBracketQuantity(inputDistance);
+              if (quantity > 0 && (materialUnit > 0 || laborUnit > 0 || totalUnit > 0)) {
+                materialTotal += materialUnit * quantity;
+                laborTotal += laborUnit * quantity;
+                totalPrice += totalUnit * quantity;
               }
             }
           }
@@ -3530,7 +3394,7 @@ function MoreDetailCard(props: any) {
       if (props.trToLand === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' || props.trToLand === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา') {
         const trToLandInputDistance = parseFloat(trToLandDistance || '0');
         if (trToLandInputDistance > 0) {
-          const transformerSize = parseInt(props.transformer || '0');
+          const transformerSize = parseTransformerKvaForTrMdb(props.transformer || '');
           const powerAuthority = props.powerAuthority || '';
           let sheetName = '';
           let rowNum = null;
@@ -3573,10 +3437,11 @@ function MoreDetailCard(props: any) {
               const quantity = fractional < 0.5 ? Math.floor(divided) : Math.ceil(divided);
 
               if (quantity > 0) {
+                const isLadder = props.trToLand === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา';
                 // เหล็กเท้าแขนสามเหลี่ยมรับ TRAY-LADDER: __EMPTY_29 (ค่าของ), __EMPTY_31 (ค่าแรง), __EMPTY_33 (รวม)
-                const bracketMaterialUnit = parsePrice(row.__EMPTY_29 || 0);
-                const bracketLaborUnit = parsePrice(row.__EMPTY_31 || 0);
-                const bracketTotalUnit = parsePrice(row.__EMPTY_33 || 0);
+                const bracketMaterialUnit = parsePrice((isLadder ? row.__EMPTY_28 : row.__EMPTY_29) || 0);
+                const bracketLaborUnit = parsePrice((isLadder ? row.__EMPTY_30 : row.__EMPTY_31) || 0);
+                const bracketTotalUnit = parsePrice((isLadder ? row.__EMPTY_32 : row.__EMPTY_33) || 0);
 
                 if (bracketMaterialUnit > 0 || bracketLaborUnit > 0 || bracketTotalUnit > 0) {
                   materialTotal += bracketMaterialUnit * quantity;
@@ -3585,9 +3450,9 @@ function MoreDetailCard(props: any) {
                 }
 
                 // Support ยึดพื้น TRAY / LADDER: __EMPTY_39 (ค่าของ), __EMPTY_41 (ค่าแรง), __EMPTY_43 (รวม)
-                const supportMaterialUnit = parsePrice(row.__EMPTY_39 || 0);
-                const supportLaborUnit = parsePrice(row.__EMPTY_41 || 0);
-                const supportTotalUnit = parsePrice(row.__EMPTY_43 || 0);
+                const supportMaterialUnit = parsePrice((isLadder ? row.__EMPTY_38 : row.__EMPTY_39) || 0);
+                const supportLaborUnit = parsePrice((isLadder ? row.__EMPTY_40 : row.__EMPTY_41) || 0);
+                const supportTotalUnit = parsePrice((isLadder ? row.__EMPTY_42 : row.__EMPTY_43) || 0);
 
                 if (supportMaterialUnit > 0 || supportLaborUnit > 0 || supportTotalUnit > 0) {
                   materialTotal += supportMaterialUnit * quantity;
@@ -3604,7 +3469,7 @@ function MoreDetailCard(props: any) {
       if (props.landToMdb === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' || props.landToMdb === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา') {
         const landToMdbInputDistance = parseFloat(landToMdbDistance || '0');
         if (landToMdbInputDistance > 0) {
-          const transformerSize = parseInt(props.transformer || '0');
+          const transformerSize = parseTransformerKvaForTrMdb(props.transformer || '');
           const powerAuthority = props.powerAuthority || '';
           let sheetName = '';
           let rowNum = null;
@@ -3674,7 +3539,7 @@ function MoreDetailCard(props: any) {
     } else if ((props.trWiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' || props.trWiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา')) {
       const inputDistance = parseFloat(trDistance || '0');
       if (inputDistance > 0) {
-        const transformerSize = parseInt(props.transformer || '0');
+        const transformerSize = parseTransformerKvaForTrMdb(props.transformer || '');
         const powerAuthority = props.powerAuthority || '';
 
         // กำหนด Sheet และ row mapping ตามประเภท
@@ -4013,21 +3878,20 @@ function MoreDetailCard(props: any) {
               const row = sheet.find((r: any) => r.__rowNum__ === rowNum);
 
               if (row) {
-                let multiplier, materialUnit, laborUnit, totalUnit;
+                let materialUnit, laborUnit, totalUnit;
                 if (conduitType === 'RSC') {
-                  multiplier = parsePrice(row.__EMPTY_27 || 1);
                   materialUnit = parsePrice(row.__EMPTY_28 || 0);
                   laborUnit = parsePrice(row.__EMPTY_30 || 0);
                   totalUnit = parsePrice(row.__EMPTY_32 || 0);
                 } else {
-                  multiplier = parsePrice(row.__EMPTY_28 || 1);
                   materialUnit = parsePrice(row.__EMPTY_29 || 0);
                   laborUnit = parsePrice(row.__EMPTY_31 || 0);
                   totalUnit = parsePrice(row.__EMPTY_33 || 0);
                 }
-                material += materialUnit * multiplier;
-                labor += laborUnit * multiplier;
-                total += totalUnit * multiplier;
+                const quantity = calculateBracketQuantity(inputDistance);
+                material += materialUnit * quantity;
+                labor += laborUnit * quantity;
+                total += totalUnit * quantity;
               }
             }
           }
@@ -4991,7 +4855,7 @@ function MoreDetailCard(props: any) {
           // Helper function สำหรับเพิ่ม TRAY/LADDER products
           const addTrayLadderProducts = (wiringType: string, inputDistance: number, sectionLabel: string) => {
             if (inputDistance > 0 && (wiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' || wiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา')) {
-              const transformerSize = parseInt(props.transformer || '0');
+              const transformerSize = parseTransformerKvaForTrMdb(props.transformer || '');
               const powerAuthority = props.powerAuthority || '';
 
               // กำหนด Sheet และ row mapping ตามประเภท
@@ -5040,7 +4904,7 @@ function MoreDetailCard(props: any) {
                   const quantity = fractional < 0.5 ? Math.floor(divided) : Math.ceil(divided);
 
                   // 1. เหล็กเท้าแขนสามเหลี่ยมรับ TRAY-LADDER: __EMPTY_29 (ค่าของ), __EMPTY_31 (ค่าแรง), __EMPTY_33 (รวม), __EMPTY_35 (รายการ)
-                  const bracketProductName = row.__EMPTY_35 || 'เหล็กเท้าแขนสามเหลี่ยมรับ TRAY-LADDER';
+                  const bracketProductName = row.__EMPTY_35 || '-';
                   const bracketMaterialUnit = parsePrice(row.__EMPTY_29 || 0);
                   const bracketLaborUnit = parsePrice(row.__EMPTY_31 || 0);
                   const bracketTotalUnit = parsePrice(row.__EMPTY_33 || 0);
@@ -5059,7 +4923,7 @@ function MoreDetailCard(props: any) {
                   }
 
                   // 2. Support ยึดพื้น TRAY / LADDER: __EMPTY_39 (ค่าของ), __EMPTY_41 (ค่าแรง), __EMPTY_43 (รวม), __EMPTY_45 (รายการ)
-                  const supportProductName = row.__EMPTY_45 || 'Support ยึดพื้น TRAY / LADDER';
+                  const supportProductName = row.__EMPTY_45 || '-';
                   const supportMaterialUnit = parsePrice(row.__EMPTY_39 || 0);
                   const supportLaborUnit = parsePrice(row.__EMPTY_41 || 0);
                   const supportTotalUnit = parsePrice(row.__EMPTY_43 || 0);
@@ -5082,7 +4946,7 @@ function MoreDetailCard(props: any) {
           };
 
           // Helper function สำหรับเพิ่ม "เหล็กเท้าแขนสามเหลี่ยมรับท่อ"
-          const addConduitBracketProducts = (wiringType: string, conduit: string, sectionLabel: string) => {
+          const addConduitBracketProducts = (wiringType: string, conduit: string, sectionLabel: string, inputDistance: number) => {
             const normalizeWiringType = (wt: string) => {
               if (wt === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ') {
                 return 'ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2';
@@ -5144,35 +5008,31 @@ function MoreDetailCard(props: any) {
                   const row = sheet.find((r: any) => r.__rowNum__ === rowNum);
 
                   if (row) {
-                    let multiplier, productName, materialUnit, laborUnit, totalUnit;
+                    let productName, materialUnit, laborUnit, totalUnit;
 
                     if (conduitType === 'RSC') {
-                      // RSC: ใช้ __EMPTY_27 เป็นตัวคูณ, __EMPTY_34 เป็นรายการ, __EMPTY_28 เป็นค่าของ, __EMPTY_30 เป็นค่าแรงรวม, __EMPTY_32 เป็นราคารวม
-                      multiplier = parsePrice(row.__EMPTY_27 || 1);
                       productName = row.__EMPTY_34 || 'เหล็กเท้าแขนสามเหลี่ยมรับท่อ';
                       materialUnit = parsePrice(row.__EMPTY_28 || 0);
                       laborUnit = parsePrice(row.__EMPTY_30 || 0);
                       totalUnit = parsePrice(row.__EMPTY_32 || 0);
                     } else {
-                      // IMC: ใช้ __EMPTY_28 เป็นตัวคูณ, __EMPTY_35 เป็นรายการ, __EMPTY_29 เป็นค่าของ, __EMPTY_31 เป็นค่าแรงรวม, __EMPTY_33 เป็นราคารวม
-                      multiplier = parsePrice(row.__EMPTY_28 || 1);
                       productName = row.__EMPTY_35 || 'เหล็กเท้าแขนสามเหลี่ยมรับท่อ';
                       materialUnit = parsePrice(row.__EMPTY_29 || 0);
                       laborUnit = parsePrice(row.__EMPTY_31 || 0);
                       totalUnit = parsePrice(row.__EMPTY_33 || 0);
                     }
 
-                    // เพิ่มเฉพาะเมื่อมีข้อมูลครบ
-                    if (multiplier > 0 && (materialUnit > 0 || laborUnit > 0 || totalUnit > 0)) {
+                    const quantity = calculateBracketQuantity(inputDistance);
+                    if (quantity > 0 && (materialUnit > 0 || laborUnit > 0 || totalUnit > 0)) {
                       products.push({
                         type: `${sectionLabel} - เหล็กเท้าแขนสามเหลี่ยมรับท่อ`,
                         code: '-',
                         productName: productName,
                         distance: undefined,
-                        materialTotal: materialUnit * multiplier,
-                        laborTotal: laborUnit * multiplier,
-                        totalPrice: totalUnit * multiplier,
-                        quantity: multiplier.toString(),
+                        materialTotal: materialUnit * quantity,
+                        laborTotal: laborUnit * quantity,
+                        totalPrice: totalUnit * quantity,
+                        quantity: quantity.toString(),
                       });
                     }
                   }
@@ -5195,7 +5055,7 @@ function MoreDetailCard(props: any) {
             const trToLandConduit = trToLandNormalized === 'ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2' ? trWiringGroup2 : '';
 
             addTrayLadderProducts(props.trToLand, trToLandInputDistance, 'TR to Land');
-            addConduitBracketProducts(props.trToLand, trToLandConduit, 'TR to Land');
+            addConduitBracketProducts(props.trToLand, trToLandConduit, 'TR to Land', trToLandInputDistance);
           }
 
           // Land to MDB - TRAY/LADDER และ Conduit Bracket
@@ -5212,13 +5072,13 @@ function MoreDetailCard(props: any) {
             const landToMdbConduit = landToMdbNormalized === 'ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2' ? landToMdbWiringGroup2 : '';
 
             addTrayLadderProducts(props.landToMdb, landToMdbInputDistance, 'Land to MDB');
-            addConduitBracketProducts(props.landToMdb, landToMdbConduit, 'Land to MDB');
+            addConduitBracketProducts(props.landToMdb, landToMdbConduit, 'Land to MDB', landToMdbInputDistance);
           }
         } else if (trDistance) {
           // กรณีเดิม (ไม่มี trToLand และ landToMdb) - TRAY/LADDER และ Conduit Bracket
           const inputDistance = parseFloat(trDistance || '0');
           if (inputDistance > 0 && (props.trWiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' || props.trWiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา')) {
-            const transformerSize = parseInt(props.transformer || '0');
+            const transformerSize = parseTransformerKvaForTrMdb(props.transformer || '');
             const powerAuthority = props.powerAuthority || '';
 
             // กำหนด Sheet และ row mapping ตามประเภท
@@ -5266,7 +5126,7 @@ function MoreDetailCard(props: any) {
                 const quantity = fractional < 0.5 ? Math.floor(divided) : Math.ceil(divided);
 
                 // 1. เหล็กเท้าแขนสามเหลี่ยมรับ TRAY-LADDER: __EMPTY_29 (ค่าของ), __EMPTY_31 (ค่าแรง), __EMPTY_33 (รวม), __EMPTY_35 (รายการ)
-                const bracketProductName = row.__EMPTY_35 || 'เหล็กเท้าแขนสามเหลี่ยมรับ TRAY-LADDER';
+                const bracketProductName = row.__EMPTY_35 || '-';
                 const bracketMaterialUnit = parsePrice(row.__EMPTY_29 || 0);
                 const bracketLaborUnit = parsePrice(row.__EMPTY_31 || 0);
                 const bracketTotalUnit = parsePrice(row.__EMPTY_33 || 0);
@@ -5285,7 +5145,7 @@ function MoreDetailCard(props: any) {
                 }
 
                 // 2. Support ยึดพื้น TRAY / LADDER: __EMPTY_39 (ค่าของ), __EMPTY_41 (ค่าแรง), __EMPTY_43 (รวม), __EMPTY_45 (รายการ)
-                const supportProductName = row.__EMPTY_45 || 'Support ยึดพื้น TRAY / LADDER';
+                const supportProductName = row.__EMPTY_45 || '-';
                 const supportMaterialUnit = parsePrice(row.__EMPTY_39 || 0);
                 const supportLaborUnit = parsePrice(row.__EMPTY_41 || 0);
                 const supportTotalUnit = parsePrice(row.__EMPTY_43 || 0);
@@ -5361,35 +5221,31 @@ function MoreDetailCard(props: any) {
                 const row = sheet.find((r: any) => r.__rowNum__ === rowNum);
 
                 if (row) {
-                  let multiplier, productName, materialUnit, laborUnit, totalUnit;
+                  let productName, materialUnit, laborUnit, totalUnit;
 
                   if (conduitType === 'RSC') {
-                    // RSC: ใช้ __EMPTY_27 เป็นตัวคูณ, __EMPTY_34 เป็นรายการ, __EMPTY_28 เป็นค่าของ, __EMPTY_30 เป็นค่าแรงรวม, __EMPTY_32 เป็นราคารวม
-                    multiplier = parsePrice(row.__EMPTY_27 || 1);
                     productName = row.__EMPTY_34 || 'เหล็กเท้าแขนสามเหลี่ยมรับท่อ';
                     materialUnit = parsePrice(row.__EMPTY_28 || 0);
                     laborUnit = parsePrice(row.__EMPTY_30 || 0);
                     totalUnit = parsePrice(row.__EMPTY_32 || 0);
                   } else {
-                    // IMC: ใช้ __EMPTY_28 เป็นตัวคูณ, __EMPTY_35 เป็นรายการ, __EMPTY_29 เป็นค่าของ, __EMPTY_31 เป็นค่าแรงรวม, __EMPTY_33 เป็นราคารวม
-                    multiplier = parsePrice(row.__EMPTY_28 || 1);
                     productName = row.__EMPTY_35 || 'เหล็กเท้าแขนสามเหลี่ยมรับท่อ';
                     materialUnit = parsePrice(row.__EMPTY_29 || 0);
                     laborUnit = parsePrice(row.__EMPTY_31 || 0);
                     totalUnit = parsePrice(row.__EMPTY_33 || 0);
                   }
 
-                  // เพิ่มเฉพาะเมื่อมีข้อมูลครบ
-                  if (multiplier > 0 && (materialUnit > 0 || laborUnit > 0 || totalUnit > 0)) {
+                  const quantity = calculateBracketQuantity(inputDistance);
+                  if (quantity > 0 && (materialUnit > 0 || laborUnit > 0 || totalUnit > 0)) {
                     products.push({
                       type: 'เหล็กเท้าแขนสามเหลี่ยมรับท่อ',
                       code: '-',
                       productName: productName,
                       distance: undefined,
-                      materialTotal: materialUnit * multiplier,
-                      laborTotal: laborUnit * multiplier,
-                      totalPrice: totalUnit * multiplier,
-                      quantity: multiplier.toString(),
+                      materialTotal: materialUnit * quantity,
+                      laborTotal: laborUnit * quantity,
+                      totalPrice: totalUnit * quantity,
+                      quantity: quantity.toString(),
                     });
                   }
                 }
@@ -5485,6 +5341,13 @@ function MoreDetailCard(props: any) {
           const cable = cables[idx] || cables[0] || '';
           // ลบ "ChargerX: " ออกจาก cable ถ้ามี
           const cableSize = cable.replace(/^Charger\d+:\s*/, '').trim();
+          const wiringOrderByType: Record<string, number> = {
+            'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ': 1,
+            'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน': 2,
+            'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา': 3,
+            'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา': 4,
+          };
+          const getWiringOrder = (wiringType: string) => wiringOrderByType[wiringType] || 90;
 
           // สร้างฟังก์ชันช่วยสำหรับสร้าง product
           const createProduct = (wiringType: string, resultData: any, isAdditional: boolean = false) => {
@@ -5586,6 +5449,7 @@ function MoreDetailCard(props: any) {
               laborTotal: parsePrice(resultData.laborCost || 0),
               totalPrice: parsePrice(resultData.totalCost || 0),
               quantity: '1',
+              sortKey: `${idx + 1}-${getWiringOrder(wiringType)}-${isAdditional ? 9 : 0}`,
             });
           };
 
@@ -5672,6 +5536,7 @@ function MoreDetailCard(props: any) {
                 laborTotal: parsePrice(result.additional.laborCost),
                 totalPrice: parsePrice(result.additional.materialCost) + parsePrice(result.additional.laborCost),
                 quantity: '1',
+                sortKey: `${idx + 1}-${getWiringOrder(additionalWiringType)}-9`,
               });
             }
           }
@@ -5705,40 +5570,127 @@ function MoreDetailCard(props: any) {
                 const row = sheet.find((r: any) => r.__rowNum__ === rowNum);
 
                 if (row) {
-                  let multiplier, productName, materialUnit, laborUnit, totalUnit;
+                  let productName, materialUnit, laborUnit, totalUnit;
 
                   if (conduitType === 'RSC') {
-                    // RSC: ใช้ __EMPTY_27 เป็นตัวคูณ, __EMPTY_34 เป็นรายการ, __EMPTY_28 เป็นค่าของ, __EMPTY_30 เป็นค่าแรงรวม, __EMPTY_32 เป็นราคารวม
-                    multiplier = parsePrice(row.__EMPTY_27 || 1);
                     productName = row.__EMPTY_34 || 'เหล็กเท้าแขนสามเหลี่ยมรับท่อ';
                     materialUnit = parsePrice(row.__EMPTY_28 || 0);
                     laborUnit = parsePrice(row.__EMPTY_30 || 0);
                     totalUnit = parsePrice(row.__EMPTY_32 || 0);
                   } else {
-                    // IMC: ใช้เงื่อนไขเดิม
-                    multiplier = parsePrice(row.__EMPTY_28 || 1);
                     productName = row.__EMPTY_35 || 'เหล็กเท้าแขนสามเหลี่ยมรับท่อ';
                     materialUnit = parsePrice(row.__EMPTY_29 || 0);
                     laborUnit = parsePrice(row.__EMPTY_31 || 0);
                     totalUnit = parsePrice(row.__EMPTY_33 || 0);
                   }
 
-                  // เพิ่มเฉพาะเมื่อมีข้อมูลครบ
-                  if (multiplier > 0 && (materialUnit > 0 || laborUnit > 0 || totalUnit > 0)) {
+                  const bracketInputDistance = result.wiringTypes?.['ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ']?.distance || 0;
+                  const quantity = calculateBracketQuantity(bracketInputDistance);
+                  if (quantity > 0 && (materialUnit > 0 || laborUnit > 0 || totalUnit > 0)) {
                     products.push({
                       type: 'เหล็กเท้าแขนสามเหลี่ยมรับท่อ',
                       code: '-',
                       productName: productName,
                       distance: undefined,
-                      materialTotal: materialUnit * multiplier,
-                      laborTotal: laborUnit * multiplier,
-                      totalPrice: totalUnit * multiplier,
-                      quantity: multiplier.toString(),
+                      materialTotal: materialUnit * quantity,
+                      laborTotal: laborUnit * quantity,
+                      totalPrice: totalUnit * quantity,
+                      quantity: quantity.toString(),
+                      sortKey: `${idx + 1}-${getWiringOrder('ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ')}-1`,
                     });
                   }
                 }
               }
             }
+          }
+
+          // เพิ่มรายการ TRAY/LADDER แยกคนละชุด:
+          // - เหล็กเท้าแขนสามเหลี่ยมรับ TRAY-LADDER
+          // - Support ยึดพื้น TRAY / LADDER
+          const trayLadderTypesFromResult = result?.wiringTypes
+            ? Object.keys(result.wiringTypes).filter(
+              (wiringType: string) =>
+                wiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' ||
+                wiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา'
+            )
+            : [];
+          const trayLadderTypesFromProps = wiringTypes.filter(
+            (wiringType: string) =>
+              wiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' ||
+              wiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา'
+          );
+          const trayLadderTypes = (trayLadderTypesFromResult.length > 0 ? trayLadderTypesFromResult : trayLadderTypesFromProps)
+            .filter((type: string, typeIdx: number, arr: string[]) => arr.indexOf(type) === typeIdx);
+
+          if (trayLadderTypes.length > 0) {
+            const chargerName = props.chargerSummary?.[idx]?.name || '';
+            const chargerLabel = chargerName ? `Charger ${idx + 1}: ${chargerName}` : `Charger ${idx + 1}`;
+            const kwMatch = chargerName.match(/(\d+)\s*kW/i);
+            const kw = kwMatch ? parseInt(kwMatch[1]) : 0;
+            const powerAuthority = props.powerAuthority || 'MEA';
+            const isGroupCharger = props.chargerInstallationType === 'group';
+
+            trayLadderTypes.forEach((selectedType: string) => {
+              const inputDistanceFromResult = result?.wiringTypes?.[selectedType]?.distance;
+              const inputDistanceFromTypeDistance = parseFloat(chargerWiringTypeDistances?.[idx]?.[selectedType] || '0') || 0;
+              const inputDistance = (typeof inputDistanceFromResult === 'number' && Number.isFinite(inputDistanceFromResult) && inputDistanceFromResult > 0)
+                ? inputDistanceFromResult
+                : (inputDistanceFromTypeDistance > 0 ? inputDistanceFromTypeDistance : (parseFloat(chargerLineDistances[idx] || '0') || 0));
+              if (inputDistance <= 0) return;
+
+              const isTrayType = selectedType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา';
+              let rowMapping = getMdbToChargerRowMapping(selectedType, '', powerAuthority, isGroupCharger);
+              let rowNum = rowMapping[kw];
+              if (!rowNum && isGroupCharger) {
+                rowMapping = getMdbToChargerRowMapping(selectedType, '', powerAuthority, false);
+                rowNum = rowMapping[kw];
+              }
+              if (!rowNum) return;
+
+              const sheetName = isTrayType ? 'แบบ 9.15' : 'แบบ 9.16';
+              const sheet = getExcelData(sheetName);
+              const row = sheet.find((r: any) => r.__rowNum__ === rowNum);
+              if (!row) return;
+
+              const quantity = calculateBracketQuantity(inputDistance);
+              if (quantity <= 0) return;
+
+              const bracketProductName = (isTrayType ? row.__EMPTY_35 : row.__EMPTY_34) || '-';
+              const bracketMaterialUnit = parsePrice((isTrayType ? row.__EMPTY_29 : row.__EMPTY_28) || 0);
+              const bracketLaborUnit = parsePrice((isTrayType ? row.__EMPTY_31 : row.__EMPTY_30) || 0);
+              const bracketTotalUnit = parsePrice((isTrayType ? row.__EMPTY_33 : row.__EMPTY_32) || 0);
+              if (bracketMaterialUnit > 0 || bracketLaborUnit > 0 || bracketTotalUnit > 0) {
+                products.push({
+                  type: 'เหล็กเท้าแขนสามเหลี่ยมรับ TRAY-LADDER',
+                  code: '-',
+                  productName: bracketProductName,
+                  distance: undefined,
+                  materialTotal: bracketMaterialUnit * quantity,
+                  laborTotal: bracketLaborUnit * quantity,
+                  totalPrice: bracketTotalUnit * quantity,
+                  quantity: quantity.toString(),
+                  sortKey: `${idx + 1}-${getWiringOrder(selectedType)}-1`,
+                });
+              }
+
+              const supportProductName = (isTrayType ? row.__EMPTY_45 : row.__EMPTY_44) || '-';
+              const supportMaterialUnit = parsePrice((isTrayType ? row.__EMPTY_39 : row.__EMPTY_38) || 0);
+              const supportLaborUnit = parsePrice((isTrayType ? row.__EMPTY_41 : row.__EMPTY_40) || 0);
+              const supportTotalUnit = parsePrice((isTrayType ? row.__EMPTY_43 : row.__EMPTY_42) || 0);
+              if (supportMaterialUnit > 0 || supportLaborUnit > 0 || supportTotalUnit > 0) {
+                products.push({
+                  type: 'Support ยึดพื้น TRAY / LADDER',
+                  code: '-',
+                  productName: supportProductName,
+                  distance: undefined,
+                  materialTotal: supportMaterialUnit * quantity,
+                  laborTotal: supportLaborUnit * quantity,
+                  totalPrice: supportTotalUnit * quantity,
+                  quantity: quantity.toString(),
+                  sortKey: `${idx + 1}-${getWiringOrder(selectedType)}-2`,
+                });
+              }
+            });
           }
         });
       }
@@ -5826,9 +5778,15 @@ function MoreDetailCard(props: any) {
             laborTotal: line.laborCost,
             totalPrice: line.totalCost,
             quantity: '1',
+            sortKey: `99-${line.terminalIndex + 1}-0`,
           });
         });
       }
+      products.sort((a: any, b: any) => {
+        const keyA = a?.sortKey ? String(a.sortKey) : 'zzzz';
+        const keyB = b?.sortKey ? String(b.sortKey) : 'zzzz';
+        return keyA.localeCompare(keyB, undefined, { numeric: true });
+      });
     } else if (sectionKey === 'additional') {
       // 1. อุปกรณ์ประกอบสถานี
       if (equipmentSelection === 'yes') {
@@ -9302,7 +9260,7 @@ function MoreDetailCard(props: any) {
                                         const isTrayOrLadder = props.trToLand === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' || props.trToLand === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา';
 
                                         if (isTrayOrLadder && trToLandInputDistance > 0) {
-                                          const transformerSize = parseInt(props.transformer || '0');
+                                          const transformerSize = parseTransformerKvaForTrMdb(props.transformer || '');
                                           const powerAuthority = props.powerAuthority || '';
                                           let sheetName = '';
                                           let rowNum = null;
@@ -9502,7 +9460,7 @@ function MoreDetailCard(props: any) {
                                           const powerAuthority = props.powerAuthority || '';
                                           const transformerSize = parseTransformerKvaForTrMdb(props.transformer || '');
                                           const trMdbMapKey = getTrMdbMappingLookupKey(powerAuthority, props.transformer || '', transformerSize);
-                                          const meaLvBracket400 = isMeaLowVoltageMeter400A(powerAuthority, props.transformer || '') ? 24 : 25;
+                                          const meaLvBracket400 = isMeaLowVoltageMeter400A(powerAuthority, props.transformer || '') ? 22 : 23;
 
                                           const imcRowMapping: { [key: number]: number } = {
                                             400: meaLvBracket400, 500: 27, 630: 30, 800: 32, 1000: 36, 1250: 40, 1500: 42,
@@ -9526,11 +9484,19 @@ function MoreDetailCard(props: any) {
                                             const row = sheet.find((r: any) => r.__rowNum__ === rowNum);
 
                                             if (row) {
-                                              const multiplier = parsePrice(row.__EMPTY_28 || 0);
-                                              const productName = row.__EMPTY_35 || 'เหล็กเท้าแขนสามเหลี่ยมรับท่อ';
-                                              const materialUnit = parsePrice(row.__EMPTY_29 || 0);
-                                              const laborUnit = parsePrice(row.__EMPTY_31 || 0);
-                                              const totalUnit = parsePrice(row.__EMPTY_33 || 0);
+                                              const quantity = calculateBracketQuantity(parseFloat(trToLandDistance || '0'));
+                                              const productName = conduitType === 'RSC'
+                                                ? (row.__EMPTY_34 || 'เหล็กเท้าแขนสามเหลี่ยมรับท่อ')
+                                                : (row.__EMPTY_35 || 'เหล็กเท้าแขนสามเหลี่ยมรับท่อ');
+                                              const materialUnit = conduitType === 'RSC'
+                                                ? parsePrice(row.__EMPTY_28 || 0)
+                                                : parsePrice(row.__EMPTY_29 || 0);
+                                              const laborUnit = conduitType === 'RSC'
+                                                ? parsePrice(row.__EMPTY_30 || 0)
+                                                : parsePrice(row.__EMPTY_31 || 0);
+                                              const totalUnit = conduitType === 'RSC'
+                                                ? parsePrice(row.__EMPTY_32 || 0)
+                                                : parsePrice(row.__EMPTY_33 || 0);
 
                                               return (
                                                 <div className="mt-4 pt-4 border-t border-blue-300">
@@ -9538,23 +9504,26 @@ function MoreDetailCard(props: any) {
                                                   <div className="text-xs text-gray-600 mb-2">
                                                     <span className="font-medium">รายการ:</span> {productName || 'เหล็กเท้าแขนสามเหลี่ยมรับท่อ'}
                                                   </div>
+                                                  <div className="text-xs text-gray-600 mb-2">
+                                                    <span className="font-medium">จำนวนชิ้น:</span> {quantity} ชิ้น
+                                                  </div>
                                                   <div className="grid grid-cols-3 gap-4">
                                                     <div>
                                                       <div className="text-xs text-gray-600 mb-1">ค่าของ:</div>
                                                       <div className="text-sm font-semibold text-gray-800">
-                                                        {(materialUnit * (multiplier || 1)).toLocaleString('th-TH')} บาท
+                                                        {(materialUnit * quantity).toLocaleString('th-TH')} บาท
                                                       </div>
                                                     </div>
                                                     <div>
                                                       <div className="text-xs text-gray-600 mb-1">ค่าแรง:</div>
                                                       <div className="text-sm font-semibold text-gray-800">
-                                                        {(laborUnit * (multiplier || 1)).toLocaleString('th-TH')} บาท
+                                                        {(laborUnit * quantity).toLocaleString('th-TH')} บาท
                                                       </div>
                                                     </div>
                                                     <div>
                                                       <div className="text-xs text-blue-700 font-semibold mb-1">ค่าใช้จ่าย:</div>
                                                       <div className="text-sm font-semibold text-blue-700">
-                                                        {(totalUnit * (multiplier || 1)).toLocaleString('th-TH')} บาท
+                                                        {(totalUnit * quantity).toLocaleString('th-TH')} บาท
                                                       </div>
                                                     </div>
                                                   </div>
@@ -9576,7 +9545,7 @@ function MoreDetailCard(props: any) {
                                         // เพิ่มค่าจากอุปกรณ์เสริม TRAY/LADDER (ถ้ามี)
                                         const isTrayOrLadder = props.trToLand === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' || props.trToLand === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา';
                                         if (isTrayOrLadder && trToLandInputDistance > 0) {
-                                          const transformerSize = parseInt(props.transformer || '0');
+                                          const transformerSize = parseTransformerKvaForTrMdb(props.transformer || '');
                                           const powerAuthority = props.powerAuthority || '';
                                           let sheetName = '';
                                           let rowNum = null;
@@ -9651,7 +9620,7 @@ function MoreDetailCard(props: any) {
                                           const powerAuthority = props.powerAuthority || '';
                                           const transformerSize = parseTransformerKvaForTrMdb(props.transformer || '');
                                           const trMdbMapKey = getTrMdbMappingLookupKey(powerAuthority, props.transformer || '', transformerSize);
-                                          const meaLvBracket400 = isMeaLowVoltageMeter400A(powerAuthority, props.transformer || '') ? 24 : 25;
+                                          const meaLvBracket400 = isMeaLowVoltageMeter400A(powerAuthority, props.transformer || '') ? 22 : 23;
 
                                           const imcRowMapping: { [key: number]: number } = {
                                             400: meaLvBracket400, 500: 27, 630: 30, 800: 32, 1000: 36, 1250: 40, 1500: 42,
@@ -9674,21 +9643,20 @@ function MoreDetailCard(props: any) {
                                             const sheet = getExcelData(sheetName);
                                             const row = sheet.find((r: any) => r.__rowNum__ === rowNum);
                                             if (row) {
-                                              let multiplier, materialUnit, laborUnit, totalUnit;
+                                              let materialUnit, laborUnit, totalUnit;
                                               if (conduitType === 'RSC') {
-                                                multiplier = parsePrice(row.__EMPTY_27 || 1);
                                                 materialUnit = parsePrice(row.__EMPTY_28 || 0);
                                                 laborUnit = parsePrice(row.__EMPTY_30 || 0);
                                                 totalUnit = parsePrice(row.__EMPTY_32 || 0);
                                               } else {
-                                                multiplier = parsePrice(row.__EMPTY_28 || 1);
                                                 materialUnit = parsePrice(row.__EMPTY_29 || 0);
                                                 laborUnit = parsePrice(row.__EMPTY_31 || 0);
                                                 totalUnit = parsePrice(row.__EMPTY_33 || 0);
                                               }
-                                              totalMaterial += materialUnit * multiplier;
-                                              totalLabor += laborUnit * multiplier;
-                                              totalCost += totalUnit * multiplier;
+                                              const quantity = calculateBracketQuantity(trToLandInputDistance);
+                                              totalMaterial += materialUnit * quantity;
+                                              totalLabor += laborUnit * quantity;
+                                              totalCost += totalUnit * quantity;
                                             }
                                           }
                                         }
@@ -9765,7 +9733,7 @@ function MoreDetailCard(props: any) {
                                         const isTrayOrLadder = props.landToMdb === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' || props.landToMdb === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา';
 
                                         if (isTrayOrLadder && landToMdbInputDistance > 0) {
-                                          const transformerSize = parseInt(props.transformer || '0');
+                                          const transformerSize = parseTransformerKvaForTrMdb(props.transformer || '');
                                           const powerAuthority = props.powerAuthority || '';
                                           let sheetName = '';
                                           let rowNum = null;
@@ -9964,7 +9932,7 @@ function MoreDetailCard(props: any) {
                                           const powerAuthority = props.powerAuthority || '';
                                           const transformerSize = parseTransformerKvaForTrMdb(props.transformer || '');
                                           const trMdbMapKey = getTrMdbMappingLookupKey(powerAuthority, props.transformer || '', transformerSize);
-                                          const meaLvBracket400 = isMeaLowVoltageMeter400A(powerAuthority, props.transformer || '') ? 24 : 25;
+                                          const meaLvBracket400 = isMeaLowVoltageMeter400A(powerAuthority, props.transformer || '') ? 22 : 23;
 
                                           const imcRowMapping: { [key: number]: number } = {
                                             400: meaLvBracket400, 500: 27, 630: 30, 800: 32, 1000: 36, 1250: 40, 1500: 42,
@@ -9988,11 +9956,19 @@ function MoreDetailCard(props: any) {
                                             const row = sheet.find((r: any) => r.__rowNum__ === rowNum);
 
                                             if (row) {
-                                              const multiplier = parsePrice(row.__EMPTY_28 || 0);
-                                              const productName = row.__EMPTY_35 || 'เหล็กเท้าแขนสามเหลี่ยมรับท่อ';
-                                              const materialUnit = parsePrice(row.__EMPTY_29 || 0);
-                                              const laborUnit = parsePrice(row.__EMPTY_31 || 0);
-                                              const totalUnit = parsePrice(row.__EMPTY_33 || 0);
+                                              const quantity = calculateBracketQuantity(parseFloat(landToMdbDistance || '0'));
+                                              const productName = conduitType === 'RSC'
+                                                ? (row.__EMPTY_34 || 'เหล็กเท้าแขนสามเหลี่ยมรับท่อ')
+                                                : (row.__EMPTY_35 || 'เหล็กเท้าแขนสามเหลี่ยมรับท่อ');
+                                              const materialUnit = conduitType === 'RSC'
+                                                ? parsePrice(row.__EMPTY_28 || 0)
+                                                : parsePrice(row.__EMPTY_29 || 0);
+                                              const laborUnit = conduitType === 'RSC'
+                                                ? parsePrice(row.__EMPTY_30 || 0)
+                                                : parsePrice(row.__EMPTY_31 || 0);
+                                              const totalUnit = conduitType === 'RSC'
+                                                ? parsePrice(row.__EMPTY_32 || 0)
+                                                : parsePrice(row.__EMPTY_33 || 0);
 
                                               return (
                                                 <div className="mt-4 pt-4 border-t border-green-300">
@@ -10000,23 +9976,26 @@ function MoreDetailCard(props: any) {
                                                   <div className="text-xs text-gray-600 mb-2">
                                                     <span className="font-medium">รายการ:</span> {productName || 'เหล็กเท้าแขนสามเหลี่ยมรับท่อ'}
                                                   </div>
+                                                  <div className="text-xs text-gray-600 mb-2">
+                                                    <span className="font-medium">จำนวนชิ้น:</span> {quantity} ชิ้น
+                                                  </div>
                                                   <div className="grid grid-cols-3 gap-4">
                                                     <div>
                                                       <div className="text-xs text-gray-600 mb-1">ค่าของ:</div>
                                                       <div className="text-sm font-semibold text-gray-800">
-                                                        {(materialUnit * (multiplier || 1)).toLocaleString('th-TH')} บาท
+                                                        {(materialUnit * quantity).toLocaleString('th-TH')} บาท
                                                       </div>
                                                     </div>
                                                     <div>
                                                       <div className="text-xs text-gray-600 mb-1">ค่าแรง:</div>
                                                       <div className="text-sm font-semibold text-gray-800">
-                                                        {(laborUnit * (multiplier || 1)).toLocaleString('th-TH')} บาท
+                                                        {(laborUnit * quantity).toLocaleString('th-TH')} บาท
                                                       </div>
                                                     </div>
                                                     <div>
                                                       <div className="text-xs text-green-700 font-semibold mb-1">ค่าใช้จ่าย:</div>
                                                       <div className="text-sm font-semibold text-green-700">
-                                                        {(totalUnit * (multiplier || 1)).toLocaleString('th-TH')} บาท
+                                                        {(totalUnit * quantity).toLocaleString('th-TH')} บาท
                                                       </div>
                                                     </div>
                                                   </div>
@@ -10038,7 +10017,7 @@ function MoreDetailCard(props: any) {
                                         // เพิ่มค่าจากอุปกรณ์เสริม TRAY/LADDER (ถ้ามี)
                                         const isTrayOrLadder = props.landToMdb === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' || props.landToMdb === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา';
                                         if (isTrayOrLadder && landToMdbInputDistance > 0) {
-                                          const transformerSize = parseInt(props.transformer || '0');
+                                          const transformerSize = parseTransformerKvaForTrMdb(props.transformer || '');
                                           const powerAuthority = props.powerAuthority || '';
                                           let sheetName = '';
                                           let rowNum = null;
@@ -10113,7 +10092,7 @@ function MoreDetailCard(props: any) {
                                           const powerAuthority = props.powerAuthority || '';
                                           const transformerSize = parseTransformerKvaForTrMdb(props.transformer || '');
                                           const trMdbMapKey = getTrMdbMappingLookupKey(powerAuthority, props.transformer || '', transformerSize);
-                                          const meaLvBracket400 = isMeaLowVoltageMeter400A(powerAuthority, props.transformer || '') ? 24 : 25;
+                                          const meaLvBracket400 = isMeaLowVoltageMeter400A(powerAuthority, props.transformer || '') ? 22 : 23;
 
                                           const imcRowMapping: { [key: number]: number } = {
                                             400: meaLvBracket400, 500: 27, 630: 30, 800: 32, 1000: 36, 1250: 40, 1500: 42,
@@ -10136,21 +10115,20 @@ function MoreDetailCard(props: any) {
                                             const sheet = getExcelData(sheetName);
                                             const row = sheet.find((r: any) => r.__rowNum__ === rowNum);
                                             if (row) {
-                                              let multiplier, materialUnit, laborUnit, totalUnit;
+                                              let materialUnit, laborUnit, totalUnit;
                                               if (conduitType === 'RSC') {
-                                                multiplier = parsePrice(row.__EMPTY_27 || 1);
                                                 materialUnit = parsePrice(row.__EMPTY_28 || 0);
                                                 laborUnit = parsePrice(row.__EMPTY_30 || 0);
                                                 totalUnit = parsePrice(row.__EMPTY_32 || 0);
                                               } else {
-                                                multiplier = parsePrice(row.__EMPTY_28 || 1);
                                                 materialUnit = parsePrice(row.__EMPTY_29 || 0);
                                                 laborUnit = parsePrice(row.__EMPTY_31 || 0);
                                                 totalUnit = parsePrice(row.__EMPTY_33 || 0);
                                               }
-                                              totalMaterial += materialUnit * multiplier;
-                                              totalLabor += laborUnit * multiplier;
-                                              totalCost += totalUnit * multiplier;
+                                              const quantity = calculateBracketQuantity(landToMdbInputDistance);
+                                              totalMaterial += materialUnit * quantity;
+                                              totalLabor += laborUnit * quantity;
+                                              totalCost += totalUnit * quantity;
                                             }
                                           }
                                         }
@@ -10194,7 +10172,7 @@ function MoreDetailCard(props: any) {
                                     // เพิ่มค่าจากอุปกรณ์เสริม TR to Land
                                     const isTrToLandTrayOrLadder = props.trToLand === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' || props.trToLand === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา';
                                     if (isTrToLandTrayOrLadder && trToLandInputDistance > 0) {
-                                      const transformerSize = parseInt(props.transformer || '0');
+                                      const transformerSize = parseTransformerKvaForTrMdb(props.transformer || '');
                                       const powerAuthority = props.powerAuthority || '';
                                       let sheetName = '';
                                       let rowNum = null;
@@ -10235,16 +10213,17 @@ function MoreDetailCard(props: any) {
                                           const fractional = divided - Math.floor(divided);
                                           const quantity = fractional < 0.5 ? Math.floor(divided) : Math.ceil(divided);
 
-                                          const bracketMaterialUnit = parsePrice(row.__EMPTY_29 || 0);
-                                          const bracketLaborUnit = parsePrice(row.__EMPTY_31 || 0);
-                                          const bracketTotalUnit = parsePrice(row.__EMPTY_33 || 0);
+                                          const isTrayType = props.trToLand === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา';
+                                          const bracketMaterialUnit = parsePrice((isTrayType ? row.__EMPTY_29 : row.__EMPTY_28) || 0);
+                                          const bracketLaborUnit = parsePrice((isTrayType ? row.__EMPTY_31 : row.__EMPTY_30) || 0);
+                                          const bracketTotalUnit = parsePrice((isTrayType ? row.__EMPTY_33 : row.__EMPTY_32) || 0);
                                           trToLandTotalMaterial += bracketMaterialUnit * quantity;
                                           trToLandTotalLabor += bracketLaborUnit * quantity;
                                           trToLandTotalCost += bracketTotalUnit * quantity;
 
-                                          const supportMaterialUnit = parsePrice(row.__EMPTY_39 || 0);
-                                          const supportLaborUnit = parsePrice(row.__EMPTY_41 || 0);
-                                          const supportTotalUnit = parsePrice(row.__EMPTY_43 || 0);
+                                          const supportMaterialUnit = parsePrice((isTrayType ? row.__EMPTY_39 : row.__EMPTY_38) || 0);
+                                          const supportLaborUnit = parsePrice((isTrayType ? row.__EMPTY_41 : row.__EMPTY_40) || 0);
+                                          const supportTotalUnit = parsePrice((isTrayType ? row.__EMPTY_43 : row.__EMPTY_42) || 0);
                                           trToLandTotalMaterial += supportMaterialUnit * quantity;
                                           trToLandTotalLabor += supportLaborUnit * quantity;
                                           trToLandTotalCost += supportTotalUnit * quantity;
@@ -10267,7 +10246,7 @@ function MoreDetailCard(props: any) {
                                       const powerAuthority = props.powerAuthority || '';
                                       const transformerSize = parseTransformerKvaForTrMdb(props.transformer || '');
                                       const trMdbMapKey = getTrMdbMappingLookupKey(powerAuthority, props.transformer || '', transformerSize);
-                                      const meaLvBracket400 = isMeaLowVoltageMeter400A(powerAuthority, props.transformer || '') ? 24 : 25;
+                                      const meaLvBracket400 = isMeaLowVoltageMeter400A(powerAuthority, props.transformer || '') ? 22 : 23;
 
                                       const imcRowMapping: { [key: number]: number } = {
                                         400: meaLvBracket400, 500: 27, 630: 30, 800: 32, 1000: 36, 1250: 40, 1500: 42,
@@ -10290,21 +10269,20 @@ function MoreDetailCard(props: any) {
                                         const sheet = getExcelData(sheetName);
                                         const row = sheet.find((r: any) => r.__rowNum__ === rowNum);
                                         if (row) {
-                                          let multiplier, materialUnit, laborUnit, totalUnit;
+                                          let materialUnit, laborUnit, totalUnit;
                                           if (trToLandConduitType === 'RSC') {
-                                            multiplier = parsePrice(row.__EMPTY_27 || 1);
                                             materialUnit = parsePrice(row.__EMPTY_28 || 0);
                                             laborUnit = parsePrice(row.__EMPTY_30 || 0);
                                             totalUnit = parsePrice(row.__EMPTY_32 || 0);
                                           } else {
-                                            multiplier = parsePrice(row.__EMPTY_28 || 1);
                                             materialUnit = parsePrice(row.__EMPTY_29 || 0);
                                             laborUnit = parsePrice(row.__EMPTY_31 || 0);
                                             totalUnit = parsePrice(row.__EMPTY_33 || 0);
                                           }
-                                          trToLandTotalMaterial += materialUnit * multiplier;
-                                          trToLandTotalLabor += laborUnit * multiplier;
-                                          trToLandTotalCost += totalUnit * multiplier;
+                                          const quantity = calculateBracketQuantity(trToLandInputDistance);
+                                          trToLandTotalMaterial += materialUnit * quantity;
+                                          trToLandTotalLabor += laborUnit * quantity;
+                                          trToLandTotalCost += totalUnit * quantity;
                                         }
                                       }
                                     }
@@ -10317,7 +10295,7 @@ function MoreDetailCard(props: any) {
                                     // เพิ่มค่าจากอุปกรณ์เสริม Land to MDB
                                     const isLandToMdbTrayOrLadder = props.landToMdb === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' || props.landToMdb === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา';
                                     if (isLandToMdbTrayOrLadder && landToMdbInputDistance > 0) {
-                                      const transformerSize = parseInt(props.transformer || '0');
+                                      const transformerSize = parseTransformerKvaForTrMdb(props.transformer || '');
                                       const powerAuthority = props.powerAuthority || '';
                                       let sheetName = '';
                                       let rowNum = null;
@@ -10384,7 +10362,7 @@ function MoreDetailCard(props: any) {
                                       const powerAuthority = props.powerAuthority || '';
                                       const transformerSize = parseTransformerKvaForTrMdb(props.transformer || '');
                                       const trMdbMapKey = getTrMdbMappingLookupKey(powerAuthority, props.transformer || '', transformerSize);
-                                      const meaLvBracket400 = isMeaLowVoltageMeter400A(powerAuthority, props.transformer || '') ? 24 : 25;
+                                      const meaLvBracket400 = isMeaLowVoltageMeter400A(powerAuthority, props.transformer || '') ? 22 : 23;
 
                                       const imcRowMapping: { [key: number]: number } = {
                                         400: meaLvBracket400, 500: 27, 630: 30, 800: 32, 1000: 36, 1250: 40, 1500: 42,
@@ -10407,21 +10385,20 @@ function MoreDetailCard(props: any) {
                                         const sheet = getExcelData(sheetName);
                                         const row = sheet.find((r: any) => r.__rowNum__ === rowNum);
                                         if (row) {
-                                          let multiplier, materialUnit, laborUnit, totalUnit;
+                                          let materialUnit, laborUnit, totalUnit;
                                           if (landToMdbConduitType === 'RSC') {
-                                            multiplier = parsePrice(row.__EMPTY_27 || 1);
                                             materialUnit = parsePrice(row.__EMPTY_28 || 0);
                                             laborUnit = parsePrice(row.__EMPTY_30 || 0);
                                             totalUnit = parsePrice(row.__EMPTY_32 || 0);
                                           } else {
-                                            multiplier = parsePrice(row.__EMPTY_28 || 1);
                                             materialUnit = parsePrice(row.__EMPTY_29 || 0);
                                             laborUnit = parsePrice(row.__EMPTY_31 || 0);
                                             totalUnit = parsePrice(row.__EMPTY_33 || 0);
                                           }
-                                          landToMdbTotalMaterial += materialUnit * multiplier;
-                                          landToMdbTotalLabor += laborUnit * multiplier;
-                                          landToMdbTotalCost += totalUnit * multiplier;
+                                          const quantity = calculateBracketQuantity(landToMdbInputDistance);
+                                          landToMdbTotalMaterial += materialUnit * quantity;
+                                          landToMdbTotalLabor += laborUnit * quantity;
+                                          landToMdbTotalCost += totalUnit * quantity;
                                         }
                                       }
                                     }
@@ -10532,7 +10509,7 @@ function MoreDetailCard(props: any) {
                                     const inputDistance = parseFloat(trDistance || '0');
 
                                     if (isTrayOrLadder && inputDistance > 0) {
-                                      const transformerSize = parseInt(props.transformer || '0');
+                                      const transformerSize = parseTransformerKvaForTrMdb(props.transformer || '');
                                       const powerAuthority = props.powerAuthority || '';
 
                                       // กำหนด Sheet และ row mapping ตามประเภท
@@ -10579,17 +10556,18 @@ function MoreDetailCard(props: any) {
                                           const fractional = divided - Math.floor(divided);
                                           const quantity = fractional < 0.5 ? Math.floor(divided) : Math.ceil(divided);
 
+                                          const isTrayType = props.trWiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา';
                                           // 1. เหล็กเท้าแขนสามเหลี่ยมรับ TRAY-LADDER: __EMPTY_29 (ค่าของ), __EMPTY_31 (ค่าแรง), __EMPTY_33 (รวม), __EMPTY_35 (รายการ)
-                                          const bracketProductName = row.__EMPTY_35 || 'เหล็กเท้าแขนสามเหลี่ยมรับ TRAY-LADDER';
-                                          const bracketMaterialUnit = parsePrice(row.__EMPTY_29 || 0);
-                                          const bracketLaborUnit = parsePrice(row.__EMPTY_31 || 0);
-                                          const bracketTotalUnit = parsePrice(row.__EMPTY_33 || 0);
+                                          const bracketProductName = (isTrayType ? row.__EMPTY_35 : row.__EMPTY_34) || 'เหล็กเท้าแขนสามเหลี่ยมรับ TRAY-LADDER';
+                                          const bracketMaterialUnit = parsePrice((isTrayType ? row.__EMPTY_29 : row.__EMPTY_28) || 0);
+                                          const bracketLaborUnit = parsePrice((isTrayType ? row.__EMPTY_31 : row.__EMPTY_30) || 0);
+                                          const bracketTotalUnit = parsePrice((isTrayType ? row.__EMPTY_33 : row.__EMPTY_32) || 0);
 
                                           // 2. Support ยึดพื้น TRAY / LADDER: __EMPTY_39 (ค่าของ), __EMPTY_41 (ค่าแรง), __EMPTY_43 (รวม), __EMPTY_45 (รายการ)
-                                          const supportProductName = row.__EMPTY_45 || 'Support ยึดพื้น TRAY / LADDER';
-                                          const supportMaterialUnit = parsePrice(row.__EMPTY_39 || 0);
-                                          const supportLaborUnit = parsePrice(row.__EMPTY_41 || 0);
-                                          const supportTotalUnit = parsePrice(row.__EMPTY_43 || 0);
+                                          const supportProductName = (isTrayType ? row.__EMPTY_45 : row.__EMPTY_44) || 'Support ยึดพื้น TRAY / LADDER';
+                                          const supportMaterialUnit = parsePrice((isTrayType ? row.__EMPTY_39 : row.__EMPTY_38) || 0);
+                                          const supportLaborUnit = parsePrice((isTrayType ? row.__EMPTY_41 : row.__EMPTY_40) || 0);
+                                          const supportTotalUnit = parsePrice((isTrayType ? row.__EMPTY_43 : row.__EMPTY_42) || 0);
 
                                           return (
                                             <>
@@ -10676,7 +10654,7 @@ function MoreDetailCard(props: any) {
                                       const powerAuthority = props.powerAuthority || '';
                                       const transformerSize = parseTransformerKvaForTrMdb(props.transformer || '');
                                       const trMdbMapKey = getTrMdbMappingLookupKey(powerAuthority, props.transformer || '', transformerSize);
-                                      const meaLvBracket400 = isMeaLowVoltageMeter400A(powerAuthority, props.transformer || '') ? 24 : 25;
+                                      const meaLvBracket400 = isMeaLowVoltageMeter400A(powerAuthority, props.transformer || '') ? 22 : 23;
 
                                       // Row mapping
                                       const imcRowMapping: { [key: number]: number } = {
@@ -10714,24 +10692,38 @@ function MoreDetailCard(props: any) {
                                           rowNum,
                                           sheetLength: sheet.length,
                                           foundRow: !!row,
-                                          rowData: row ? {
+                                          rowData: row ? (conduitType === 'RSC' ? {
+                                            __EMPTY_27: row.__EMPTY_27,
+                                            __EMPTY_28: row.__EMPTY_28,
+                                            __EMPTY_30: row.__EMPTY_30,
+                                            __EMPTY_32: row.__EMPTY_32,
+                                            __EMPTY_34: row.__EMPTY_34
+                                          } : {
                                             __EMPTY_28: row.__EMPTY_28,
                                             __EMPTY_29: row.__EMPTY_29,
                                             __EMPTY_31: row.__EMPTY_31,
                                             __EMPTY_33: row.__EMPTY_33,
                                             __EMPTY_35: row.__EMPTY_35
-                                          } : null
+                                          }) : null
                                         });
 
                                         if (row) {
-                                          const multiplier = parsePrice(row.__EMPTY_28 || 0);
-                                          const productName = row.__EMPTY_35 || 'เหล็กเท้าแขนสามเหลี่ยมรับท่อ';
-                                          const materialUnit = parsePrice(row.__EMPTY_29 || 0);
-                                          const laborUnit = parsePrice(row.__EMPTY_31 || 0);
-                                          const totalUnit = parsePrice(row.__EMPTY_33 || 0);
+                                          const quantity = calculateBracketQuantity(parseFloat(trDistance || '0'));
+                                          const productName = conduitType === 'RSC'
+                                            ? (row.__EMPTY_34 || 'เหล็กเท้าแขนสามเหลี่ยมรับท่อ')
+                                            : (row.__EMPTY_35 || 'เหล็กเท้าแขนสามเหลี่ยมรับท่อ');
+                                          const materialUnit = conduitType === 'RSC'
+                                            ? parsePrice(row.__EMPTY_28 || 0)
+                                            : parsePrice(row.__EMPTY_29 || 0);
+                                          const laborUnit = conduitType === 'RSC'
+                                            ? parsePrice(row.__EMPTY_30 || 0)
+                                            : parsePrice(row.__EMPTY_31 || 0);
+                                          const totalUnit = conduitType === 'RSC'
+                                            ? parsePrice(row.__EMPTY_32 || 0)
+                                            : parsePrice(row.__EMPTY_33 || 0);
 
                                           console.log('TR to MDB - Calculated values', {
-                                            multiplier,
+                                            quantity,
                                             productName,
                                             materialUnit,
                                             laborUnit,
@@ -10745,23 +10737,26 @@ function MoreDetailCard(props: any) {
                                               <div className="text-xs text-gray-600 mb-2">
                                                 <span className="font-medium">รายการ:</span> {productName || 'เหล็กเท้าแขนสามเหลี่ยมรับท่อ'}
                                               </div>
+                                              <div className="text-xs text-gray-600 mb-2">
+                                                <span className="font-medium">จำนวนชิ้น:</span> {quantity} ชิ้น
+                                              </div>
                                               <div className="grid grid-cols-3 gap-4">
                                                 <div>
                                                   <div className="text-xs text-gray-600 mb-1">ค่าของ:</div>
                                                   <div className="text-sm font-semibold text-gray-800">
-                                                    {(materialUnit * (multiplier || 1)).toLocaleString('th-TH')} บาท
+                                                    {(materialUnit * quantity).toLocaleString('th-TH')} บาท
                                                   </div>
                                                 </div>
                                                 <div>
                                                   <div className="text-xs text-gray-600 mb-1">ค่าแรงรวม:</div>
                                                   <div className="text-sm font-semibold text-gray-800">
-                                                    {(laborUnit * (multiplier || 1)).toLocaleString('th-TH')} บาท
+                                                    {(laborUnit * quantity).toLocaleString('th-TH')} บาท
                                                   </div>
                                                 </div>
                                                 <div>
                                                   <div className="text-xs text-green-700 font-semibold mb-1">ราคารวม:</div>
                                                   <div className="text-sm font-semibold text-green-700">
-                                                    {(totalUnit * (multiplier || 1)).toLocaleString('th-TH')} บาท
+                                                    {(totalUnit * quantity).toLocaleString('th-TH')} บาท
                                                   </div>
                                                 </div>
                                               </div>
@@ -12593,13 +12588,126 @@ function MoreDetailCard(props: any) {
                                               </div>
                                             </div>
                                           </div>
+
+                                          {/* รายการอุปกรณ์ต่อท้ายตามประเภทสาย เพื่อให้อ่านง่ายต่อประเภทนั้นๆ */}
+                                          {wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ' && (conduitType === 'IMC' || conduitType === 'RSC') && (() => {
+                                            const chargerName = props.chargerSummary?.[chargerIndex]?.name || '';
+                                            const kwMatch = chargerName.match(/(\d+)\s*kW/i);
+                                            const kw = kwMatch ? parseInt(kwMatch[1]) : 0;
+                                            const rowMapping: { [key: number]: number } = {
+                                              30: 9, 40: 10, 60: 12, 80: 13, 120: 15, 160: 17, 180: 18, 200: 18,
+                                              240: 22, 320: 25, 360: 28, 480: 29, 600: 34, 640: 35, 720: 38, 800: 22
+                                            };
+                                            const rowNum = rowMapping[kw];
+                                            if (!rowNum) return null;
+                                            const sheetName = conduitType === 'IMC' ? 'แบบ 9.10' : 'แบบ 9.11';
+                                            const sheet = getExcelData(sheetName);
+                                            const row = sheet.find((r: any) => r.__rowNum__ === rowNum);
+                                            if (!row) return null;
+                                            const productName = conduitType === 'RSC' ? (row.__EMPTY_34 || 'เหล็กเท้าแขนสามเหลี่ยมรับท่อ') : (row.__EMPTY_35 || 'เหล็กเท้าแขนสามเหลี่ยมรับท่อ');
+                                            const materialUnit = conduitType === 'RSC' ? parsePrice(row.__EMPTY_28 || 0) : parsePrice(row.__EMPTY_29 || 0);
+                                            const laborUnit = conduitType === 'RSC' ? parsePrice(row.__EMPTY_30 || 0) : parsePrice(row.__EMPTY_31 || 0);
+                                            const totalUnit = conduitType === 'RSC' ? parsePrice(row.__EMPTY_32 || 0) : parsePrice(row.__EMPTY_33 || 0);
+                                            const quantity = calculateBracketQuantity(inputDistance);
+                                            if (quantity <= 0) return null;
+                                            return (
+                                              <div className="mt-4 pt-4 border-t border-blue-300">
+                                                <div className="text-sm font-semibold text-gray-700 mb-2">เหล็กเท้าแขนสามเหลี่ยมรับท่อ</div>
+                                                <div className="text-xs text-gray-600 mb-2">
+                                                  <span className="font-medium">รายการ:</span> {productName}
+                                                  <span className="ml-2">จำนวน: {quantity} ชิ้น</span>
+                                                </div>
+                                                <div className="grid grid-cols-3 gap-4">
+                                                  <div>
+                                                    <div className="text-xs text-gray-600 mb-1">ค่าของ:</div>
+                                                    <div className="text-sm font-semibold text-gray-800">{(materialUnit * quantity).toLocaleString('th-TH')} บาท</div>
+                                                  </div>
+                                                  <div>
+                                                    <div className="text-xs text-gray-600 mb-1">ค่าแรง:</div>
+                                                    <div className="text-sm font-semibold text-gray-800">{(laborUnit * quantity).toLocaleString('th-TH')} บาท</div>
+                                                  </div>
+                                                  <div>
+                                                    <div className="text-xs text-blue-700 font-semibold mb-1">ค่าใช้จ่าย:</div>
+                                                    <div className="text-sm font-semibold text-blue-700">{(totalUnit * quantity).toLocaleString('th-TH')} บาท</div>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            );
+                                          })()}
+
+                                          {(wiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' || wiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา') && (() => {
+                                            const isTrayType = wiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา';
+                                            const chargerName = props.chargerSummary?.[chargerIndex]?.name || '';
+                                            const kwMatch = chargerName.match(/(\d+)\s*kW/i);
+                                            const kw = kwMatch ? parseInt(kwMatch[1]) : 0;
+                                            const powerAuthority = props.powerAuthority || 'MEA';
+                                            let rowMapping = getMdbToChargerRowMapping(wiringType, '', powerAuthority, props.chargerInstallationType === 'group');
+                                            let rowNum = rowMapping[kw];
+                                            if (!rowNum && props.chargerInstallationType === 'group') {
+                                              rowMapping = getMdbToChargerRowMapping(wiringType, '', powerAuthority, false);
+                                              rowNum = rowMapping[kw];
+                                            }
+                                            if (!rowNum) return null;
+                                            const sheetName = isTrayType ? 'แบบ 9.15' : 'แบบ 9.16';
+                                            const sheet = getExcelData(sheetName);
+                                            const row = sheet.find((r: any) => r.__rowNum__ === rowNum);
+                                            if (!row) return null;
+                                            const quantity = calculateBracketQuantity(inputDistance);
+                                            if (quantity <= 0) return null;
+
+                                            const bracketProductName = isTrayType ? (row.__EMPTY_35 || '-') : (row.__EMPTY_34 || row.__EMPTY_35 || '-');
+                                            const bracketMaterialUnit = parsePrice(isTrayType ? (row.__EMPTY_29 || 0) : (row.__EMPTY_28 || row.__EMPTY_29 || 0));
+                                            const bracketLaborUnit = parsePrice(isTrayType ? (row.__EMPTY_31 || 0) : (row.__EMPTY_30 || row.__EMPTY_31 || 0));
+                                            const bracketTotalUnit = parsePrice(isTrayType ? (row.__EMPTY_33 || 0) : (row.__EMPTY_32 || row.__EMPTY_33 || 0));
+                                            const supportProductName = isTrayType ? (row.__EMPTY_45 || '-') : (row.__EMPTY_44 || row.__EMPTY_45 || '-');
+                                            const supportMaterialUnit = parsePrice(isTrayType ? (row.__EMPTY_39 || 0) : (row.__EMPTY_38 || row.__EMPTY_39 || 0));
+                                            const supportLaborUnit = parsePrice(isTrayType ? (row.__EMPTY_41 || 0) : (row.__EMPTY_40 || row.__EMPTY_41 || 0));
+                                            const supportTotalUnit = parsePrice(isTrayType ? (row.__EMPTY_43 || 0) : (row.__EMPTY_42 || row.__EMPTY_43 || 0));
+
+                                            const hasBracket = bracketMaterialUnit > 0 || bracketLaborUnit > 0 || bracketTotalUnit > 0;
+                                            const hasSupport = supportMaterialUnit > 0 || supportLaborUnit > 0 || supportTotalUnit > 0;
+                                            if (!hasBracket && !hasSupport) return null;
+
+                                            return (
+                                              <div className="mt-4 pt-4 border-t border-blue-300 space-y-4">
+                                                {hasBracket && (
+                                                  <div>
+                                                    <div className="text-sm font-semibold text-gray-700 mb-2">{isTrayType ? 'เหล็กเท้าแขนสามเหลี่ยมรับ TRAY' : 'เหล็กเท้าแขนสามเหลี่ยมรับ LADDER'}</div>
+                                                    <div className="text-xs text-gray-600 mb-2">
+                                                      <span className="font-medium">รายการ:</span> {bracketProductName}
+                                                      <span className="ml-2">จำนวน: {quantity} ชิ้น</span>
+                                                    </div>
+                                                    <div className="grid grid-cols-3 gap-4">
+                                                      <div><div className="text-xs text-gray-600 mb-1">ค่าของ:</div><div className="text-sm font-semibold text-gray-800">{(bracketMaterialUnit * quantity).toLocaleString('th-TH')} บาท</div></div>
+                                                      <div><div className="text-xs text-gray-600 mb-1">ค่าแรง:</div><div className="text-sm font-semibold text-gray-800">{(bracketLaborUnit * quantity).toLocaleString('th-TH')} บาท</div></div>
+                                                      <div><div className="text-xs text-blue-700 font-semibold mb-1">ค่าใช้จ่าย:</div><div className="text-sm font-semibold text-blue-700">{(bracketTotalUnit * quantity).toLocaleString('th-TH')} บาท</div></div>
+                                                    </div>
+                                                  </div>
+                                                )}
+                                                {hasSupport && (
+                                                  <div>
+                                                    <div className="text-sm font-semibold text-gray-700 mb-2">{isTrayType ? 'Support ยึดพื้น TRAY' : 'Support ยึดพื้น LADDER'}</div>
+                                                    <div className="text-xs text-gray-600 mb-2">
+                                                      <span className="font-medium">รายการ:</span> {supportProductName}
+                                                      <span className="ml-2">จำนวน: {quantity} ชิ้น</span>
+                                                    </div>
+                                                    <div className="grid grid-cols-3 gap-4">
+                                                      <div><div className="text-xs text-gray-600 mb-1">ค่าของ:</div><div className="text-sm font-semibold text-gray-800">{(supportMaterialUnit * quantity).toLocaleString('th-TH')} บาท</div></div>
+                                                      <div><div className="text-xs text-gray-600 mb-1">ค่าแรง:</div><div className="text-sm font-semibold text-gray-800">{(supportLaborUnit * quantity).toLocaleString('th-TH')} บาท</div></div>
+                                                      <div><div className="text-xs text-blue-700 font-semibold mb-1">ค่าใช้จ่าย:</div><div className="text-sm font-semibold text-blue-700">{(supportTotalUnit * quantity).toLocaleString('th-TH')} บาท</div></div>
+                                                    </div>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            );
+                                          })()}
                                         </div>
                                       );
                                     });
                                   })()}
 
                                   {/* แสดงเหล็กเท้าแขนสามเหลี่ยมรับท่อ สำหรับกรณี "ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ" */}
-                                  {(() => {
+                                  {false && (() => {
                                     // ตรวจสอบเงื่อนไข
                                     const wiringTypes = Array.isArray(props.chargerWiringType)
                                       ? props.chargerWiringType
@@ -12663,34 +12771,33 @@ function MoreDetailCard(props: any) {
                                         });
 
                                         if (row) {
-                                          let multiplier, productName, materialUnit, laborUnit, totalUnit;
+                                          let productName, materialUnit, laborUnit, totalUnit;
 
                                           if (conduitType === 'RSC') {
-                                            // RSC: ใช้ __EMPTY_27 เป็นตัวคูณ, __EMPTY_34 เป็นรายการ, __EMPTY_28 เป็นค่าของ, __EMPTY_30 เป็นค่าแรงรวม, __EMPTY_32 เป็นราคารวม
-                                            multiplier = parsePrice(row.__EMPTY_27 || 0);
                                             productName = row.__EMPTY_34 || 'เหล็กเท้าแขนสามเหลี่ยมรับท่อ';
                                             materialUnit = parsePrice(row.__EMPTY_28 || 0);
                                             laborUnit = parsePrice(row.__EMPTY_30 || 0);
                                             totalUnit = parsePrice(row.__EMPTY_32 || 0);
                                           } else {
-                                            // IMC: ใช้เงื่อนไขเดิม
-                                            multiplier = parsePrice(row.__EMPTY_28 || 0);
                                             productName = row.__EMPTY_35 || 'เหล็กเท้าแขนสามเหลี่ยมรับท่อ';
                                             materialUnit = parsePrice(row.__EMPTY_29 || 0);
                                             laborUnit = parsePrice(row.__EMPTY_31 || 0);
                                             totalUnit = parsePrice(row.__EMPTY_33 || 0);
                                           }
 
+                                          const bracketInputDistance = result.wiringTypes?.['ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ']?.distance || 0;
+                                          const quantity = calculateBracketQuantity(bracketInputDistance);
+
                                           console.log('MDB to Charger - Calculated values', {
                                             conduitType,
-                                            multiplier,
+                                            quantity,
                                             productName,
                                             materialUnit,
                                             laborUnit,
                                             totalUnit,
-                                            materialTotal: materialUnit * (multiplier || 1),
-                                            laborTotal: laborUnit * (multiplier || 1),
-                                            totalTotal: totalUnit * (multiplier || 1)
+                                            materialTotal: materialUnit * quantity,
+                                            laborTotal: laborUnit * quantity,
+                                            totalTotal: totalUnit * quantity
                                           });
 
                                           // แสดงผลเสมอถ้ามี row (แม้ว่าบางค่าเป็น 0)
@@ -12700,23 +12807,26 @@ function MoreDetailCard(props: any) {
                                               <div className="text-xs text-gray-600 mb-2">
                                                 <span className="font-medium">รายการ:</span> {productName || 'เหล็กเท้าแขนสามเหลี่ยมรับท่อ'}
                                               </div>
+                                              <div className="text-xs text-gray-600 mb-2">
+                                                <span className="font-medium">จำนวนชิ้น:</span> {quantity} ชิ้น
+                                              </div>
                                               <div className="grid grid-cols-3 gap-4">
                                                 <div>
                                                   <div className="text-xs text-gray-600 mb-1">ค่าของ:</div>
                                                   <div className="text-sm font-semibold text-gray-800">
-                                                    {(materialUnit * (multiplier || 1)).toLocaleString('th-TH')} บาท
+                                                    {(materialUnit * quantity).toLocaleString('th-TH')} บาท
                                                   </div>
                                                 </div>
                                                 <div>
                                                   <div className="text-xs text-gray-600 mb-1">ค่าแรง:</div>
                                                   <div className="text-sm font-semibold text-gray-800">
-                                                    {(laborUnit * (multiplier || 1)).toLocaleString('th-TH')} บาท
+                                                    {(laborUnit * quantity).toLocaleString('th-TH')} บาท
                                                   </div>
                                                 </div>
                                                 <div>
                                                   <div className="text-xs text-blue-700 font-semibold mb-1">ค่าใช้จ่าย:</div>
                                                   <div className="text-sm font-semibold text-blue-700">
-                                                    {(totalUnit * (multiplier || 1)).toLocaleString('th-TH')} บาท
+                                                    {(totalUnit * quantity).toLocaleString('th-TH')} บาท
                                                   </div>
                                                 </div>
                                               </div>
@@ -12733,127 +12843,153 @@ function MoreDetailCard(props: any) {
                                   })()}
 
                                   {/* แสดงเหล็กเท้าแขนสามเหลี่ยมรับ TRAY-LADDER และ Support ยึดพื้น TRAY / LADDER สำหรับกรณี TRAY หรือ LADDER */}
-                                  {(() => {
+                                  {false && (() => {
                                     const wiringTypes = Array.isArray(props.chargerWiringType)
                                       ? props.chargerWiringType
                                       : (props.chargerWiringType ? [props.chargerWiringType] : []);
-                                    const isTray = wiringTypes.includes('ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา');
-                                    const isLadder = wiringTypes.includes('ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา');
+                                    const trayLadderTypes: string[] = wiringTypes.filter(
+                                      (wiringType: string) =>
+                                        wiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' ||
+                                        wiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา'
+                                    );
 
-                                    if (isTray || isLadder) {
-                                      const inputDistance = parseFloat(chargerLineDistances[chargerIndex] || '0') || 0;
+                                    if (trayLadderTypes.length > 0) {
+                                      const getTypeInputDistance = (selectedType: string) => {
+                                        const fromResult = result.wiringTypes?.[selectedType]?.distance;
+                                        if (typeof fromResult === 'number' && Number.isFinite(fromResult) && fromResult > 0) return fromResult;
+                                        const fromTypeDistance = parseFloat(chargerWiringTypeDistances?.[chargerIndex]?.[selectedType] || '0') || 0;
+                                        if (fromTypeDistance > 0) return fromTypeDistance;
+                                        return parseFloat(chargerLineDistances[chargerIndex] || '0') || 0;
+                                      };
 
-                                      if (inputDistance > 0) {
+                                      const hasAnyDistance = trayLadderTypes.some((selectedType) => getTypeInputDistance(selectedType) > 0);
+                                      if (hasAnyDistance) {
                                         const chargerName = props.chargerSummary?.[chargerIndex]?.name || '';
                                         const kwMatch = chargerName.match(/(\d+)\s*kW/i);
                                         const kw = kwMatch ? parseInt(kwMatch[1]) : 0;
                                         const powerAuthority = props.powerAuthority || 'MEA';
+                                        const sections = trayLadderTypes.map((selectedType: string, sectionIdx: number) => {
+                                          const inputDistance = getTypeInputDistance(selectedType);
+                                          if (inputDistance <= 0) return null;
+                                          const isTrayType = selectedType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา';
+                                          let rowMapping = getMdbToChargerRowMapping(
+                                            selectedType,
+                                            '',
+                                            powerAuthority,
+                                            props.chargerInstallationType === 'group'
+                                          );
+                                          let rowNum = rowMapping[kw];
+                                          // บางเคส Group ไม่มี row ของ kW นี้ใน TRAY/LADDER ให้ fallback ไป mapping ปกติ
+                                          if (!rowNum && props.chargerInstallationType === 'group') {
+                                            rowMapping = getMdbToChargerRowMapping(selectedType, '', powerAuthority, false);
+                                            rowNum = rowMapping[kw];
+                                          }
+                                          if (!rowNum) return null;
 
-                                        // ใช้ row mapping จาก getMdbToChargerRowMapping
-                                        // ใช้ประเภทแรกจาก array (หรือ string เดียวถ้าเป็น backward compatibility)
-                                        const firstWiringType = Array.isArray(props.chargerWiringType)
-                                          ? (props.chargerWiringType.length > 0 ? props.chargerWiringType[0] : '')
-                                          : (props.chargerWiringType || '');
-                                        const rowMapping = getMdbToChargerRowMapping(
-                                          firstWiringType,
-                                          '',
-                                          powerAuthority,
-                                          props.chargerInstallationType === 'group'
-                                        );
-                                        const rowNum = rowMapping[kw];
-
-                                        if (rowNum) {
-                                          const sheetName = isTray ? 'แบบ 9.15' : 'แบบ 9.16';
+                                          const sheetName = isTrayType ? 'แบบ 9.15' : 'แบบ 9.16';
                                           const sheet = getExcelData(sheetName);
                                           const row = sheet.find((r: any) => r.__rowNum__ === rowNum);
+                                          if (!row) return null;
 
-                                          if (row) {
-                                            // คำนวณจำนวนชิ้น: distance / 1.2 (ปัดเศษ: <0.5 ปัดลง, >=0.5 ปัดขึ้น)
-                                            const divided = inputDistance / 1.2;
-                                            const fractional = divided - Math.floor(divided);
-                                            const quantity = fractional < 0.5 ? Math.floor(divided) : Math.ceil(divided);
+                                          const quantity = calculateBracketQuantity(inputDistance);
+                                          const bracketProductName = isTrayType
+                                            ? (row.__EMPTY_35 || 'เหล็กเท้าแขนสามเหลี่ยมรับ TRAY-LADDER')
+                                            : (row.__EMPTY_34 || row.__EMPTY_35 || 'เหล็กเท้าแขนสามเหลี่ยมรับ TRAY-LADDER');
+                                          const bracketMaterialUnit = parsePrice(
+                                            isTrayType ? (row.__EMPTY_29 || 0) : (row.__EMPTY_28 || row.__EMPTY_29 || 0)
+                                          );
+                                          const bracketLaborUnit = parsePrice(
+                                            isTrayType ? (row.__EMPTY_31 || 0) : (row.__EMPTY_30 || row.__EMPTY_31 || 0)
+                                          );
+                                          const bracketTotalUnit = parsePrice(
+                                            isTrayType ? (row.__EMPTY_33 || 0) : (row.__EMPTY_32 || row.__EMPTY_33 || 0)
+                                          );
 
-                                            // 1. เหล็กเท้าแขนสามเหลี่ยมรับ TRAY-LADDER: __EMPTY_29 (ค่าของ), __EMPTY_31 (ค่าแรง), __EMPTY_33 (รวม), __EMPTY_35 (รายการ)
-                                            const bracketProductName = row.__EMPTY_35 || 'เหล็กเท้าแขนสามเหลี่ยมรับ TRAY-LADDER';
-                                            const bracketMaterialUnit = parsePrice(row.__EMPTY_29 || 0);
-                                            const bracketLaborUnit = parsePrice(row.__EMPTY_31 || 0);
-                                            const bracketTotalUnit = parsePrice(row.__EMPTY_33 || 0);
+                                          const supportProductName = isTrayType
+                                            ? (row.__EMPTY_45 || 'Support ยึดพื้น TRAY / LADDER')
+                                            : (row.__EMPTY_44 || row.__EMPTY_45 || 'Support ยึดพื้น TRAY / LADDER');
+                                          const supportMaterialUnit = parsePrice(
+                                            isTrayType ? (row.__EMPTY_39 || 0) : (row.__EMPTY_38 || row.__EMPTY_39 || 0)
+                                          );
+                                          const supportLaborUnit = parsePrice(
+                                            isTrayType ? (row.__EMPTY_41 || 0) : (row.__EMPTY_40 || row.__EMPTY_41 || 0)
+                                          );
+                                          const supportTotalUnit = parsePrice(
+                                            isTrayType ? (row.__EMPTY_43 || 0) : (row.__EMPTY_42 || row.__EMPTY_43 || 0)
+                                          );
 
-                                            // 2. Support ยึดพื้น TRAY / LADDER: __EMPTY_39 (ค่าของ), __EMPTY_41 (ค่าแรง), __EMPTY_43 (รวม), __EMPTY_45 (รายการ)
-                                            const supportProductName = row.__EMPTY_45 || 'Support ยึดพื้น TRAY / LADDER';
-                                            const supportMaterialUnit = parsePrice(row.__EMPTY_39 || 0);
-                                            const supportLaborUnit = parsePrice(row.__EMPTY_41 || 0);
-                                            const supportTotalUnit = parsePrice(row.__EMPTY_43 || 0);
+                                          const hasBracket = quantity > 0 && (bracketMaterialUnit > 0 || bracketLaborUnit > 0 || bracketTotalUnit > 0);
+                                          const hasSupport = quantity > 0 && (supportMaterialUnit > 0 || supportLaborUnit > 0 || supportTotalUnit > 0);
+                                          if (!hasBracket && !hasSupport) return null;
 
-                                            const hasBracket = quantity > 0 && (bracketMaterialUnit > 0 || bracketLaborUnit > 0 || bracketTotalUnit > 0);
-                                            const hasSupport = quantity > 0 && (supportMaterialUnit > 0 || supportLaborUnit > 0 || supportTotalUnit > 0);
-
-                                            if (hasBracket || hasSupport) {
-                                              return (
-                                                <div className="mt-4 pt-4 border-t border-blue-300 space-y-4">
-                                                  {hasBracket && (
+                                          return (
+                                            <div key={`tray-ladder-${sectionIdx}-${selectedType}`} className="mt-4 pt-4 border-t border-blue-300 space-y-4">
+                                              <div className="text-xs font-semibold text-gray-600">{selectedType}</div>
+                                              {hasBracket && (
+                                                <div>
+                                                  <div className="text-sm font-semibold text-gray-700 mb-2">เหล็กเท้าแขนสามเหลี่ยมรับ TRAY</div>
+                                                  <div className="text-xs text-gray-600 mb-2">
+                                                    <span className="font-medium">รายการ:</span> {bracketProductName}
+                                                    <span className="ml-2">จำนวน: {quantity} ชิ้น</span>
+                                                  </div>
+                                                  <div className="grid grid-cols-3 gap-4">
                                                     <div>
-                                                      <div className="text-sm font-semibold text-gray-700 mb-2">เหล็กเท้าแขนสามเหลี่ยมรับ TRAY-LADDER</div>
-                                                      <div className="text-xs text-gray-600 mb-2">
-                                                        <span className="font-medium">รายการ:</span> {bracketProductName}
-                                                        <span className="ml-2">จำนวน: {quantity} ชิ้น</span>
-                                                      </div>
-                                                      <div className="grid grid-cols-3 gap-4">
-                                                        <div>
-                                                          <div className="text-xs text-gray-600 mb-1">ค่าของ:</div>
-                                                          <div className="text-sm font-semibold text-gray-800">
-                                                            {(bracketMaterialUnit * quantity).toLocaleString('th-TH')} บาท
-                                                          </div>
-                                                        </div>
-                                                        <div>
-                                                          <div className="text-xs text-gray-600 mb-1">ค่าแรง:</div>
-                                                          <div className="text-sm font-semibold text-gray-800">
-                                                            {(bracketLaborUnit * quantity).toLocaleString('th-TH')} บาท
-                                                          </div>
-                                                        </div>
-                                                        <div>
-                                                          <div className="text-xs text-blue-700 font-semibold mb-1">ค่าใช้จ่าย:</div>
-                                                          <div className="text-sm font-semibold text-blue-700">
-                                                            {(bracketTotalUnit * quantity).toLocaleString('th-TH')} บาท
-                                                          </div>
-                                                        </div>
+                                                      <div className="text-xs text-gray-600 mb-1">ค่าของ:</div>
+                                                      <div className="text-sm font-semibold text-gray-800">
+                                                        {(bracketMaterialUnit * quantity).toLocaleString('th-TH')} บาท
                                                       </div>
                                                     </div>
-                                                  )}
-
-                                                  {hasSupport && (
                                                     <div>
-                                                      <div className="text-sm font-semibold text-gray-700 mb-2">Support ยึดพื้น TRAY / LADDER</div>
-                                                      <div className="text-xs text-gray-600 mb-2">
-                                                        <span className="font-medium">รายการ:</span> {supportProductName}
-                                                        <span className="ml-2">จำนวน: {quantity} ชิ้น</span>
-                                                      </div>
-                                                      <div className="grid grid-cols-3 gap-4">
-                                                        <div>
-                                                          <div className="text-xs text-gray-600 mb-1">ค่าของ:</div>
-                                                          <div className="text-sm font-semibold text-gray-800">
-                                                            {(supportMaterialUnit * quantity).toLocaleString('th-TH')} บาท
-                                                          </div>
-                                                        </div>
-                                                        <div>
-                                                          <div className="text-xs text-gray-600 mb-1">ค่าแรง:</div>
-                                                          <div className="text-sm font-semibold text-gray-800">
-                                                            {(supportLaborUnit * quantity).toLocaleString('th-TH')} บาท
-                                                          </div>
-                                                        </div>
-                                                        <div>
-                                                          <div className="text-xs text-blue-700 font-semibold mb-1">ค่าใช้จ่าย:</div>
-                                                          <div className="text-sm font-semibold text-blue-700">
-                                                            {(supportTotalUnit * quantity).toLocaleString('th-TH')} บาท
-                                                          </div>
-                                                        </div>
+                                                      <div className="text-xs text-gray-600 mb-1">ค่าแรง:</div>
+                                                      <div className="text-sm font-semibold text-gray-800">
+                                                        {(bracketLaborUnit * quantity).toLocaleString('th-TH')} บาท
                                                       </div>
                                                     </div>
-                                                  )}
+                                                    <div>
+                                                      <div className="text-xs text-blue-700 font-semibold mb-1">ค่าใช้จ่าย:</div>
+                                                      <div className="text-sm font-semibold text-blue-700">
+                                                        {(bracketTotalUnit * quantity).toLocaleString('th-TH')} บาท
+                                                      </div>
+                                                    </div>
+                                                  </div>
                                                 </div>
-                                              );
-                                            }
-                                          }
+                                              )}
+                                              {hasSupport && (
+                                                <div>
+                                                  <div className="text-sm font-semibold text-gray-700 mb-2">Support ยึดพื้น TRAY</div>
+                                                  <div className="text-xs text-gray-600 mb-2">
+                                                    <span className="font-medium">รายการ:</span> {supportProductName}
+                                                    <span className="ml-2">จำนวน: {quantity} ชิ้น</span>
+                                                  </div>
+                                                  <div className="grid grid-cols-3 gap-4">
+                                                    <div>
+                                                      <div className="text-xs text-gray-600 mb-1">ค่าของ:</div>
+                                                      <div className="text-sm font-semibold text-gray-800">
+                                                        {(supportMaterialUnit * quantity).toLocaleString('th-TH')} บาท
+                                                      </div>
+                                                    </div>
+                                                    <div>
+                                                      <div className="text-xs text-gray-600 mb-1">ค่าแรง:</div>
+                                                      <div className="text-sm font-semibold text-gray-800">
+                                                        {(supportLaborUnit * quantity).toLocaleString('th-TH')} บาท
+                                                      </div>
+                                                    </div>
+                                                    <div>
+                                                      <div className="text-xs text-blue-700 font-semibold mb-1">ค่าใช้จ่าย:</div>
+                                                      <div className="text-sm font-semibold text-blue-700">
+                                                        {(supportTotalUnit * quantity).toLocaleString('th-TH')} บาท
+                                                      </div>
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              )}
+                                            </div>
+                                          );
+                                        });
+
+                                        const renderedSections = sections.filter(Boolean);
+                                        if (renderedSections.length > 0) {
+                                          return <>{renderedSections}</>;
                                         }
                                       }
                                     }
@@ -12881,51 +13017,75 @@ function MoreDetailCard(props: any) {
                                     }
 
                                     // เพิ่มค่าจากอุปกรณ์เสริม TRAY/LADDER (ถ้ามี)
-                                    const isTray = chargerWiringTypes.includes('ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา');
-                                    const isLadder = chargerWiringTypes.includes('ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา');
-                                    if (isTray || isLadder) {
-                                      const inputDistance = parseFloat(chargerLineDistances[chargerIndex] || '0') || 0;
-                                      if (inputDistance > 0) {
+                                    const trayLadderTypes: string[] = chargerWiringTypes.filter(
+                                      (wiringType: string) =>
+                                        wiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' ||
+                                        wiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา'
+                                    );
+                                    if (trayLadderTypes.length > 0) {
+                                      const getTypeInputDistance = (selectedType: string) => {
+                                        const fromResult = result.wiringTypes?.[selectedType]?.distance;
+                                        if (typeof fromResult === 'number' && Number.isFinite(fromResult) && fromResult > 0) return fromResult;
+                                        const fromTypeDistance = parseFloat(chargerWiringTypeDistances?.[chargerIndex]?.[selectedType] || '0') || 0;
+                                        if (fromTypeDistance > 0) return fromTypeDistance;
+                                        return parseFloat(chargerLineDistances[chargerIndex] || '0') || 0;
+                                      };
+
+                                      const hasAnyDistance = trayLadderTypes.some((selectedType) => getTypeInputDistance(selectedType) > 0);
+                                      if (hasAnyDistance) {
                                         const chargerName = props.chargerSummary?.[chargerIndex]?.name || '';
                                         const kwMatch = chargerName.match(/(\d+)\s*kW/i);
                                         const kw = kwMatch ? parseInt(kwMatch[1]) : 0;
                                         const powerAuthority = props.powerAuthority || 'MEA';
+                                        trayLadderTypes.forEach((selectedType: string) => {
+                                          const inputDistance = getTypeInputDistance(selectedType);
+                                          if (inputDistance <= 0) return;
+                                          const isTrayType = selectedType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา';
+                                          let rowMapping = getMdbToChargerRowMapping(
+                                            selectedType,
+                                            '',
+                                            powerAuthority,
+                                            props.chargerInstallationType === 'group'
+                                          );
+                                          let rowNum = rowMapping[kw];
+                                          if (!rowNum && props.chargerInstallationType === 'group') {
+                                            rowMapping = getMdbToChargerRowMapping(selectedType, '', powerAuthority, false);
+                                            rowNum = rowMapping[kw];
+                                          }
+                                          if (!rowNum) return;
 
-                                        const rowMapping = getMdbToChargerRowMapping(
-                                          props.chargerWiringType,
-                                          '',
-                                          powerAuthority,
-                                          props.chargerInstallationType === 'group'
-                                        );
-                                        const rowNum = rowMapping[kw];
-
-                                        if (rowNum) {
-                                          const sheetName = isTray ? 'แบบ 9.15' : 'แบบ 9.16';
+                                          const sheetName = isTrayType ? 'แบบ 9.15' : 'แบบ 9.16';
                                           const sheet = getExcelData(sheetName);
                                           const row = sheet.find((r: any) => r.__rowNum__ === rowNum);
+                                          if (!row) return;
 
-                                          if (row) {
-                                            const divided = inputDistance / 1.2;
-                                            const fractional = divided - Math.floor(divided);
-                                            const quantity = fractional < 0.5 ? Math.floor(divided) : Math.ceil(divided);
+                                          const quantity = calculateBracketQuantity(inputDistance);
+                                          const bracketMaterialUnit = parsePrice(
+                                            isTrayType ? (row.__EMPTY_29 || 0) : (row.__EMPTY_28 || row.__EMPTY_29 || 0)
+                                          );
+                                          const bracketLaborUnit = parsePrice(
+                                            isTrayType ? (row.__EMPTY_31 || 0) : (row.__EMPTY_30 || row.__EMPTY_31 || 0)
+                                          );
+                                          const bracketTotalUnit = parsePrice(
+                                            isTrayType ? (row.__EMPTY_33 || 0) : (row.__EMPTY_32 || row.__EMPTY_33 || 0)
+                                          );
+                                          totalMaterial += bracketMaterialUnit * quantity;
+                                          totalLabor += bracketLaborUnit * quantity;
+                                          totalCost += bracketTotalUnit * quantity;
 
-                                            // เหล็กเท้าแขนสามเหลี่ยมรับ TRAY-LADDER
-                                            const bracketMaterialUnit = parsePrice(row.__EMPTY_29 || 0);
-                                            const bracketLaborUnit = parsePrice(row.__EMPTY_31 || 0);
-                                            const bracketTotalUnit = parsePrice(row.__EMPTY_33 || 0);
-                                            totalMaterial += bracketMaterialUnit * quantity;
-                                            totalLabor += bracketLaborUnit * quantity;
-                                            totalCost += bracketTotalUnit * quantity;
-
-                                            // Support ยึดพื้น TRAY / LADDER
-                                            const supportMaterialUnit = parsePrice(row.__EMPTY_39 || 0);
-                                            const supportLaborUnit = parsePrice(row.__EMPTY_41 || 0);
-                                            const supportTotalUnit = parsePrice(row.__EMPTY_43 || 0);
-                                            totalMaterial += supportMaterialUnit * quantity;
-                                            totalLabor += supportLaborUnit * quantity;
-                                            totalCost += supportTotalUnit * quantity;
-                                          }
-                                        }
+                                          const supportMaterialUnit = parsePrice(
+                                            isTrayType ? (row.__EMPTY_39 || 0) : (row.__EMPTY_38 || row.__EMPTY_39 || 0)
+                                          );
+                                          const supportLaborUnit = parsePrice(
+                                            isTrayType ? (row.__EMPTY_41 || 0) : (row.__EMPTY_40 || row.__EMPTY_41 || 0)
+                                          );
+                                          const supportTotalUnit = parsePrice(
+                                            isTrayType ? (row.__EMPTY_43 || 0) : (row.__EMPTY_42 || row.__EMPTY_43 || 0)
+                                          );
+                                          totalMaterial += supportMaterialUnit * quantity;
+                                          totalLabor += supportLaborUnit * quantity;
+                                          totalCost += supportTotalUnit * quantity;
+                                        });
                                       }
                                     }
 
@@ -12951,21 +13111,21 @@ function MoreDetailCard(props: any) {
                                         const row = sheet.find((r: any) => r.__rowNum__ === rowNum);
 
                                         if (row) {
-                                          let multiplier, materialUnit, laborUnit, totalUnit;
+                                          let materialUnit, laborUnit, totalUnit;
                                           if (conduitType === 'RSC') {
-                                            multiplier = parsePrice(row.__EMPTY_27 || 1);
                                             materialUnit = parsePrice(row.__EMPTY_28 || 0);
                                             laborUnit = parsePrice(row.__EMPTY_30 || 0);
                                             totalUnit = parsePrice(row.__EMPTY_32 || 0);
                                           } else {
-                                            multiplier = parsePrice(row.__EMPTY_28 || 1);
                                             materialUnit = parsePrice(row.__EMPTY_29 || 0);
                                             laborUnit = parsePrice(row.__EMPTY_31 || 0);
                                             totalUnit = parsePrice(row.__EMPTY_33 || 0);
                                           }
-                                          totalMaterial += materialUnit * multiplier;
-                                          totalLabor += laborUnit * multiplier;
-                                          totalCost += totalUnit * multiplier;
+                                          const bracketInputDistance = result.wiringTypes?.['ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ']?.distance || 0;
+                                          const quantity = calculateBracketQuantity(bracketInputDistance);
+                                          totalMaterial += materialUnit * quantity;
+                                          totalLabor += laborUnit * quantity;
+                                          totalCost += totalUnit * quantity;
                                         }
                                       }
                                     }
@@ -18283,6 +18443,7 @@ function StationAccessory() {
 
   // State for Home data (ข้อมูลจาก Home.tsx)
   const [homeData, setHomeData] = useState<any>(null);
+  const [initialStationData, setInitialStationData] = useState<any>(null);
 
   // Save form data handler - will be set by MoreDetailCard
   const [saveFormDataHandler, setSaveFormDataHandler] = useState<(() => void) | null>(null);
@@ -18302,73 +18463,23 @@ function StationAccessory() {
     }
   }, [navigate]);
 
-  // Load customer code and Home data from state or localStorage
+  const normalizeHomeDataPayload = useCallback((raw: any) => {
+    if (!raw) return null;
+    return {
+      ...raw,
+      form: raw.form ? {
+        ...raw.form,
+        chargerWiringType: Array.isArray(raw.form.chargerWiringType)
+          ? raw.form.chargerWiringType
+          : (raw.form.chargerWiringType ? [raw.form.chargerWiringType] : [])
+      } : raw.form
+    };
+  }, []);
+
+  // Load customer code and Home data from navigation state only
   useEffect(() => {
-    // Load from localStorage first
-    const savedStationData = localStorage.getItem('ev_station_accessory_form_data');
-    const savedHomeData = localStorage.getItem('ev_calculator_form_data');
-    const combinedDataKey = localStorage.key(0)?.startsWith('ev_combined_data_')
-      ? Array.from({ length: localStorage.length }, (_, i) => {
-        const key = localStorage.key(i);
-        return key && key.startsWith('ev_combined_data_') ? key : null;
-      }).filter(Boolean)[0]
-      : null;
-
-    // Try to load combined data first
-    if (combinedDataKey) {
-      try {
-        const combinedData = JSON.parse(localStorage.getItem(combinedDataKey) || '{}');
-        if (combinedData.customerCode) setCustomerCode(combinedData.customerCode);
-        if (combinedData.home) {
-          // แปลง chargerWiringType จาก string เป็น array ถ้าเป็น string (backward compatibility)
-          const normalizedHomeData = {
-            ...combinedData.home,
-            form: combinedData.home.form ? {
-              ...combinedData.home.form,
-              chargerWiringType: Array.isArray(combinedData.home.form.chargerWiringType)
-                ? combinedData.home.form.chargerWiringType
-                : (combinedData.home.form.chargerWiringType ? [combinedData.home.form.chargerWiringType] : [])
-            } : combinedData.home.form
-          };
-          setHomeData(normalizedHomeData);
-          console.log('✅ Loaded combined home data:', normalizedHomeData);
-        }
-      } catch (error) {
-        console.error('Error loading combined data:', error);
-      }
-    }
-
-    // Load from separate keys if combined data not found
-    if (savedStationData) {
-      try {
-        const parsed = JSON.parse(savedStationData);
-        if (parsed.customerCode) setCustomerCode(parsed.customerCode);
-      } catch (error) {
-        console.error('Error loading customer code:', error);
-      }
-    }
-
-    if (savedHomeData) {
-      try {
-        const parsed = JSON.parse(savedHomeData);
-        if (parsed.customerCode === customerCode || !customerCode) {
-          // แปลง chargerWiringType จาก string เป็น array ถ้าเป็น string (backward compatibility)
-          const normalizedParsed = {
-            ...parsed,
-            form: parsed.form ? {
-              ...parsed.form,
-              chargerWiringType: Array.isArray(parsed.form.chargerWiringType)
-                ? parsed.form.chargerWiringType
-                : (parsed.form.chargerWiringType ? [parsed.form.chargerWiringType] : [])
-            } : parsed.form
-          };
-          setHomeData(normalizedParsed);
-          console.log('✅ Loaded home data from localStorage:', normalizedParsed);
-        }
-      } catch (error) {
-        console.error('Error loading home data:', error);
-      }
-    }
+    setInitialStationData(null);
+    setHomeData(null);
 
     // Check if data is passed from navigation (priority)
     if (state && (state as any).customerCode) {
@@ -18379,26 +18490,10 @@ function StationAccessory() {
       console.log('📦 Loading from navigation state.loadData:', loadData);
       if (loadData.customerCode) setCustomerCode(loadData.customerCode);
       if (loadData.home) {
-        // แปลง chargerWiringType จาก string เป็น array ถ้าเป็น string (backward compatibility)
-        const normalizedLoadHomeData = {
-          ...loadData.home,
-          form: loadData.home.form ? {
-            ...loadData.home.form,
-            chargerWiringType: Array.isArray(loadData.home.form.chargerWiringType)
-              ? loadData.home.form.chargerWiringType
-              : (loadData.home.form.chargerWiringType ? [loadData.home.form.chargerWiringType] : [])
-          } : loadData.home.form
-        };
-        setHomeData(normalizedLoadHomeData);
+        setHomeData(normalizeHomeDataPayload(loadData.home));
       }
-      // ถ้า loadData เป็น stationData ให้โหลดไปยัง localStorage เพื่อให้ MoreDetailCard โหลดได้
       if (loadData.trDistance !== undefined || loadData.jobName || loadData.concreteSelection !== undefined || loadData.travelCostResult !== undefined || loadData.highVoltageSystem !== undefined || loadData.transformerType !== undefined || loadData.parkingSlots !== undefined) {
-        console.log('📦 Detected stationData in loadData, saving to localStorage');
-        localStorage.setItem('ev_station_accessory_form_data', JSON.stringify(loadData));
-        // Trigger reload ของ MoreDetailCard โดยการ force update
-        setTimeout(() => {
-          window.dispatchEvent(new Event('storage'));
-        }, 100);
+        setInitialStationData(loadData);
       }
     }
 
@@ -18407,7 +18502,6 @@ function StationAccessory() {
       const stateObj = state as any;
       // ตรวจสอบว่ามีข้อมูล Home data ที่ spread มา (ไม่ใช่ loadData)
       if ((stateObj.powerAuthority || stateObj.charger || stateObj.transformer) && !stateObj.loadData) {
-        // แปลง chargerWiringType จาก string เป็น array ถ้าเป็น string (backward compatibility)
         const normalizedStateObj = {
           ...stateObj,
           chargerWiringType: Array.isArray(stateObj.chargerWiringType)
@@ -18419,21 +18513,12 @@ function StationAccessory() {
       }
       // ถ้ามี homeData ใน state โดยตรง
       if (stateObj.homeData) {
-        // แปลง chargerWiringType จาก string เป็น array ถ้าเป็น string (backward compatibility)
-        const normalizedHomeData = {
-          ...stateObj.homeData,
-          form: stateObj.homeData.form ? {
-            ...stateObj.homeData.form,
-            chargerWiringType: Array.isArray(stateObj.homeData.form.chargerWiringType)
-              ? stateObj.homeData.form.chargerWiringType
-              : (stateObj.homeData.form.chargerWiringType ? [stateObj.homeData.form.chargerWiringType] : [])
-          } : stateObj.homeData.form
-        };
+        const normalizedHomeData = normalizeHomeDataPayload(stateObj.homeData);
         setHomeData(normalizedHomeData);
         console.log('✅ Using Home data from state.homeData:', normalizedHomeData);
       }
     }
-  }, [state]);
+  }, [normalizeHomeDataPayload, state]);
 
   // Prepare Home data props for MoreDetailCard
   const homeProps = useMemo(() => {
@@ -19499,6 +19584,7 @@ function StationAccessory() {
         <MoreDetailCard
           {...state}
           {...homeProps}
+          initialStationData={initialStationData}
           customerCode={customerCode}
           setCustomerCode={setCustomerCode}
           stationEquipmentPriceMapping={stationEquipmentPriceMapping}
