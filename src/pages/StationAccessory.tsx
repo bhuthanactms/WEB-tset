@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react'
+import React, { useEffect, useLayoutEffect, useMemo, useState, useCallback, useRef } from 'react'
 
 import { Zap, Car, Paintbrush, Shield, Home, Wrench, MapPin, ChevronDown, ChevronUp, Box, Package, Settings, Ruler, Printer, Save, FolderOpen, Trash2, Calculator, Cable, DollarSign } from 'lucide-react'
 
@@ -3951,6 +3951,65 @@ function MoreDetailCard(props: any) {
   // ตัวคูณปรับราคา (%) - คิดจากต้นทุนเบื้องต้น (เหมือน Accessories)
   const [priceAdjustPercent, setPriceAdjustPercent] = useState<string>('');
 
+  const STATION_DRAFT_KEY = 'ev_station_accessory_form_draft';
+
+  // Auto-save draft เมื่อ state เปลี่ยน (สำหรับ back/forward navigation restore)
+  useEffect(() => {
+    const draft = {
+      customerCode,
+      trDistance, trWiringGroup2, trToLandDistance, landToMdbDistance, landToMdbWiringGroup2,
+      jobName, location, salesPerson,
+      chargerLineDistances, chargerConduitChoices, chargerResults, chargerSelection,
+      terminalLineDistances, terminalLineResults, terminalResult,
+      transformerSelection, transformerType, transformerPrice,
+      lowVoltageRequest, lowVoltageDistance2, lowVoltageDistance3,
+      highVoltageDistance, highVoltageSystem,
+      mccbMainBrand, mccbSubBrand, mdbConfiguration, mdbSelection, trMdbSelection,
+      installationLocation, installationLocationBrand,
+      parkingSlots, floorPainting, roofCoverType, roofCoverWidth, roofCoverLength, roofCoverM2,
+      mdbRoof, mdbRoofType, mdbRoofWidth, mdbRoofLength, mdbRoofM2, chargerRoofType,
+      travelType, travelDistance, installationTravelDistance,
+      travelCostResult, installationTravelCost, constructionTravelCost, trainingWork,
+      additionalSelection, equipmentSelection, communicationSelection, concreteSelection, paintingSelection,
+      bumperPoles, wheelStops, fireExtinguisherCabinet, signage, routerType,
+      routerCableDistance, cctvCableDistance, lightingCableDistance, bumperPoleMaterial, wheelStopMaterial,
+      wifi4gHub, cctv, lighting,
+      mdbConcreteBase, chargerConcreteBase, powerCabinetConcreteBase, parkingConcreteFloor,
+      generalConcreteFloor, generalConcreteFloorArea,
+      excavationSelection, excavation30cm, excavation60cm, excavation10cm, excavation20cm,
+      excavation30cmFloor, excavationLevel, excavationFill,
+      parkingPaintType, sideLineMarking, centerPattern, centerPatternOriginal, centerPatternNew,
+      signageWorkSelection, signageStationType,
+      profitPercent, cfPercent, priceAdjustPercent,
+      includeDesignCost, extraItemsCount, extraItems,
+    }
+    localStorage.setItem(STATION_DRAFT_KEY, JSON.stringify(draft))
+  }, [
+    customerCode, trDistance, trWiringGroup2, chargerLineDistances, chargerConduitChoices,
+    chargerSelection, travelType, travelDistance, travelCostResult, transformerSelection,
+    mdbSelection, trMdbSelection, parkingSlots, profitPercent, cfPercent, priceAdjustPercent,
+    jobName, location, salesPerson, chargerResults, additionalSelection, equipmentSelection,
+    communicationSelection, concreteSelection, paintingSelection, bumperPoles, wheelStops,
+    excavationSelection, signageWorkSelection, signageStationType, extraItems,
+  ])
+
+  // Restore draft เมื่อ mount (ยกเว้นตอน load จาก history)
+  useEffect(() => {
+    // ถ้ามี initialStationData (load จาก history) ให้ใช้ค่านั้นแทน draft
+    if (props.initialStationData) return
+
+    const draftData = localStorage.getItem(STATION_DRAFT_KEY)
+    if (draftData) {
+      try {
+        const draft = JSON.parse(draftData)
+        loadParsedDataIntoState(draft)
+        console.log('✅ Restored StationAccessory draft on mount')
+      } catch (e) {
+        console.error('❌ Error restoring station draft:', e)
+      }
+    }
+  }, [])
+
   const stationTotals = React.useMemo(() => {
     const totals = [
       transformerTotals,
@@ -7177,8 +7236,12 @@ function MoreDetailCard(props: any) {
     setTravelCostResult(total);
   };
 
-  // คำนวณเมื่อมีการเปลี่ยนแปลง
+  // คำนวณเมื่อมีการเปลี่ยนแปลง (ต้องรอ Excel data โหลดก่อน)
   React.useEffect(() => {
+    // ถ้า Excel data ยังไม่โหลด ให้รอก่อน ไม่ reset ค่าที่ load มาจาก save
+    const travelSheet = getExcelData('ตารางสรุปต้นทุนค่าเดินทาง');
+    if (!travelSheet || travelSheet.length === 0) return;
+
     if (travelType === 'construction') {
       if (travelDistance) {
         calculateTravelCost();
@@ -7188,7 +7251,7 @@ function MoreDetailCard(props: any) {
     } else if (travelType === 'installation') {
       calculateInstallationTravelCost();
     }
-  }, [travelType, travelDistance, installationTravelDistance, trainingWork, transformerSelection, trMdbSelection, mdbSelection, chargerSelection, props.numberOfChargers]);
+  }, [travelType, travelDistance, installationTravelDistance, trainingWork, transformerSelection, trMdbSelection, mdbSelection, chargerSelection, props.numberOfChargers, props.excelData]);
 
   // ดึงข้อมูลค่าออกแบบ/เขียน/เซ็นจาก Excel
   React.useEffect(() => {
@@ -18335,10 +18398,42 @@ function MoreDetailCard(props: any) {
   )
 
 }
+
+const LAST_STATION_NAV_SESSION_KEY = 'ev_last_station_accessory_nav_state';
+
+function readLastStationAccessoryNavState(): any | null {
+  try {
+    const raw = sessionStorage.getItem(LAST_STATION_NAV_SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/** ตรวจว่าเป็น state แบบที่ Home ส่งตอนกดถอดต้นทุน (ไม่ใช่ loadData จากประวัติ) */
+function isUsableSpreadNavState(s: any): boolean {
+  if (!s || typeof s !== 'object' || s.loadData) return false;
+  return Boolean(
+    s.powerAuthority ||
+      s.transformer ||
+      s.chargerInstallationType ||
+      s.trWiringType ||
+      s.trToLand ||
+      s.landToMdb ||
+      s.numberOfChargers ||
+      (s.charger !== undefined && s.charger !== null && String(s.charger).length > 0)
+  );
+}
+
 function StationAccessory() {
 
-  const { state } = useLocation()
+  const location = useLocation()
+  const { state, pathname, key: locationKey } = location
   const navigate = useNavigate()
+  /** Re-hydrate after browser back/forward (HashRouter may drop location.state). */
+  const [popStateTick, setPopStateTick] = useState(0)
 
   // state จะมีค่าที่ส่งมาจาก Home
 
@@ -18371,17 +18466,21 @@ function StationAccessory() {
     };
   }, []);
 
-  // Load customer code and Home data from navigation state only
   useEffect(() => {
+    const onPopState = () => setPopStateTick((t) => t + 1)
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
+
+  // Hydrate from location.state or sessionStorage; useLayoutEffect runs before child paint.
+  useLayoutEffect(() => {
     setInitialStationData(null);
     setHomeData(null);
 
-    // Check if data is passed from navigation (priority)
-    if (state && (state as any).customerCode) {
-      setCustomerCode((state as any).customerCode);
-    }
-    if (state && (state as any).loadData) {
-      const loadData = (state as any).loadData;
+    const stateObj = state as any;
+
+    if (stateObj?.loadData) {
+      const loadData = stateObj.loadData;
       console.log('📦 Loading from navigation state.loadData:', loadData);
       if (loadData.customerCode) setCustomerCode(loadData.customerCode);
       if (loadData.home) {
@@ -18390,30 +18489,32 @@ function StationAccessory() {
       if (loadData.trDistance !== undefined || loadData.jobName || loadData.concreteSelection !== undefined || loadData.travelCostResult !== undefined || loadData.highVoltageSystem !== undefined || loadData.transformerType !== undefined || loadData.parkingSlots !== undefined) {
         setInitialStationData(loadData);
       }
+      return;
     }
 
-    // If state has Home data directly (spread from homeData), use it
-    if (state) {
-      const stateObj = state as any;
-      // ตรวจสอบว่ามีข้อมูล Home data ที่ spread มา (ไม่ใช่ loadData)
-      if ((stateObj.powerAuthority || stateObj.charger || stateObj.transformer) && !stateObj.loadData) {
+    const sessionNav = readLastStationAccessoryNavState();
+    const spreadSource: any =
+      isUsableSpreadNavState(stateObj) ? stateObj : isUsableSpreadNavState(sessionNav) ? sessionNav : null;
+
+    if (spreadSource) {
+      setCustomerCode(spreadSource.customerCode ?? '');
+      if (!spreadSource.loadData) {
         const normalizedStateObj = {
-          ...stateObj,
-          chargerWiringType: Array.isArray(stateObj.chargerWiringType)
-            ? stateObj.chargerWiringType
-            : (stateObj.chargerWiringType ? [stateObj.chargerWiringType] : [])
+          ...spreadSource,
+          chargerWiringType: Array.isArray(spreadSource.chargerWiringType)
+            ? spreadSource.chargerWiringType
+            : (spreadSource.chargerWiringType ? [spreadSource.chargerWiringType] : [])
         };
         setHomeData(normalizedStateObj);
-        console.log('✅ Using Home data from navigation state (spread):', normalizedStateObj);
+        console.log('✅ Using Home data (router state or session fallback):', normalizedStateObj);
       }
-      // ถ้ามี homeData ใน state โดยตรง
-      if (stateObj.homeData) {
-        const normalizedHomeData = normalizeHomeDataPayload(stateObj.homeData);
+      if (spreadSource.homeData) {
+        const normalizedHomeData = normalizeHomeDataPayload(spreadSource.homeData);
         setHomeData(normalizedHomeData);
-        console.log('✅ Using Home data from state.homeData:', normalizedHomeData);
+        console.log('✅ Using Home data from spreadSource.homeData:', normalizedHomeData);
       }
     }
-  }, [normalizeHomeDataPayload, state]);
+  }, [normalizeHomeDataPayload, state, pathname, locationKey, popStateTick]);
 
   // Prepare Home data props for MoreDetailCard
   const homeProps = useMemo(() => {
@@ -19477,7 +19578,6 @@ function StationAccessory() {
         </div>
 
         <MoreDetailCard
-          {...state}
           {...homeProps}
           initialStationData={initialStationData}
           customerCode={customerCode}

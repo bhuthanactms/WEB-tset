@@ -166,16 +166,13 @@ export default function AppHeader(): React.JSX.Element {
   }
 
   const handleForward = () => {
-    // ตรวจสอบว่ามี history ให้ forward หรือไม่
-    // ถ้าอยู่ที่หน้า Home และมี history ต่อไป ให้ forward ตามปกติ
-    // ถ้าอยู่ที่หน้า Station Accessory แล้ว forward ไม่ควรทำอะไร (ไม่มีหน้าต่อไป)
     if (location.pathname === '/station-accessory') {
       console.log('➡️ Forward button clicked - Already at Station Accessory, no forward available')
-      // อยู่ที่หน้าสุดท้ายแล้ว ไม่สามารถ forward ได้
       return
     } else {
-      // Forward ตามประวัติของ browser
-    window.history.forward()
+      // ถ้าอยู่ที่ Home และกด Forward ไป StationAccessory ให้ set flag เพื่อ restore draft
+      sessionStorage.setItem('back_navigation_station', 'true')
+      window.history.forward()
     }
   }
 
@@ -186,9 +183,12 @@ export default function AppHeader(): React.JSX.Element {
       localStorage.removeItem('ev_calculator_form_data')
       localStorage.removeItem('ev_station_accessory_form_data')
       localStorage.removeItem('ev_calculator_form_draft')
+      localStorage.removeItem('ev_station_accessory_form_draft')
+      sessionStorage.removeItem('ev_last_station_accessory_nav_state')
       // ลบ flag ที่บอกว่าโหลดจากประวัติ
       sessionStorage.removeItem('loaded_from_history')
       sessionStorage.removeItem('back_navigation')
+      sessionStorage.removeItem('back_navigation_station')
       // ตั้ง flag เพื่อบอกให้หน้าแรก reset form
       sessionStorage.setItem('reset_form_on_load', 'true')
       console.log('✅ Cleared current data and set reset_form_on_load flag')

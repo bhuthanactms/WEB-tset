@@ -4,7 +4,7 @@
  * including power authority selection, transformer sizing, and cost analysis.
  */
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -12,6 +12,16 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Checkbox } from '@/components/ui/checkbox'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Calculator, Zap, Battery, Settings, Cable, Save, FolderOpen, Trash2 } from 'lucide-react'
 import axios from 'axios'
 import * as XLSX from 'xlsx'
@@ -86,12 +96,16 @@ export default function Home(): React.JSX.Element {
   const [excelData, setExcelData] = useState<any[]>([]);
   const [excelSheets, setExcelSheets] = useState<Record<string, any[]>>({});
   const [customerCode, setCustomerCode] = useState<string>('');
+  const [noCustomerCodeStationDialogOpen, setNoCustomerCodeStationDialogOpen] = useState(false);
+  const navigateToStationAccessoryRef = useRef<() => void>(() => {});
   const navigate = useNavigate()
   const location = useLocation()
 
   // Save/Load functionality
   const STORAGE_KEY = 'ev_calculator_form_data';
   const DRAFT_KEY = 'ev_calculator_form_draft';
+  /** เก็บ state ล่าสุดตอนไป StationAccessory — ใช้เมื่อย้อนกลับ/forward แล้ว location.state หาย (HashRouter) */
+  const LAST_STATION_NAV_SESSION_KEY = 'ev_last_station_accessory_nav_state';
 
   // Auto-save draft on every form change (for back/forward navigation restore)
   useEffect(() => {
@@ -111,6 +125,7 @@ export default function Home(): React.JSX.Element {
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem('ev_station_accessory_form_data');
       localStorage.removeItem(DRAFT_KEY);
+      sessionStorage.removeItem(LAST_STATION_NAV_SESSION_KEY);
       // ลบ flag ที่บอกว่าโหลดจากประวัติ
       sessionStorage.removeItem('loaded_from_history');
       // Reset form state
@@ -126,16 +141,14 @@ export default function Home(): React.JSX.Element {
       return;
     }
 
-    // ตรวจสอบว่าเป็นการย้อนกลับจาก StationAccessory หรือไม่
-    const isBackNavigation = sessionStorage.getItem('back_navigation') === 'true'
     sessionStorage.removeItem('back_navigation')
-    // ตรวจสอบประเภท navigation (back_forward = ปุ่ม Back/Forward ของ browser)
-    const navEntries = performance.getEntriesByType('navigation')
-    const navType = navEntries.length > 0 ? (navEntries[0] as PerformanceNavigationTiming).type : 'navigate'
-    const isBrowserBackForward = navType === 'back_forward'
 
-    if ((isBackNavigation || isBrowserBackForward)) {
-      // Restore draft เมื่อกดย้อนกลับ
+    // ตรวจสอบว่ามี navigation state จาก history load หรือไม่
+    const locationState = location.state || (window.history.state && window.history.state.usr) || {};
+    const hasHistoryLoad = !!(locationState as any).loadData
+
+    if (!hasHistoryLoad) {
+      // Restore draft ทุกครั้งที่ mount โดยไม่มี history load (back/forward/direct)
       const draftData = localStorage.getItem(DRAFT_KEY)
       if (draftData) {
         try {
@@ -145,7 +158,7 @@ export default function Home(): React.JSX.Element {
           if (draft.chargerTypeMode) setChargerTypeMode(draft.chargerTypeMode)
           if (draft.multiChargers) setMultiChargers(draft.multiChargers)
           if (draft.customerCode) setCustomerCode(draft.customerCode)
-          console.log('✅ Restored draft from back navigation')
+          console.log('✅ Restored draft on mount')
         } catch (e) {
           console.error('❌ Error restoring draft:', e)
         }
@@ -156,15 +169,12 @@ export default function Home(): React.JSX.Element {
     // ตรวจสอบว่ามี flag ที่บอกว่าโหลดจากประวัติหรือไม่
     const loadedFromHistory = sessionStorage.getItem('loaded_from_history');
 
-    // Check if data is passed from navigation (priority)
-    // ใช้ location.state จาก useLocation hook แทน window.history.state
-    const locationState = location.state || (window.history.state && window.history.state.usr) || {};
     console.log('🔍 locationState:', locationState);
     console.log('🔍 location.state:', location.state);
     console.log('🔍 loadedFromHistory flag:', loadedFromHistory);
 
-    if (locationState.loadData) {
-      const loadData = locationState.loadData;
+    if ((locationState as any).loadData) {
+      const loadData = (locationState as any).loadData;
       console.log('📦 Loading data from navigation state:', loadData);
       // ตั้ง flag ว่าโหลดจากประวัติ
       sessionStorage.setItem('loaded_from_history', 'true');
@@ -422,6 +432,21 @@ export default function Home(): React.JSX.Element {
       ? getChargerWireConduit()
       : '';
 
+    const chargerWiringCableAll = (() => {
+      const v = chargerWiringCable;
+      if (Array.isArray(v)) return v;
+      const n = parseInt(form.numberOfChargers) || 1;
+      return Array(n).fill(v).map((val, i) => `Charger${i + 1}: ${val || ''}`);
+    })();
+
+    const chargerWireConduitAll = (() => {
+      const v = chargerWireConduit;
+      const norm = (s: string) => (s || '').replace(/^Charger\d+:\s*/i, '').trim();
+      if (Array.isArray(v)) return v.map(norm);
+      const n = parseInt(form.numberOfChargers) || 1;
+      return Array(n).fill(norm((v as unknown as string) || ''));
+    })();
+
     const dataToSave = {
       customerCode: customerCode.trim(),
       form,
@@ -439,6 +464,28 @@ export default function Home(): React.JSX.Element {
       mdbMainAf: mdbMainAf,
       chargerWiringCable: chargerWiringCable,
       chargerWireConduit: chargerWireConduit,
+      chargerWiringCableAll: chargerWiringCableAll,
+      chargerWireConduitAll: chargerWireConduitAll,
+      chargerSummary: (() => {
+        if (chargerTypeMode === 'any') {
+          return multiChargers.filter(name => name !== '').map((chargerName, idx) => {
+            const cableArr = getChargerWiringCable();
+            const cable = Array.isArray(cableArr) ? cableArr[idx] || '-' : (typeof cableArr === 'string' ? cableArr : '-');
+            const conduitArr = getChargerWireConduit();
+            const conduit = Array.isArray(conduitArr) ? conduitArr[idx] || '-' : (typeof conduitArr === 'string' ? conduitArr : '-');
+            return { name: chargerName, kw: extractPowerValue(chargerName), cable: cable.replace(/^Charger\d+:\s*/, ''), conduit: conduit.replace(/^Charger\d+:\s*/, '') };
+          });
+        }
+        const num = parseInt(form.numberOfChargers) || 1;
+        const cableArr = getChargerWiringCable();
+        const conduitArr = getChargerWireConduit();
+        return Array.from({ length: num }).map((_, idx) => ({
+          name: form.charger,
+          kw: extractPowerValue(form.charger),
+          cable: (Array.isArray(cableArr) ? cableArr[idx] || '-' : (typeof cableArr === 'string' ? cableArr : '-')).replace(/^Charger\d+:\s*/, ''),
+          conduit: (Array.isArray(conduitArr) ? conduitArr[idx] || '-' : (typeof conduitArr === 'string' ? conduitArr : '-')).replace(/^Charger\d+:\s*/, ''),
+        }));
+      })(),
       savedAt: new Date().toISOString()
     };
     try {
@@ -2044,8 +2091,426 @@ export default function Home(): React.JSX.Element {
     return result;
   };
 
+  navigateToStationAccessoryRef.current = () => {
+    try {
+      console.log('=== Navigate to StationAccessory ===');
+      console.log('Form:', form);
+      console.log('Charger Type Mode:', chargerTypeMode);
+      console.log('Multi Chargers:', multiChargers);
+
+      // Save current form data before navigation
+      const currentData = {
+        customerCode: customerCode,
+        form,
+        chargerInstallationType,
+        chargerTypeMode,
+        multiChargers
+      };
+      localStorage.setItem('ev_calculator_form_data', JSON.stringify(currentData));
+
+      // ส่งข้อมูลที่ต้องการไปหน้า StationAccessory
+      const navigationState = {
+        customerCode: customerCode,
+        powerAuthority: form.powerAuthority,
+        numberOfChargers: form.numberOfChargers,
+        chargerInstallationType: chargerInstallationType,
+        chargerTypeMode: chargerTypeMode,
+        multiChargers: multiChargers,
+        charger: chargerTypeMode === 'any' ? '' : form.charger,
+        transformer: (() => {
+          const kWAllChargerValue = chargerTypeMode === 'any'
+            ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
+              return sum + extractPowerValue(chargerName);
+            }, 0)
+            : results?.kWAllCharger || 0;
+          // ถ้าเป็น Row 32 (≤ 280 kW) ให้ส่ง "มิเตอร์แรงต่ำ 400 A"
+          if (isRow32(kWAllChargerValue)) {
+            return 'มิเตอร์แรงต่ำ 400 A';
+          }
+          // ถ้าไม่ใช่ ให้ส่งค่าจาก getTRSizeFromExcel
+          return getTRSizeFromExcel(kWAllChargerValue);
+        })(),
+        trWiringType: form.trWiringType,
+        trToLand: form.trToLand,
+        landToMdb: form.landToMdb,
+        numberOfTerminals: form.numberOfTerminals || '',
+        terminalSize: form.terminalSize || '',
+        terminalWiringType: form.terminalWiringType || '',
+        terminalWireConduit: (() => {
+          const terminalData = getTerminalWiringData();
+          return terminalData?.conduitTray || '';
+        })(),
+        trWiringSize: form.landToMdb ? getLandToMdbWiringSizeCVs() : (form.trToLand ? getTRToLandWiringSizeCVs() : (getTRWiringSizeCVs()[0] || '')),
+        trWireConduit: form.landToMdb ? getLandToMdbWireConduit() : (form.trToLand ? getTRToLandWireConduit() : (getTRWireConduit() || '')),
+        // Legacy MDB summary for backward compatibility
+        mdb: (() => {
+          // ใช้ row number จาก TR Wiring Size CVs แทน Transformer Size
+          const trWiringRowNum = getTRWiringSizeCVsRowNumber();
+          const trRow = excelData.find(r => r.__rowNum__ === trWiringRowNum);
+          const mccbMain = trRow ? trRow.__EMPTY_7 : '-';
+          console.log(`MDB (MCCB Main) Debug - Using TR Wiring Row ${trWiringRowNum}:`, trRow);
+          console.log(`MCCB Main value (__EMPTY_7): ${mccbMain}`);
+          return mccbMain ? `${mccbMain} A` : '-';
+        })(),
+        // New detailed MDB fields
+        mdbMainAt: (() => {
+          // ใช้ row number จาก TR Wiring Size CVs แทน Transformer Size
+          const trWiringRowNum = getTRWiringSizeCVsRowNumber();
+          const trRow = excelData.find(r => r.__rowNum__ === trWiringRowNum);
+          const mccbMain = trRow ? trRow.__EMPTY_7 : '';
+          console.log(`MDB Main AT Debug - Using TR Wiring Row ${trWiringRowNum}:`, trRow);
+          console.log(`MCCB Main AT value (__EMPTY_7): ${mccbMain}`);
+          return mccbMain ? `${mccbMain} A` : '';
+        })(),
+        mdbMainAf: (() => {
+          let trRowNum: number | undefined = undefined;
+          if (form.powerAuthority === 'MEA') {
+            const steps = [
+              { max: 280, row: 32 },
+              { max: 320, row: 33 },
+              { max: 400, row: 34 },
+              { max: 504, row: 35 },
+              { max: 640, row: 36 },
+              { max: 800, row: 37 },
+              { max: 1000, row: 38 },
+              { max: 1200, row: 39 },
+              { max: 1600, row: 40 },
+              { max: 2000, row: 41 },
+            ];
+            const inAll = chargerTypeMode === 'any'
+              ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
+                return sum + extractPowerValue(chargerName);
+              }, 0)
+              : results?.kWAllCharger || 0;
+            const found = steps.find(s => inAll <= s.max);
+            trRowNum = found?.row;
+          } else if (form.powerAuthority === 'PEA') {
+            const steps = [
+              { max: 80, row: 76 },
+              { max: 128, row: 77 },
+              { max: 200, row: 78 },
+              { max: 252, row: 79 },
+              { max: 320, row: 80 },
+              { max: 400, row: 81 },
+              { max: 504, row: 82 },
+              { max: 640, row: 83 },
+              { max: 800, row: 84 },
+              { max: 1000, row: 85 },
+              { max: 1200, row: 86 },
+              { max: 1600, row: 87 },
+              { max: 2000, row: 88 },
+            ];
+            const inAll = chargerTypeMode === 'any'
+              ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
+                return sum + extractPowerValue(chargerName);
+              }, 0)
+              : results?.kWAllCharger || 0;
+            const found = steps.find(s => inAll <= s.max);
+            trRowNum = found?.row;
+          }
+          const trRow = excelData.find(r => r.__rowNum__ === trRowNum);
+          const main2 = trRow ? trRow.__EMPTY_10 : '';
+          return main2 ? `${main2} A` : '';
+        })(),
+        mdbSubs: (() => {
+          // สำหรับ Group Charger: อ่านจาก __EMPTY_22 ถึง __EMPTY_24
+          // สำหรับ Stand-alone: MEA: ใช้ __EMPTY_23, __EMPTY_24, __EMPTY_24 | PEA: ใช้ MEA. กฟน. 416 V:, __EMPTY_22, __EMPTY_23
+          const groupChargerColumns = ['__EMPTY_22', '__EMPTY_23', '__EMPTY_24'];
+          const meaColumns = ['__EMPTY_23', '__EMPTY_24', '__EMPTY_24'];
+          const peaColumns = ['MEA. กฟน. 416 V:', '__EMPTY_22', '__EMPTY_23'];
+          const columns = chargerInstallationType === 'group'
+            ? groupChargerColumns
+            : (form.powerAuthority === 'MEA' ? meaColumns : peaColumns);
+
+          console.log('=== MCCB Sub Debug ===');
+          console.log('Charger Installation Type:', chargerInstallationType);
+          console.log('Power Authority:', form.powerAuthority);
+          console.log('Columns to read:', columns);
+          console.log('Charger Type Mode:', chargerTypeMode);
+
+          if (chargerTypeMode === 'any') {
+            console.log('Multi Chargers:', multiChargers);
+            return multiChargers.map((chargerName, index) => {
+              let rowNum: number | undefined;
+
+              if (chargerInstallationType === 'group') {
+                const groupCell = groupChargerToExcelCell[chargerName];
+                if (!groupCell) {
+                  console.log(`[MCCB Sub ${index + 1}] Group charger cell not found!`);
+                  return '-';
+                }
+                rowNum = groupCell.rowNum;
+              } else {
+                const cell = chargerToExcelCell[chargerName];
+              if (form.powerAuthority === 'MEA' && cell?.mea) {
+                rowNum = parseInt(cell.mea.replace('C', ''));
+              }
+              if (form.powerAuthority === 'PEA' && cell?.pea) {
+                rowNum = parseInt(cell.pea.replace('C', ''));
+                }
+              }
+
+              console.log(`[MCCB Sub ${index + 1}] Charger: ${chargerName}, Row: ${rowNum}`);
+
+              const row = excelData.find(r => r.__rowNum__ === rowNum);
+              if (!row) {
+                console.log(`[MCCB Sub ${index + 1}] Row not found!`);
+                return '-';
+              }
+
+              console.log(`[MCCB Sub ${index + 1}] Row data:`, row);
+
+              // สำหรับ Group Charger: อ่าน __EMPTY_22 (จำนวนชุด) และ __EMPTY_24 (ค่า MCCB Sub)
+              if (chargerInstallationType === 'group') {
+                const numSets = (row as any)['__EMPTY_22'];
+                const mccbValue = (row as any)['__EMPTY_24'];
+                const mccbValueStr = mccbValue && mccbValue !== '-' ? `${mccbValue}A` : '-';
+                const numSetsStr = numSets && numSets !== '-' ? `${numSets}ชุด` : '';
+                const result = mccbValueStr !== '-' && numSetsStr
+                  ? `${mccbValueStr} (${numSetsStr})`
+                  : mccbValueStr;
+                console.log(`[MCCB Sub ${index + 1}] Group Charger - Sets: ${numSets}, Value: ${mccbValue}, Result: ${result}`);
+                return result;
+              }
+
+              // สำหรับ Stand-alone: อ่านค่าจากทั้ง 3 คอลัมน์และแสดงพร้อมกัน
+              const values = columns.map(col => {
+                let val = (row as any)[col];
+                // สำหรับ Stand-alone PEA: ถ้าต้องการหา 'MEA. กฟน. 416 V:'
+                if (form.powerAuthority === 'PEA' && col === 'MEA. กฟน. 416 V:') {
+                  // ลองใช้ชื่อคอลัมน์ตรงๆ ก่อน
+                  if (!val || val === '-') {
+                    // ถ้าไม่เจอ ให้หาที่มี "กฟน" แต่ไม่มี "24kV" (เพื่อหลีกเลี่ยง MEA. 24kV/416/240V)
+                    const keys = Object.keys(row);
+                    const foundKey = keys.find(k =>
+                      k.includes('กฟน') &&
+                      k.includes('416') &&
+                      k.includes('V') &&
+                      !k.includes('24kV') &&
+                      !k.includes('240V')
+                    );
+                    if (foundKey) {
+                      val = (row as any)[foundKey];
+                      console.log(`[MCCB Sub ${index + 1}] Found key: ${foundKey} = ${val}`);
+                    }
+                  } else {
+                    // ถ้าเจอแล้ว ตรวจสอบว่าไม่ใช่ MEA. 24kV/416/240V
+                    if (typeof val === 'number' && val > 1000) {
+                      // ถ้าเป็นตัวเลขมากๆ อาจจะเป็นค่าผิด (เช่น 174.95975925537127)
+                      const keys = Object.keys(row);
+                      const foundKey = keys.find(k =>
+                        k.includes('กฟน') &&
+                        k.includes('416') &&
+                        k.includes('V') &&
+                        !k.includes('24kV') &&
+                        !k.includes('240V')
+                      );
+                      if (foundKey) {
+                        val = (row as any)[foundKey];
+                        console.log(`[MCCB Sub ${index + 1}] Fixed: using ${foundKey} = ${val} instead`);
+                      }
+                    }
+                  }
+                }
+                if (!val || val === '-') val = '-';
+                console.log(`[MCCB Sub ${index + 1}] Column ${col}:`, val);
+                return val;
+              });
+              const result = `${values.join(' ')} A`;
+              console.log(`[MCCB Sub ${index + 1}] Final result:`, result);
+              return result;
+            });
+          } else {
+            let rowNum: number | undefined;
+
+            if (chargerInstallationType === 'group') {
+              const groupCell = groupChargerToExcelCell[form.charger];
+              if (!groupCell) {
+                console.log('Group charger cell not found!');
+                return Array(parseInt(form.numberOfChargers) || 1).fill('-');
+              }
+              rowNum = groupCell.rowNum;
+            } else {
+              const cell = chargerToExcelCell[form.charger];
+            if (form.powerAuthority === 'MEA' && cell?.mea) {
+              rowNum = parseInt(cell.mea.replace('C', ''));
+            }
+            if (form.powerAuthority === 'PEA' && cell?.pea) {
+              rowNum = parseInt(cell.pea.replace('C', ''));
+              }
+            }
+
+            console.log('Charger:', form.charger, 'Row:', rowNum);
+
+            const row = excelData.find(r => r.__rowNum__ === rowNum);
+            if (!row) {
+              console.log('Row not found!');
+              return Array(parseInt(form.numberOfChargers) || 1).fill('-');
+            }
+
+            console.log('Row data:', row);
+
+            // สำหรับ Group Charger: อ่าน __EMPTY_22 (จำนวนชุด) และ __EMPTY_24 (ค่า MCCB Sub)
+            if (chargerInstallationType === 'group') {
+              const numSets = (row as any)['__EMPTY_22'];
+              const mccbValue = (row as any)['__EMPTY_24'];
+              const mccbValueStr = mccbValue && mccbValue !== '-' ? `${mccbValue}A` : '-';
+              const numSetsStr = numSets && numSets !== '-' ? `${numSets}ชุด` : '';
+              const result = mccbValueStr !== '-' && numSetsStr
+                ? `${mccbValueStr} (${numSetsStr})`
+                : mccbValueStr;
+              console.log(`Group Charger - Sets: ${numSets}, Value: ${mccbValue}, Result: ${result}`);
+              const numChargers = parseInt(form.numberOfChargers) || 1;
+              const finalArray = Array(numChargers).fill(result);
+              console.log('Final array:', finalArray);
+              return finalArray;
+            }
+
+            // สำหรับ Stand-alone: อ่านค่าจากทั้ง 3 คอลัมน์และแสดงพร้อมกัน (ทุก MCCB Sub แสดงเหมือนกัน)
+            const values = columns.map(col => {
+              let val = (row as any)[col];
+              // สำหรับ Stand-alone PEA: ถ้าต้องการหา 'MEA. กฟน. 416 V:'
+              if (form.powerAuthority === 'PEA' && col === 'MEA. กฟน. 416 V:') {
+                // ลองใช้ชื่อคอลัมน์ตรงๆ ก่อน
+                if (!val || val === '-') {
+                  // ถ้าไม่เจอ ให้หาที่มี "กฟน" แต่ไม่มี "24kV" (เพื่อหลีกเลี่ยง MEA. 24kV/416/240V)
+                  const keys = Object.keys(row);
+                  const foundKey = keys.find(k =>
+                    k.includes('กฟน') &&
+                    k.includes('416') &&
+                    k.includes('V') &&
+                    !k.includes('24kV') &&
+                    !k.includes('240V')
+                  );
+                  if (foundKey) {
+                    val = (row as any)[foundKey];
+                    console.log(`Found key: ${foundKey} = ${val}`);
+                  }
+                } else {
+                  // ถ้าเจอแล้ว ตรวจสอบว่าไม่ใช่ MEA. 24kV/416/240V
+                  if (typeof val === 'number' && val > 1000) {
+                    // ถ้าเป็นตัวเลขมากๆ อาจจะเป็นค่าผิด (เช่น 174.95975925537127)
+                    const keys = Object.keys(row);
+                    const foundKey = keys.find(k =>
+                      k.includes('กฟน') &&
+                      k.includes('416') &&
+                      k.includes('V') &&
+                      !k.includes('24kV') &&
+                      !k.includes('240V')
+                    );
+                    if (foundKey) {
+                      val = (row as any)[foundKey];
+                      console.log(`Fixed: using ${foundKey} = ${val} instead`);
+                    }
+                  }
+                }
+              }
+              if (!val || val === '-') val = '-';
+              console.log(`Column ${col}:`, val);
+              return val;
+            });
+            const result = `${values.join(' ')} A`;
+            console.log('Final result:', result);
+            const numChargers = parseInt(form.numberOfChargers) || 1;
+            const finalArray = Array(numChargers).fill(result);
+            console.log('Final array:', finalArray);
+            return finalArray;
+          }
+        })(),
+        mdbLighting: '10 A',
+        mdbCommu: '10 A',
+        chargerWiringType: form.chargerWiringType, // ส่งเป็น array
+        chargerWiringCable: getChargerWiringCable(), // ฟังก์ชันจะ return array หรือ string ตามเงื่อนไข
+        chargerWireConduit: getChargerWireConduit(), // ฟังก์ชันจะ return array หรือ string ตามเงื่อนไข
+        chargerWiringCableAll: (() => {
+          const v = getChargerWiringCable();
+          if (Array.isArray(v)) return v;
+          const n = parseInt(form.numberOfChargers) || 1;
+          return Array(n).fill(v);
+        })(),
+        chargerWireConduitAll: (() => {
+          const v = getChargerWireConduit();
+          const norm = (s: string) => (s || '').replace(/^Charger\d+:\s*/i, '').trim();
+          if (Array.isArray(v)) return v.map(norm);
+          const n = parseInt(form.numberOfChargers) || 1;
+          return Array(n).fill(norm((v as unknown as string) || ''));
+        })(),
+        chargerDistance: 0, // เพิ่มช่องกรอกในหน้า StationAccessory
+        trDistance: 0, // เพิ่มช่องกรอกในหน้า StationAccessory
+        // ข้อมูลจาก Summary for Charger
+        chargerSummary: (() => {
+          if (chargerTypeMode === 'any') {
+            return multiChargers.filter(name => name !== '').map((chargerName, idx) => {
+              const cableArr = getChargerWiringCable();
+              const cable = Array.isArray(cableArr) ? cableArr[idx] || '-' : (typeof cableArr === 'string' ? cableArr : '-');
+              const conduitArr = getChargerWireConduit();
+              const conduit = Array.isArray(conduitArr) ? conduitArr[idx] || '-' : (typeof conduitArr === 'string' ? conduitArr : '-');
+              return {
+                name: chargerName,
+                kw: extractPowerValue(chargerName),
+                cable: cable.replace(/^Charger\d+:\s*/, ''),
+                conduit: conduit.replace(/^Charger\d+:\s*/, '')
+              };
+            });
+          } else {
+            const num = parseInt(form.numberOfChargers) || 1;
+            const cableArr = getChargerWiringCable();
+            const conduitArr = getChargerWireConduit();
+            return Array.from({ length: num }).map((_, idx) => ({
+              name: form.charger,
+              kw: extractPowerValue(form.charger),
+              cable: Array.isArray(cableArr) ? (cableArr[idx] ? cableArr[idx].replace(/^Charger\d+:\s*/, '') : '-') : (typeof cableArr === 'string' ? cableArr : '-'),
+              conduit: Array.isArray(conduitArr) ? (conduitArr[idx] ? conduitArr[idx].replace(/^Charger\d+:\s*/, '') : '-') : (typeof conduitArr === 'string' ? conduitArr : '-')
+            }));
+          }
+        })()
+      };
+
+      console.log('✅ Navigation state prepared:', navigationState);
+
+      try {
+        sessionStorage.setItem(LAST_STATION_NAV_SESSION_KEY, JSON.stringify(navigationState));
+      } catch {
+        /* ignore quota */
+      }
+
+      // Navigate with state
+      navigate('/station-accessory', {
+        state: navigationState,
+        replace: false
+      });
+
+      console.log('✅ Navigation called');
+    } catch (error) {
+      console.error('Error navigating to StationAccessory:', error);
+      alert('เกิดข้อผิดพลาดในการเปลี่ยนหน้าฺ' + (error instanceof Error ? error.message : String(error)));
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 relative">
+      <AlertDialog open={noCustomerCodeStationDialogOpen} onOpenChange={setNoCustomerCodeStationDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยังไม่ได้กรอกรหัสลูกค้า</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="text-left text-sm text-muted-foreground space-y-2">
+                <p>กรุณาใส่รหัสลูกค้า (Customer Code)</p>
+                <p>หากไม่ใส่รหัสลูกค้า คุณจะไม่สามารถบันทึกข้อมูลในหน้าถอดต้นทุนได้</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">กลับ</AlertDialogCancel>
+            <AlertDialogAction
+              type="button"
+              onClick={() => navigateToStationAccessoryRef.current()}
+            >
+              ไปหน้าถอดต้นทุน
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-8">
@@ -2519,388 +2984,12 @@ export default function Home(): React.JSX.Element {
                     return;
                   }
 
-                  console.log('=== Navigate to StationAccessory ===');
-                  console.log('Form:', form);
-                  console.log('Charger Type Mode:', chargerTypeMode);
-                  console.log('Multi Chargers:', multiChargers);
+                  if (!customerCode || !String(customerCode).trim()) {
+                    setNoCustomerCodeStationDialogOpen(true);
+                    return;
+                  }
 
-                  // Save current form data before navigation
-                  const currentData = {
-                    customerCode: customerCode,
-                    form,
-                    chargerInstallationType,
-                    chargerTypeMode,
-                    multiChargers
-                  };
-                  localStorage.setItem('ev_calculator_form_data', JSON.stringify(currentData));
-
-                  // ส่งข้อมูลที่ต้องการไปหน้า StationAccessory
-                  const navigationState = {
-                    customerCode: customerCode,
-                    powerAuthority: form.powerAuthority,
-                    numberOfChargers: form.numberOfChargers,
-                    chargerInstallationType: chargerInstallationType,
-                    chargerTypeMode: chargerTypeMode,
-                    multiChargers: multiChargers,
-                    charger: chargerTypeMode === 'any' ? '' : form.charger,
-                    transformer: (() => {
-                      const kWAllChargerValue = chargerTypeMode === 'any'
-                        ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
-                          return sum + extractPowerValue(chargerName);
-                        }, 0)
-                        : results?.kWAllCharger || 0;
-                      // ถ้าเป็น Row 32 (≤ 280 kW) ให้ส่ง "มิเตอร์แรงต่ำ 400 A"
-                      if (isRow32(kWAllChargerValue)) {
-                        return 'มิเตอร์แรงต่ำ 400 A';
-                      }
-                      // ถ้าไม่ใช่ ให้ส่งค่าจาก getTRSizeFromExcel
-                      return getTRSizeFromExcel(kWAllChargerValue);
-                    })(),
-                    trWiringType: form.trWiringType,
-                    trToLand: form.trToLand,
-                    landToMdb: form.landToMdb,
-                    numberOfTerminals: form.numberOfTerminals || '',
-                    terminalSize: form.terminalSize || '',
-                    terminalWiringType: form.terminalWiringType || '',
-                    terminalWireConduit: (() => {
-                      const terminalData = getTerminalWiringData();
-                      return terminalData?.conduitTray || '';
-                    })(),
-                    trWiringSize: form.landToMdb ? getLandToMdbWiringSizeCVs() : (form.trToLand ? getTRToLandWiringSizeCVs() : (getTRWiringSizeCVs()[0] || '')),
-                    trWireConduit: form.landToMdb ? getLandToMdbWireConduit() : (form.trToLand ? getTRToLandWireConduit() : (getTRWireConduit() || '')),
-                    // Legacy MDB summary for backward compatibility
-                    mdb: (() => {
-                      // ใช้ row number จาก TR Wiring Size CVs แทน Transformer Size
-                      const trWiringRowNum = getTRWiringSizeCVsRowNumber();
-                      const trRow = excelData.find(r => r.__rowNum__ === trWiringRowNum);
-                      const mccbMain = trRow ? trRow.__EMPTY_7 : '-';
-                      console.log(`MDB (MCCB Main) Debug - Using TR Wiring Row ${trWiringRowNum}:`, trRow);
-                      console.log(`MCCB Main value (__EMPTY_7): ${mccbMain}`);
-                      return mccbMain ? `${mccbMain} A` : '-';
-                    })(),
-                    // New detailed MDB fields
-                    mdbMainAt: (() => {
-                      // ใช้ row number จาก TR Wiring Size CVs แทน Transformer Size
-                      const trWiringRowNum = getTRWiringSizeCVsRowNumber();
-                      const trRow = excelData.find(r => r.__rowNum__ === trWiringRowNum);
-                      const mccbMain = trRow ? trRow.__EMPTY_7 : '';
-                      console.log(`MDB Main AT Debug - Using TR Wiring Row ${trWiringRowNum}:`, trRow);
-                      console.log(`MCCB Main AT value (__EMPTY_7): ${mccbMain}`);
-                      return mccbMain ? `${mccbMain} A` : '';
-                    })(),
-                    mdbMainAf: (() => {
-                      let trRowNum: number | undefined = undefined;
-                      if (form.powerAuthority === 'MEA') {
-                        const steps = [
-                          { max: 280, row: 32 },
-                          { max: 320, row: 33 },
-                          { max: 400, row: 34 },
-                          { max: 504, row: 35 },
-                          { max: 640, row: 36 },
-                          { max: 800, row: 37 },
-                          { max: 1000, row: 38 },
-                          { max: 1200, row: 39 },
-                          { max: 1600, row: 40 },
-                          { max: 2000, row: 41 },
-                        ];
-                        const inAll = chargerTypeMode === 'any'
-                          ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
-                            return sum + extractPowerValue(chargerName);
-                          }, 0)
-                          : results?.kWAllCharger || 0;
-                        const found = steps.find(s => inAll <= s.max);
-                        trRowNum = found?.row;
-                      } else if (form.powerAuthority === 'PEA') {
-                        const steps = [
-                          { max: 80, row: 76 },
-                          { max: 128, row: 77 },
-                          { max: 200, row: 78 },
-                          { max: 252, row: 79 },
-                          { max: 320, row: 80 },
-                          { max: 400, row: 81 },
-                          { max: 504, row: 82 },
-                          { max: 640, row: 83 },
-                          { max: 800, row: 84 },
-                          { max: 1000, row: 85 },
-                          { max: 1200, row: 86 },
-                          { max: 1600, row: 87 },
-                          { max: 2000, row: 88 },
-                        ];
-                        const inAll = chargerTypeMode === 'any'
-                          ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
-                            return sum + extractPowerValue(chargerName);
-                          }, 0)
-                          : results?.kWAllCharger || 0;
-                        const found = steps.find(s => inAll <= s.max);
-                        trRowNum = found?.row;
-                      }
-                      const trRow = excelData.find(r => r.__rowNum__ === trRowNum);
-                      const main2 = trRow ? trRow.__EMPTY_10 : '';
-                      return main2 ? `${main2} A` : '';
-                    })(),
-                    mdbSubs: (() => {
-                      // สำหรับ Group Charger: อ่านจาก __EMPTY_22 ถึง __EMPTY_24
-                      // สำหรับ Stand-alone: MEA: ใช้ __EMPTY_23, __EMPTY_24, __EMPTY_24 | PEA: ใช้ MEA. กฟน. 416 V:, __EMPTY_22, __EMPTY_23
-                      const groupChargerColumns = ['__EMPTY_22', '__EMPTY_23', '__EMPTY_24'];
-                      const meaColumns = ['__EMPTY_23', '__EMPTY_24', '__EMPTY_24'];
-                      const peaColumns = ['MEA. กฟน. 416 V:', '__EMPTY_22', '__EMPTY_23'];
-                      const columns = chargerInstallationType === 'group'
-                        ? groupChargerColumns
-                        : (form.powerAuthority === 'MEA' ? meaColumns : peaColumns);
-
-                      console.log('=== MCCB Sub Debug ===');
-                      console.log('Charger Installation Type:', chargerInstallationType);
-                      console.log('Power Authority:', form.powerAuthority);
-                      console.log('Columns to read:', columns);
-                      console.log('Charger Type Mode:', chargerTypeMode);
-
-                      if (chargerTypeMode === 'any') {
-                        console.log('Multi Chargers:', multiChargers);
-                        return multiChargers.map((chargerName, index) => {
-                          let rowNum: number | undefined;
-
-                          if (chargerInstallationType === 'group') {
-                            const groupCell = groupChargerToExcelCell[chargerName];
-                            if (!groupCell) {
-                              console.log(`[MCCB Sub ${index + 1}] Group charger cell not found!`);
-                              return '-';
-                            }
-                            rowNum = groupCell.rowNum;
-                          } else {
-                            const cell = chargerToExcelCell[chargerName];
-                          if (form.powerAuthority === 'MEA' && cell?.mea) {
-                            rowNum = parseInt(cell.mea.replace('C', ''));
-                          }
-                          if (form.powerAuthority === 'PEA' && cell?.pea) {
-                            rowNum = parseInt(cell.pea.replace('C', ''));
-                            }
-                          }
-
-                          console.log(`[MCCB Sub ${index + 1}] Charger: ${chargerName}, Row: ${rowNum}`);
-
-                          const row = excelData.find(r => r.__rowNum__ === rowNum);
-                          if (!row) {
-                            console.log(`[MCCB Sub ${index + 1}] Row not found!`);
-                            return '-';
-                          }
-
-                          console.log(`[MCCB Sub ${index + 1}] Row data:`, row);
-
-                          // สำหรับ Group Charger: อ่าน __EMPTY_22 (จำนวนชุด) และ __EMPTY_24 (ค่า MCCB Sub)
-                          if (chargerInstallationType === 'group') {
-                            const numSets = (row as any)['__EMPTY_22'];
-                            const mccbValue = (row as any)['__EMPTY_24'];
-                            const mccbValueStr = mccbValue && mccbValue !== '-' ? `${mccbValue}A` : '-';
-                            const numSetsStr = numSets && numSets !== '-' ? `${numSets}ชุด` : '';
-                            const result = mccbValueStr !== '-' && numSetsStr
-                              ? `${mccbValueStr} (${numSetsStr})`
-                              : mccbValueStr;
-                            console.log(`[MCCB Sub ${index + 1}] Group Charger - Sets: ${numSets}, Value: ${mccbValue}, Result: ${result}`);
-                            return result;
-                          }
-
-                          // สำหรับ Stand-alone: อ่านค่าจากทั้ง 3 คอลัมน์และแสดงพร้อมกัน
-                          const values = columns.map(col => {
-                            let val = (row as any)[col];
-                            // สำหรับ Stand-alone PEA: ถ้าต้องการหา 'MEA. กฟน. 416 V:'
-                            if (form.powerAuthority === 'PEA' && col === 'MEA. กฟน. 416 V:') {
-                              // ลองใช้ชื่อคอลัมน์ตรงๆ ก่อน
-                              if (!val || val === '-') {
-                                // ถ้าไม่เจอ ให้หาที่มี "กฟน" แต่ไม่มี "24kV" (เพื่อหลีกเลี่ยง MEA. 24kV/416/240V)
-                                const keys = Object.keys(row);
-                                const foundKey = keys.find(k =>
-                                  k.includes('กฟน') &&
-                                  k.includes('416') &&
-                                  k.includes('V') &&
-                                  !k.includes('24kV') &&
-                                  !k.includes('240V')
-                                );
-                                if (foundKey) {
-                                  val = (row as any)[foundKey];
-                                  console.log(`[MCCB Sub ${index + 1}] Found key: ${foundKey} = ${val}`);
-                                }
-                              } else {
-                                // ถ้าเจอแล้ว ตรวจสอบว่าไม่ใช่ MEA. 24kV/416/240V
-                                if (typeof val === 'number' && val > 1000) {
-                                  // ถ้าเป็นตัวเลขมากๆ อาจจะเป็นค่าผิด (เช่น 174.95975925537127)
-                                  const keys = Object.keys(row);
-                                  const foundKey = keys.find(k =>
-                                    k.includes('กฟน') &&
-                                    k.includes('416') &&
-                                    k.includes('V') &&
-                                    !k.includes('24kV') &&
-                                    !k.includes('240V')
-                                  );
-                                  if (foundKey) {
-                                    val = (row as any)[foundKey];
-                                    console.log(`[MCCB Sub ${index + 1}] Fixed: using ${foundKey} = ${val} instead`);
-                                  }
-                                }
-                              }
-                            }
-                            if (!val || val === '-') val = '-';
-                            console.log(`[MCCB Sub ${index + 1}] Column ${col}:`, val);
-                            return val;
-                          });
-                          const result = `${values.join(' ')} A`;
-                          console.log(`[MCCB Sub ${index + 1}] Final result:`, result);
-                          return result;
-                        });
-                      } else {
-                        let rowNum: number | undefined;
-
-                        if (chargerInstallationType === 'group') {
-                          const groupCell = groupChargerToExcelCell[form.charger];
-                          if (!groupCell) {
-                            console.log('Group charger cell not found!');
-                            return Array(parseInt(form.numberOfChargers) || 1).fill('-');
-                          }
-                          rowNum = groupCell.rowNum;
-                        } else {
-                          const cell = chargerToExcelCell[form.charger];
-                        if (form.powerAuthority === 'MEA' && cell?.mea) {
-                          rowNum = parseInt(cell.mea.replace('C', ''));
-                        }
-                        if (form.powerAuthority === 'PEA' && cell?.pea) {
-                          rowNum = parseInt(cell.pea.replace('C', ''));
-                          }
-                        }
-
-                        console.log('Charger:', form.charger, 'Row:', rowNum);
-
-                        const row = excelData.find(r => r.__rowNum__ === rowNum);
-                        if (!row) {
-                          console.log('Row not found!');
-                          return Array(parseInt(form.numberOfChargers) || 1).fill('-');
-                        }
-
-                        console.log('Row data:', row);
-
-                        // สำหรับ Group Charger: อ่าน __EMPTY_22 (จำนวนชุด) และ __EMPTY_24 (ค่า MCCB Sub)
-                        if (chargerInstallationType === 'group') {
-                          const numSets = (row as any)['__EMPTY_22'];
-                          const mccbValue = (row as any)['__EMPTY_24'];
-                          const mccbValueStr = mccbValue && mccbValue !== '-' ? `${mccbValue}A` : '-';
-                          const numSetsStr = numSets && numSets !== '-' ? `${numSets}ชุด` : '';
-                          const result = mccbValueStr !== '-' && numSetsStr
-                            ? `${mccbValueStr} (${numSetsStr})`
-                            : mccbValueStr;
-                          console.log(`Group Charger - Sets: ${numSets}, Value: ${mccbValue}, Result: ${result}`);
-                          const numChargers = parseInt(form.numberOfChargers) || 1;
-                          const finalArray = Array(numChargers).fill(result);
-                          console.log('Final array:', finalArray);
-                          return finalArray;
-                        }
-
-                        // สำหรับ Stand-alone: อ่านค่าจากทั้ง 3 คอลัมน์และแสดงพร้อมกัน (ทุก MCCB Sub แสดงเหมือนกัน)
-                        const values = columns.map(col => {
-                          let val = (row as any)[col];
-                          // สำหรับ Stand-alone PEA: ถ้าต้องการหา 'MEA. กฟน. 416 V:'
-                          if (form.powerAuthority === 'PEA' && col === 'MEA. กฟน. 416 V:') {
-                            // ลองใช้ชื่อคอลัมน์ตรงๆ ก่อน
-                            if (!val || val === '-') {
-                              // ถ้าไม่เจอ ให้หาที่มี "กฟน" แต่ไม่มี "24kV" (เพื่อหลีกเลี่ยง MEA. 24kV/416/240V)
-                              const keys = Object.keys(row);
-                              const foundKey = keys.find(k =>
-                                k.includes('กฟน') &&
-                                k.includes('416') &&
-                                k.includes('V') &&
-                                !k.includes('24kV') &&
-                                !k.includes('240V')
-                              );
-                              if (foundKey) {
-                                val = (row as any)[foundKey];
-                                console.log(`Found key: ${foundKey} = ${val}`);
-                              }
-                            } else {
-                              // ถ้าเจอแล้ว ตรวจสอบว่าไม่ใช่ MEA. 24kV/416/240V
-                              if (typeof val === 'number' && val > 1000) {
-                                // ถ้าเป็นตัวเลขมากๆ อาจจะเป็นค่าผิด (เช่น 174.95975925537127)
-                                const keys = Object.keys(row);
-                                const foundKey = keys.find(k =>
-                                  k.includes('กฟน') &&
-                                  k.includes('416') &&
-                                  k.includes('V') &&
-                                  !k.includes('24kV') &&
-                                  !k.includes('240V')
-                                );
-                                if (foundKey) {
-                                  val = (row as any)[foundKey];
-                                  console.log(`Fixed: using ${foundKey} = ${val} instead`);
-                                }
-                              }
-                            }
-                          }
-                          if (!val || val === '-') val = '-';
-                          console.log(`Column ${col}:`, val);
-                          return val;
-                        });
-                        const result = `${values.join(' ')} A`;
-                        console.log('Final result:', result);
-                        const numChargers = parseInt(form.numberOfChargers) || 1;
-                        const finalArray = Array(numChargers).fill(result);
-                        console.log('Final array:', finalArray);
-                        return finalArray;
-                      }
-                    })(),
-                    mdbLighting: '10 A',
-                    mdbCommu: '10 A',
-                    chargerWiringType: form.chargerWiringType, // ส่งเป็น array
-                    chargerWiringCable: getChargerWiringCable(), // ฟังก์ชันจะ return array หรือ string ตามเงื่อนไข
-                    chargerWireConduit: getChargerWireConduit(), // ฟังก์ชันจะ return array หรือ string ตามเงื่อนไข
-                    chargerWiringCableAll: (() => {
-                      const v = getChargerWiringCable();
-                      if (Array.isArray(v)) return v;
-                      const n = parseInt(form.numberOfChargers) || 1;
-                      return Array(n).fill(v);
-                    })(),
-                    chargerWireConduitAll: (() => {
-                      const v = getChargerWireConduit();
-                      const norm = (s: string) => (s || '').replace(/^Charger\d+:\s*/i, '').trim();
-                      if (Array.isArray(v)) return v.map(norm);
-                      const n = parseInt(form.numberOfChargers) || 1;
-                      return Array(n).fill(norm((v as unknown as string) || ''));
-                    })(),
-                    chargerDistance: 0, // เพิ่มช่องกรอกในหน้า StationAccessory
-                    trDistance: 0, // เพิ่มช่องกรอกในหน้า StationAccessory
-                    // ข้อมูลจาก Summary for Charger
-                    chargerSummary: (() => {
-                      if (chargerTypeMode === 'any') {
-                        return multiChargers.filter(name => name !== '').map((chargerName, idx) => {
-                          const cableArr = getChargerWiringCable();
-                          const cable = Array.isArray(cableArr) ? cableArr[idx] || '-' : (typeof cableArr === 'string' ? cableArr : '-');
-                          const conduitArr = getChargerWireConduit();
-                          const conduit = Array.isArray(conduitArr) ? conduitArr[idx] || '-' : (typeof conduitArr === 'string' ? conduitArr : '-');
-                          return {
-                            name: chargerName,
-                            kw: extractPowerValue(chargerName),
-                            cable: cable.replace(/^Charger\d+:\s*/, ''),
-                            conduit: conduit.replace(/^Charger\d+:\s*/, '')
-                          };
-                        });
-                      } else {
-                        const num = parseInt(form.numberOfChargers) || 1;
-                        const cableArr = getChargerWiringCable();
-                        const conduitArr = getChargerWireConduit();
-                        return Array.from({ length: num }).map((_, idx) => ({
-                          name: form.charger,
-                          kw: extractPowerValue(form.charger),
-                          cable: Array.isArray(cableArr) ? (cableArr[idx] ? cableArr[idx].replace(/^Charger\d+:\s*/, '') : '-') : (typeof cableArr === 'string' ? cableArr : '-'),
-                          conduit: Array.isArray(conduitArr) ? (conduitArr[idx] ? conduitArr[idx].replace(/^Charger\d+:\s*/, '') : '-') : (typeof conduitArr === 'string' ? conduitArr : '-')
-                        }));
-                      }
-                    })()
-                  };
-
-                  console.log('✅ Navigation state prepared:', navigationState);
-
-                  // Navigate with state
-                  navigate('/station-accessory', {
-                    state: navigationState,
-                    replace: false
-                  });
-
-                  console.log('✅ Navigation called');
+                  navigateToStationAccessoryRef.current();
                 } catch (error) {
                   console.error('❌ Error navigating to StationAccessory:', error);
                   alert('เกิดข้อผิดพลาดในการเปลี่ยนหน้า: ' + (error instanceof Error ? error.message : String(error)));

@@ -1,5 +1,13 @@
 import { supabase, supabaseAdmin } from './supabase'
 
+function generateUUID(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
+}
+
 export type UserRole = 'sales' | 'design' | 'worker' | 'manager' | 'admin'
 
 export interface AuthUser {
@@ -33,7 +41,8 @@ export async function login(
   password: string
 ): Promise<{ ok: boolean; message?: string; user?: AuthUser }> {
   // Supabase Auth ใช้ email ดังนั้น username จะถูก map เป็น email ภายใน
-  const email = `${username}@internal.app`
+  const emailLocal = username.toLowerCase().replace(/[^a-z0-9._-]/g, '_')
+  const email = `${emailLocal}@internal.app`
 
   // sign out session เก่าก่อนเสมอ เพื่อบังคับ 1 session ต่อ user
   await supabase.auth.signOut()
@@ -62,7 +71,7 @@ export async function login(
   }
 
   // สร้าง session token ใหม่ และบันทึกลง DB (บังคับ 1 session)
-  const sessionToken = crypto.randomUUID()
+  const sessionToken = generateUUID()
   await supabase
     .from('user_profiles')
     .update({ active_session_token: sessionToken })
@@ -180,7 +189,8 @@ export async function createUserAccount(
   password: string,
   role: UserRole
 ): Promise<{ ok: boolean; message?: string }> {
-  const email = `${username}@internal.app`
+  const emailLocal = username.toLowerCase().replace(/[^a-z0-9._-]/g, '_')
+  const email = `${emailLocal}@internal.app`
 
   const { data, error } = await supabaseAdmin.auth.admin.createUser({
     email,
@@ -193,16 +203,20 @@ export async function createUserAccount(
   }
 
   const { error: profileError } = await supabaseAdmin.from('user_profiles').insert({
+    id: generateUUID(),
     user_id: data.user.id,
     username,
     role,
     enabled: true,
     permissions: {},
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
   })
 
   if (profileError) {
+    console.error('Profile insert error:', profileError)
     await supabaseAdmin.auth.admin.deleteUser(data.user.id)
-    return { ok: false, message: 'สร้าง profile ไม่สำเร็จ' }
+    return { ok: false, message: `สร้าง profile ไม่สำเร็จ: ${profileError.message}` }
   }
 
   return { ok: true }
