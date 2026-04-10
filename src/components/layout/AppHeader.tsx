@@ -148,24 +148,20 @@ export default function AppHeader(): React.JSX.Element {
     // ถ้าอยู่ที่หน้า Station Accessory ให้ navigate ไปหน้า Home โดยตรง
     if (location.pathname === '/station-accessory') {
       console.log('🔙 Back button clicked - Navigating to Home')
+      // ตั้ง flag เพื่อบอกให้ Home.tsx restore draft
+      sessionStorage.setItem('back_navigation', 'true')
       // เปลี่ยน hash เป็น #/ ก่อน
       window.location.hash = '#/'
-      // ตรวจสอบว่าหน้าเปลี่ยนหรือไม่หลังจาก 100ms
-      // ถ้ายังไม่เปลี่ยน ให้ reload เพื่อให้แน่ใจว่าหน้าเปลี่ยน
       setTimeout(() => {
-        // ถ้า hash เปลี่ยนเป็น #/ แล้ว แต่ component ยังไม่ re-render
-        // ให้ reload เพื่อ force navigation
         const currentHash = window.location.hash
         if (currentHash === '#/' || currentHash === '') {
-          // Hash เปลี่ยนแล้ว แต่ component อาจจะยังไม่ re-render
-          // ให้ reload เพื่อให้แน่ใจว่าหน้าเปลี่ยน
           console.log('⚠️ Hash changed but component may not re-render, reloading')
           window.location.reload()
         }
       }, 100)
     } else {
       // ถ้าอยู่ที่หน้า Home หรือหน้าอื่น ให้ย้อนกลับตามประวัติ
-    window.history.back()
+      window.history.back()
     }
   }
 
@@ -189,8 +185,10 @@ export default function AppHeader(): React.JSX.Element {
       // ลบข้อมูลปัจจุบันใน localStorage (แต่ไม่ลบประวัติการบันทึก)
       localStorage.removeItem('ev_calculator_form_data')
       localStorage.removeItem('ev_station_accessory_form_data')
+      localStorage.removeItem('ev_calculator_form_draft')
       // ลบ flag ที่บอกว่าโหลดจากประวัติ
       sessionStorage.removeItem('loaded_from_history')
+      sessionStorage.removeItem('back_navigation')
       // ตั้ง flag เพื่อบอกให้หน้าแรก reset form
       sessionStorage.setItem('reset_form_on_load', 'true')
       console.log('✅ Cleared current data and set reset_form_on_load flag')

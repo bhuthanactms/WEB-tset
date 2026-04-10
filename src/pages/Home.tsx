@@ -91,6 +91,13 @@ export default function Home(): React.JSX.Element {
 
   // Save/Load functionality
   const STORAGE_KEY = 'ev_calculator_form_data';
+  const DRAFT_KEY = 'ev_calculator_form_draft';
+
+  // Auto-save draft on every form change (for back/forward navigation restore)
+  useEffect(() => {
+    const draft = { form, chargerInstallationType, chargerTypeMode, multiChargers, customerCode }
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
+  }, [form, chargerInstallationType, chargerTypeMode, multiChargers, customerCode])
 
   // Load saved data on mount
   useEffect(() => {
@@ -103,6 +110,7 @@ export default function Home(): React.JSX.Element {
       // ลบข้อมูลปัจจุบันใน localStorage (แต่ไม่ลบประวัติการบันทึก)
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem('ev_station_accessory_form_data');
+      localStorage.removeItem(DRAFT_KEY);
       // ลบ flag ที่บอกว่าโหลดจากประวัติ
       sessionStorage.removeItem('loaded_from_history');
       // Reset form state
@@ -116,6 +124,33 @@ export default function Home(): React.JSX.Element {
       sessionStorage.removeItem('reset_form_on_load');
       console.log('✅ Form reset - เคลียร์ข้อมูลทั้งหมดแล้ว (ประวัติการบันทึกยังคงอยู่)');
       return;
+    }
+
+    // ตรวจสอบว่าเป็นการย้อนกลับจาก StationAccessory หรือไม่
+    const isBackNavigation = sessionStorage.getItem('back_navigation') === 'true'
+    sessionStorage.removeItem('back_navigation')
+    // ตรวจสอบประเภท navigation (back_forward = ปุ่ม Back/Forward ของ browser)
+    const navEntries = performance.getEntriesByType('navigation')
+    const navType = navEntries.length > 0 ? (navEntries[0] as PerformanceNavigationTiming).type : 'navigate'
+    const isBrowserBackForward = navType === 'back_forward'
+
+    if ((isBackNavigation || isBrowserBackForward)) {
+      // Restore draft เมื่อกดย้อนกลับ
+      const draftData = localStorage.getItem(DRAFT_KEY)
+      if (draftData) {
+        try {
+          const draft = JSON.parse(draftData)
+          if (draft.form) setForm(normalizeLoadedForm(draft.form))
+          if (draft.chargerInstallationType) setChargerInstallationType(draft.chargerInstallationType)
+          if (draft.chargerTypeMode) setChargerTypeMode(draft.chargerTypeMode)
+          if (draft.multiChargers) setMultiChargers(draft.multiChargers)
+          if (draft.customerCode) setCustomerCode(draft.customerCode)
+          console.log('✅ Restored draft from back navigation')
+        } catch (e) {
+          console.error('❌ Error restoring draft:', e)
+        }
+        return
+      }
     }
 
     // ตรวจสอบว่ามี flag ที่บอกว่าโหลดจากประวัติหรือไม่

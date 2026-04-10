@@ -59,6 +59,80 @@ function getTrMdbMappingLookupKey(powerAuthority: string, transformer: string, n
   return isMeaLowVoltageMeter400A(powerAuthority, transformer) ? TR_MDB_MAP_KEY_MEA_LOW_VOLT_400A : numericKva;
 }
 
+/** __rowNum__ in sheets 9.10 / 9.11 for conduit triangle bracket — must match trToMdbTotals */
+function resolveTrToMdbConduitBracketRowNum(
+  powerAuthority: string,
+  conduitType: string,
+  transformerLabel: string,
+  trToMdbMapping: any
+): number | null {
+  if (conduitType !== 'IMC' && conduitType !== 'RSC') return null;
+  const transformerSize = parseTransformerKvaForTrMdb(transformerLabel);
+  const trMdbMapKey = getTrMdbMappingLookupKey(powerAuthority, transformerLabel, transformerSize);
+
+  let imcRowMapping: { [key: number]: number } = {};
+  if (powerAuthority === 'MEA') {
+    imcRowMapping = {
+      400: isMeaLowVoltageMeter400A(powerAuthority, transformerLabel) ? 22 : 23,
+      500: 25,
+      630: 28,
+      800: 30,
+      1000: 34,
+      1250: 38,
+      1500: 40,
+    };
+  } else if (powerAuthority === 'PEA') {
+    imcRowMapping = {
+      100: 13,
+      160: 15,
+      250: 21,
+      315: 22,
+      400: 23,
+      500: 25,
+      630: 28,
+      800: 30,
+      1000: 34,
+      1250: 38,
+      1500: 40,
+    };
+  }
+
+  let rscRowMapping: { [key: number]: number } = {};
+  if (powerAuthority === 'MEA') {
+    rscRowMapping = {
+      400: isMeaLowVoltageMeter400A(powerAuthority, transformerLabel) ? 22 : 23,
+      500: 25,
+      630: 28,
+      800: 30,
+      1000: 32,
+      1250: 38,
+      1500: 40,
+    };
+  } else if (powerAuthority === 'PEA') {
+    rscRowMapping = {
+      100: 13,
+      160: 15,
+      250: 21,
+      315: 22,
+      400: 23,
+      500: 25,
+      630: 28,
+      800: 30,
+      1000: 32,
+      1250: 38,
+      1500: 40,
+    };
+  }
+
+  let rowNum: number | undefined;
+  if (conduitType === 'IMC' && trToMdbMapping?.['imc']?.[powerAuthority]?.[trMdbMapKey]) {
+    rowNum = imcRowMapping[transformerSize];
+  } else if (conduitType === 'RSC' && trToMdbMapping?.['rsc']?.[powerAuthority]?.[trMdbMapKey]) {
+    rowNum = rscRowMapping[transformerSize];
+  }
+  return rowNum ?? null;
+}
+
 function MoreDetailCard(props: any) {
   const { stationEquipmentPriceMapping, roofCostMapping, getParkingRoofData, getTrToMdbPrice, trToMdbMapping } = props;
 
@@ -3161,40 +3235,13 @@ function MoreDetailCard(props: any) {
         const trToLandInputDistance = parseFloat(trToLandDistance || '0');
         if (trToLandInputDistance > 0) {
           const powerAuthority = props.powerAuthority || '';
-          const transformerSize = parseTransformerKvaForTrMdb(props.transformer || '');
-          const trMdbMapKey = getTrMdbMappingLookupKey(powerAuthority, props.transformer || '', transformerSize);
-          let rowNum = null;
           const conduitType = trWiringGroup2;
-
-          // Row mapping สำหรับ IMC (แบบ 9.10) แยกตาม Power Authority
-          let imcRowMapping: { [key: number]: number } = {};
-          if (powerAuthority === 'MEA') {
-            imcRowMapping = {
-              400: isMeaLowVoltageMeter400A(powerAuthority, props.transformer || '') ? 22 : 23, 500: 25, 630: 28, 800: 30, 1000: 34, 1250: 38, 1500: 40
-            };
-          } else if (powerAuthority === 'PEA') {
-            imcRowMapping = {
-              100: 13, 160: 15, 250: 21, 315: 22, 400: 23, 500: 25, 630: 28, 800: 30, 1000: 34, 1250: 38, 1500: 40
-            };
-          }
-
-          // Row mapping สำหรับ RSC (แบบ 9.11) แยกตาม Power Authority
-          let rscRowMapping: { [key: number]: number } = {};
-          if (powerAuthority === 'MEA') {
-            rscRowMapping = {
-              400: isMeaLowVoltageMeter400A(powerAuthority, props.transformer || '') ? 22 : 23, 500: 25, 630: 28, 800: 30, 1000: 32, 1250: 38, 1500: 40
-            };
-          } else if (powerAuthority === 'PEA') {
-            rscRowMapping = {
-              100: 13, 160: 15, 250: 21, 315: 22, 400: 23, 500: 25, 630: 28, 800: 30, 1000: 32, 1250: 38, 1500: 40
-            };
-          }
-
-          if (conduitType === 'IMC' && trToMdbMapping?.['imc']?.[powerAuthority]?.[trMdbMapKey]) {
-            rowNum = imcRowMapping[transformerSize];
-          } else if (conduitType === 'RSC' && trToMdbMapping?.['rsc']?.[powerAuthority]?.[trMdbMapKey]) {
-            rowNum = rscRowMapping[transformerSize];
-          }
+          const rowNum = resolveTrToMdbConduitBracketRowNum(
+            powerAuthority,
+            conduitType,
+            props.transformer || '',
+            trToMdbMapping
+          );
 
           if (rowNum) {
             let sheetName = '';
@@ -3238,40 +3285,13 @@ function MoreDetailCard(props: any) {
         const landToMdbInputDistance = parseFloat(landToMdbDistance || '0');
         if (landToMdbInputDistance > 0) {
           const powerAuthority = props.powerAuthority || '';
-          const transformerSize = parseTransformerKvaForTrMdb(props.transformer || '');
-          const trMdbMapKey = getTrMdbMappingLookupKey(powerAuthority, props.transformer || '', transformerSize);
-          let rowNum = null;
           const conduitType = landToMdbWiringGroup2;
-
-          // Row mapping สำหรับ IMC (แบบ 9.10) แยกตาม Power Authority
-          let imcRowMapping: { [key: number]: number } = {};
-          if (powerAuthority === 'MEA') {
-            imcRowMapping = {
-              400: isMeaLowVoltageMeter400A(powerAuthority, props.transformer || '') ? 22 : 23, 500: 25, 630: 28, 800: 30, 1000: 34, 1250: 38, 1500: 40
-            };
-          } else if (powerAuthority === 'PEA') {
-            imcRowMapping = {
-              100: 13, 160: 15, 250: 21, 315: 22, 400: 23, 500: 25, 630: 28, 800: 30, 1000: 34, 1250: 38, 1500: 40
-            };
-          }
-
-          // Row mapping สำหรับ RSC (แบบ 9.11) แยกตาม Power Authority
-          let rscRowMapping: { [key: number]: number } = {};
-          if (powerAuthority === 'MEA') {
-            rscRowMapping = {
-              400: isMeaLowVoltageMeter400A(powerAuthority, props.transformer || '') ? 22 : 23, 500: 25, 630: 28, 800: 30, 1000: 32, 1250: 38, 1500: 40
-            };
-          } else if (powerAuthority === 'PEA') {
-            rscRowMapping = {
-              100: 13, 160: 15, 250: 21, 315: 22, 400: 23, 500: 25, 630: 28, 800: 30, 1000: 32, 1250: 38, 1500: 40
-            };
-          }
-
-          if (conduitType === 'IMC' && trToMdbMapping?.['imc']?.[powerAuthority]?.[trMdbMapKey]) {
-            rowNum = imcRowMapping[transformerSize];
-          } else if (conduitType === 'RSC' && trToMdbMapping?.['rsc']?.[powerAuthority]?.[trMdbMapKey]) {
-            rowNum = rscRowMapping[transformerSize];
-          }
+          const rowNum = resolveTrToMdbConduitBracketRowNum(
+            powerAuthority,
+            conduitType,
+            props.transformer || '',
+            trToMdbMapping
+          );
 
           if (rowNum) {
             let sheetName = '';
@@ -3314,40 +3334,13 @@ function MoreDetailCard(props: any) {
       const conduit = trWiringGroup2;
       if (inputDistance > 0 && conduit && (conduit === 'IMC' || conduit === 'RSC')) {
         const powerAuthority = props.powerAuthority || '';
-        const transformerSize = parseTransformerKvaForTrMdb(props.transformer || '');
-        const trMdbMapKey = getTrMdbMappingLookupKey(powerAuthority, props.transformer || '', transformerSize);
-        let rowNum = null;
         const conduitType = conduit;
-
-        // Row mapping สำหรับ IMC (แบบ 9.10) แยกตาม Power Authority
-        let imcRowMapping: { [key: number]: number } = {};
-        if (powerAuthority === 'MEA') {
-          imcRowMapping = {
-            400: isMeaLowVoltageMeter400A(powerAuthority, props.transformer || '') ? 22 : 23, 500: 25, 630: 28, 800: 30, 1000: 34, 1250: 38, 1500: 40
-          };
-        } else if (powerAuthority === 'PEA') {
-          imcRowMapping = {
-            100: 13, 160: 15, 250: 21, 315: 22, 400: 23, 500: 25, 630: 28, 800: 30, 1000: 34, 1250: 38, 1500: 40
-          };
-        }
-
-        // Row mapping สำหรับ RSC (แบบ 9.11) แยกตาม Power Authority
-        let rscRowMapping: { [key: number]: number } = {};
-        if (powerAuthority === 'MEA') {
-          rscRowMapping = {
-            400: isMeaLowVoltageMeter400A(powerAuthority, props.transformer || '') ? 22 : 23, 500: 25, 630: 28, 800: 30, 1000: 32, 1250: 38, 1500: 40
-          };
-        } else if (powerAuthority === 'PEA') {
-          rscRowMapping = {
-            100: 13, 160: 15, 250: 21, 315: 22, 400: 23, 500: 25, 630: 28, 800: 30, 1000: 32, 1250: 38, 1500: 40
-          };
-        }
-
-        if (conduitType === 'IMC' && trToMdbMapping?.['imc']?.[powerAuthority]?.[trMdbMapKey]) {
-          rowNum = imcRowMapping[transformerSize];
-        } else if (conduitType === 'RSC' && trToMdbMapping?.['rsc']?.[powerAuthority]?.[trMdbMapKey]) {
-          rowNum = rscRowMapping[transformerSize];
-        }
+        const rowNum = resolveTrToMdbConduitBracketRowNum(
+          powerAuthority,
+          conduitType,
+          props.transformer || '',
+          trToMdbMapping
+        );
 
         if (rowNum) {
           // กำหนด Sheet ตาม conduit type
@@ -9459,25 +9452,12 @@ function MoreDetailCard(props: any) {
 
                                         if (isGroup2Air && hasValidConduit) {
                                           const powerAuthority = props.powerAuthority || '';
-                                          const transformerSize = parseTransformerKvaForTrMdb(props.transformer || '');
-                                          const trMdbMapKey = getTrMdbMappingLookupKey(powerAuthority, props.transformer || '', transformerSize);
-                                          const meaLvBracket400 = isMeaLowVoltageMeter400A(powerAuthority, props.transformer || '') ? 22 : 23;
-
-                                          const imcRowMapping: { [key: number]: number } = {
-                                            400: meaLvBracket400, 500: 27, 630: 30, 800: 32, 1000: 36, 1250: 40, 1500: 42,
-                                            100: 15, 160: 17, 250: 23, 315: 24
-                                          };
-                                          const rscRowMapping: { [key: number]: number } = {
-                                            400: meaLvBracket400, 500: 27, 630: 30, 800: 32, 1000: 36, 1250: 40, 1500: 42,
-                                            100: 15, 160: 17, 250: 23, 315: 24
-                                          };
-
-                                          let rowNum = null;
-                                          if (conduitType === 'IMC' && trToMdbMapping?.['imc']?.[powerAuthority]?.[trMdbMapKey]) {
-                                            rowNum = imcRowMapping[transformerSize];
-                                          } else if (conduitType === 'RSC' && trToMdbMapping?.['rsc']?.[powerAuthority]?.[trMdbMapKey]) {
-                                            rowNum = rscRowMapping[transformerSize];
-                                          }
+                                          const rowNum = resolveTrToMdbConduitBracketRowNum(
+                                            powerAuthority,
+                                            conduitType,
+                                            props.transformer || '',
+                                            trToMdbMapping
+                                          );
 
                                           if (rowNum) {
                                             const sheetName = conduitType === 'IMC' ? 'แบบ 9.10' : 'แบบ 9.11';
@@ -9619,25 +9599,12 @@ function MoreDetailCard(props: any) {
 
                                         if (isGroup2Air && hasValidConduit) {
                                           const powerAuthority = props.powerAuthority || '';
-                                          const transformerSize = parseTransformerKvaForTrMdb(props.transformer || '');
-                                          const trMdbMapKey = getTrMdbMappingLookupKey(powerAuthority, props.transformer || '', transformerSize);
-                                          const meaLvBracket400 = isMeaLowVoltageMeter400A(powerAuthority, props.transformer || '') ? 22 : 23;
-
-                                          const imcRowMapping: { [key: number]: number } = {
-                                            400: meaLvBracket400, 500: 27, 630: 30, 800: 32, 1000: 36, 1250: 40, 1500: 42,
-                                            100: 15, 160: 17, 250: 23, 315: 24
-                                          };
-                                          const rscRowMapping: { [key: number]: number } = {
-                                            400: meaLvBracket400, 500: 27, 630: 30, 800: 32, 1000: 36, 1250: 40, 1500: 42,
-                                            100: 15, 160: 17, 250: 23, 315: 24
-                                          };
-
-                                          let rowNum = null;
-                                          if (conduitType === 'IMC' && trToMdbMapping?.['imc']?.[powerAuthority]?.[trMdbMapKey]) {
-                                            rowNum = imcRowMapping[transformerSize];
-                                          } else if (conduitType === 'RSC' && trToMdbMapping?.['rsc']?.[powerAuthority]?.[trMdbMapKey]) {
-                                            rowNum = rscRowMapping[transformerSize];
-                                          }
+                                          const rowNum = resolveTrToMdbConduitBracketRowNum(
+                                            powerAuthority,
+                                            conduitType,
+                                            props.transformer || '',
+                                            trToMdbMapping
+                                          );
 
                                           if (rowNum) {
                                             const sheetName = conduitType === 'IMC' ? 'แบบ 9.10' : 'แบบ 9.11';
@@ -9931,25 +9898,12 @@ function MoreDetailCard(props: any) {
 
                                         if (isGroup2Air && hasValidConduit) {
                                           const powerAuthority = props.powerAuthority || '';
-                                          const transformerSize = parseTransformerKvaForTrMdb(props.transformer || '');
-                                          const trMdbMapKey = getTrMdbMappingLookupKey(powerAuthority, props.transformer || '', transformerSize);
-                                          const meaLvBracket400 = isMeaLowVoltageMeter400A(powerAuthority, props.transformer || '') ? 22 : 23;
-
-                                          const imcRowMapping: { [key: number]: number } = {
-                                            400: meaLvBracket400, 500: 27, 630: 30, 800: 32, 1000: 36, 1250: 40, 1500: 42,
-                                            100: 15, 160: 17, 250: 23, 315: 24
-                                          };
-                                          const rscRowMapping: { [key: number]: number } = {
-                                            400: meaLvBracket400, 500: 27, 630: 30, 800: 32, 1000: 36, 1250: 40, 1500: 42,
-                                            100: 15, 160: 17, 250: 23, 315: 24
-                                          };
-
-                                          let rowNum = null;
-                                          if (conduitType === 'IMC' && trToMdbMapping?.['imc']?.[powerAuthority]?.[trMdbMapKey]) {
-                                            rowNum = imcRowMapping[transformerSize];
-                                          } else if (conduitType === 'RSC' && trToMdbMapping?.['rsc']?.[powerAuthority]?.[trMdbMapKey]) {
-                                            rowNum = rscRowMapping[transformerSize];
-                                          }
+                                          const rowNum = resolveTrToMdbConduitBracketRowNum(
+                                            powerAuthority,
+                                            conduitType,
+                                            props.transformer || '',
+                                            trToMdbMapping
+                                          );
 
                                           if (rowNum) {
                                             const sheetName = conduitType === 'IMC' ? 'แบบ 9.10' : 'แบบ 9.11';
@@ -10091,25 +10045,12 @@ function MoreDetailCard(props: any) {
 
                                         if (isGroup2Air && hasValidConduit) {
                                           const powerAuthority = props.powerAuthority || '';
-                                          const transformerSize = parseTransformerKvaForTrMdb(props.transformer || '');
-                                          const trMdbMapKey = getTrMdbMappingLookupKey(powerAuthority, props.transformer || '', transformerSize);
-                                          const meaLvBracket400 = isMeaLowVoltageMeter400A(powerAuthority, props.transformer || '') ? 22 : 23;
-
-                                          const imcRowMapping: { [key: number]: number } = {
-                                            400: meaLvBracket400, 500: 27, 630: 30, 800: 32, 1000: 36, 1250: 40, 1500: 42,
-                                            100: 15, 160: 17, 250: 23, 315: 24
-                                          };
-                                          const rscRowMapping: { [key: number]: number } = {
-                                            400: meaLvBracket400, 500: 27, 630: 30, 800: 32, 1000: 36, 1250: 40, 1500: 42,
-                                            100: 15, 160: 17, 250: 23, 315: 24
-                                          };
-
-                                          let rowNum = null;
-                                          if (conduitType === 'IMC' && trToMdbMapping?.['imc']?.[powerAuthority]?.[trMdbMapKey]) {
-                                            rowNum = imcRowMapping[transformerSize];
-                                          } else if (conduitType === 'RSC' && trToMdbMapping?.['rsc']?.[powerAuthority]?.[trMdbMapKey]) {
-                                            rowNum = rscRowMapping[transformerSize];
-                                          }
+                                          const rowNum = resolveTrToMdbConduitBracketRowNum(
+                                            powerAuthority,
+                                            conduitType,
+                                            props.transformer || '',
+                                            trToMdbMapping
+                                          );
 
                                           if (rowNum) {
                                             const sheetName = conduitType === 'IMC' ? 'แบบ 9.10' : 'แบบ 9.11';
@@ -10245,25 +10186,12 @@ function MoreDetailCard(props: any) {
 
                                     if (isTrToLandGroup2Air && hasTrToLandValidConduit) {
                                       const powerAuthority = props.powerAuthority || '';
-                                      const transformerSize = parseTransformerKvaForTrMdb(props.transformer || '');
-                                      const trMdbMapKey = getTrMdbMappingLookupKey(powerAuthority, props.transformer || '', transformerSize);
-                                      const meaLvBracket400 = isMeaLowVoltageMeter400A(powerAuthority, props.transformer || '') ? 22 : 23;
-
-                                      const imcRowMapping: { [key: number]: number } = {
-                                        400: meaLvBracket400, 500: 27, 630: 30, 800: 32, 1000: 36, 1250: 40, 1500: 42,
-                                        100: 15, 160: 17, 250: 23, 315: 24
-                                      };
-                                      const rscRowMapping: { [key: number]: number } = {
-                                        400: meaLvBracket400, 500: 27, 630: 30, 800: 32, 1000: 36, 1250: 40, 1500: 42,
-                                        100: 15, 160: 17, 250: 23, 315: 24
-                                      };
-
-                                      let rowNum = null;
-                                      if (trToLandConduitType === 'IMC' && trToMdbMapping?.['imc']?.[powerAuthority]?.[trMdbMapKey]) {
-                                        rowNum = imcRowMapping[transformerSize];
-                                      } else if (trToLandConduitType === 'RSC' && trToMdbMapping?.['rsc']?.[powerAuthority]?.[trMdbMapKey]) {
-                                        rowNum = rscRowMapping[transformerSize];
-                                      }
+                                      const rowNum = resolveTrToMdbConduitBracketRowNum(
+                                        powerAuthority,
+                                        trToLandConduitType,
+                                        props.transformer || '',
+                                        trToMdbMapping
+                                      );
 
                                       if (rowNum) {
                                         const sheetName = trToLandConduitType === 'IMC' ? 'แบบ 9.10' : 'แบบ 9.11';
@@ -10361,25 +10289,12 @@ function MoreDetailCard(props: any) {
 
                                     if (isLandToMdbGroup2Air && hasLandToMdbValidConduit) {
                                       const powerAuthority = props.powerAuthority || '';
-                                      const transformerSize = parseTransformerKvaForTrMdb(props.transformer || '');
-                                      const trMdbMapKey = getTrMdbMappingLookupKey(powerAuthority, props.transformer || '', transformerSize);
-                                      const meaLvBracket400 = isMeaLowVoltageMeter400A(powerAuthority, props.transformer || '') ? 22 : 23;
-
-                                      const imcRowMapping: { [key: number]: number } = {
-                                        400: meaLvBracket400, 500: 27, 630: 30, 800: 32, 1000: 36, 1250: 40, 1500: 42,
-                                        100: 15, 160: 17, 250: 23, 315: 24
-                                      };
-                                      const rscRowMapping: { [key: number]: number } = {
-                                        400: meaLvBracket400, 500: 27, 630: 30, 800: 32, 1000: 36, 1250: 40, 1500: 42,
-                                        100: 15, 160: 17, 250: 23, 315: 24
-                                      };
-
-                                      let rowNum = null;
-                                      if (landToMdbConduitType === 'IMC' && trToMdbMapping?.['imc']?.[powerAuthority]?.[trMdbMapKey]) {
-                                        rowNum = imcRowMapping[transformerSize];
-                                      } else if (landToMdbConduitType === 'RSC' && trToMdbMapping?.['rsc']?.[powerAuthority]?.[trMdbMapKey]) {
-                                        rowNum = rscRowMapping[transformerSize];
-                                      }
+                                      const rowNum = resolveTrToMdbConduitBracketRowNum(
+                                        powerAuthority,
+                                        landToMdbConduitType,
+                                        props.transformer || '',
+                                        trToMdbMapping
+                                      );
 
                                       if (rowNum) {
                                         const sheetName = landToMdbConduitType === 'IMC' ? 'แบบ 9.10' : 'แบบ 9.11';
@@ -10655,24 +10570,12 @@ function MoreDetailCard(props: any) {
                                       const powerAuthority = props.powerAuthority || '';
                                       const transformerSize = parseTransformerKvaForTrMdb(props.transformer || '');
                                       const trMdbMapKey = getTrMdbMappingLookupKey(powerAuthority, props.transformer || '', transformerSize);
-                                      const meaLvBracket400 = isMeaLowVoltageMeter400A(powerAuthority, props.transformer || '') ? 22 : 23;
-
-                                      // Row mapping
-                                      const imcRowMapping: { [key: number]: number } = {
-                                        400: meaLvBracket400, 500: 27, 630: 30, 800: 32, 1000: 36, 1250: 40, 1500: 42,
-                                        100: 15, 160: 17, 250: 23, 315: 24
-                                      };
-                                      const rscRowMapping: { [key: number]: number } = {
-                                        400: meaLvBracket400, 500: 27, 630: 30, 800: 32, 1000: 36, 1250: 40, 1500: 42,
-                                        100: 15, 160: 17, 250: 23, 315: 24
-                                      };
-
-                                      let rowNum = null;
-                                      if (conduitType === 'IMC' && trToMdbMapping?.['imc']?.[powerAuthority]?.[trMdbMapKey]) {
-                                        rowNum = imcRowMapping[transformerSize];
-                                      } else if (conduitType === 'RSC' && trToMdbMapping?.['rsc']?.[powerAuthority]?.[trMdbMapKey]) {
-                                        rowNum = rscRowMapping[transformerSize];
-                                      }
+                                      const rowNum = resolveTrToMdbConduitBracketRowNum(
+                                        powerAuthority,
+                                        conduitType,
+                                        props.transformer || '',
+                                        trToMdbMapping
+                                      );
 
                                       console.log('TR to MDB - Row lookup', {
                                         transformerSize,
