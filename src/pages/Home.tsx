@@ -298,7 +298,7 @@ export default function Home(): React.JSX.Element {
   }, [form.powerAuthority, form.charger, form.numberOfChargers, chargerTypeMode, multiChargers, excelData.length, results]);
 
   // Save data to localStorage
-  const saveFormData = () => {
+  const saveFormData = async () => {
     if (!customerCode.trim()) {
       alert('⚠️ กรุณากรอกรหัสลูกค้าก่อนบันทึก');
       return;
