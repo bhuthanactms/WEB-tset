@@ -2123,7 +2123,14 @@ function MoreDetailCard(props: any) {
 
   // Sheet for signage work (งานป้าย)
   const signageSheet = useMemo(() => {
-    return props.excelData?.['ต้นทุนงานป้าย + สติ๊กเกอร์'] || [];
+    const data = props.excelData;
+    if (!data) return [];
+    const preferred = data['ต้นทุนงานป้าย + สติ๊กเกอร์'];
+    if (Array.isArray(preferred) && preferred.length > 0) return preferred;
+    const altKey = Object.keys(data).find(
+      (name) => /งานป้าย|ป้าย.*สติ๊ก/i.test(name)
+    );
+    return altKey ? data[altKey] || [] : [];
   }, [props.excelData]);
 
   // ฟังก์ชันดึงข้อมูลงานป้าย
@@ -2132,9 +2139,11 @@ function MoreDetailCard(props: any) {
     const row = signageSheet.find((entry: any) => entry.__rowNum__ === rowNum);
     if (!row) return null;
 
-    const materialUnit = parsePrice(row.__EMPTY_41);
-    const laborUnit = parsePrice(row.__EMPTY_43);
-    const totalUnit = materialUnit + laborUnit;
+    // ชีตงานป้าย: ค่าของ/หน่วย __EMPTY_40, ค่าแรง/หน่วย __EMPTY_42, รวม/หน่วย __EMPTY_44
+    const materialUnit = parsePrice(row.__EMPTY_40);
+    const laborUnit = parsePrice(row.__EMPTY_42);
+    const totalUnit =
+      parsePrice(row.__EMPTY_44) || (materialUnit + laborUnit);
 
     return {
       row,
@@ -18624,7 +18633,12 @@ function StationAccessory() {
 
         const worksheet = workbook.Sheets[sheetName];
 
-        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+        // blankrows + defval: ให้ลำดับแถวตรงกับเลขแถวใน Excel (sheet_to_json ปกติจะข้ามแถวว่าง
+        // ทำให้ __rowNum__ = index+1 ผิด — งานป้าย/แผ่นอื่นที่อ้าง __rowNum__ จึงดึงราคาไม่ตรง)
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+          defval: '',
+          blankrows: true,
+        });
 
         // เพิ่ม __sheetName__ และ __rowNum__ ให้กับแต่ละ row
         const processedData = jsonData.map((row: any, index: number) => ({

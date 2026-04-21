@@ -58,7 +58,8 @@ if (isProd) {
 } else {
   const ctx = await esbuild.context(esbuildOpts)
   await ctx.watch()
-  const { hosts, port } = await ctx.serve()
+  const devPort = Number(process.env.PORT) || 8000
+  const { hosts, port } = await ctx.serve({ port: devPort })
   console.log(`Running on:`)
   hosts.forEach((host) => {
     console.log(`http://${host}:${port}`)
