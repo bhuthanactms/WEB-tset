@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { login, cacheUser } from '@/utils/auth'
+import { migrateLocalStorageToSupabase } from '@/utils/migrateLocalStorage'
 import { Lock, LogIn, Zap } from 'lucide-react'
 
 interface LoginForm {
@@ -36,6 +37,8 @@ export default function Login() {
     }
 
     cacheUser(res.user!)
+    // migrate localStorage history เข้า Supabase (รันครั้งเดียว)
+    migrateLocalStorageToSupabase().catch(() => {})
     window.location.hash = '#/'
   }
 

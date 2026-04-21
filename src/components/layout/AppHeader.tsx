@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { User, LogOut, ArrowLeft, ArrowRight, Menu, Search, Home, Users, Settings } from 'lucide-react'
 import { getCurrentUserSync, logout, isAdmin, canDeleteHistory, canSaveHistory } from '@/utils/auth'
+import { getLatestHistory, deleteHistory, HistoryEntry } from '@/utils/historyService'
 import {
   Sheet,
   SheetContent,
@@ -24,112 +25,20 @@ import { Trash2 } from 'lucide-react'
 /**
  * AppHeader component - Main application header
  */
-interface SavedHistory {
-  customerCode: string
-  page: 'home' | 'station-accessory' | 'combined'
-  data: any
-  homeData?: any
-  stationData?: any
-  savedAt: string
-  lastUpdated?: string
-}
 
 export default function AppHeader(): React.JSX.Element {
   const currentUser = getCurrentUserSync()
   const navigate = useNavigate()
   const location = useLocation()
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
-  const [history, setHistory] = useState<SavedHistory[]>([])
+  const [history, setHistory] = useState<HistoryEntry[]>([])
   const [searchTerm, setSearchTerm] = useState('')
 
 
-  // Use useCallback to memoize loadHistory function to prevent infinite loops
-  const loadHistory = React.useCallback(() => {
+  const loadHistory = useCallback(async () => {
     try {
-      const allKeys = Object.keys(localStorage)
-      const historyMap = new Map<string, SavedHistory>()
-
-      // Load combined data (key format: ev_combined_data_${customerCode})
-      allKeys.forEach(key => {
-        if (key.startsWith('ev_combined_data_')) {
-          try {
-            const combinedData = JSON.parse(localStorage.getItem(key) || '{}')
-            if (combinedData.customerCode) {
-              historyMap.set(combinedData.customerCode, {
-                customerCode: combinedData.customerCode,
-                page: 'combined',
-                data: combinedData,
-                homeData: combinedData.home,
-                stationData: combinedData.stationAccessory,
-                savedAt: combinedData.savedAt || new Date().toISOString(),
-                lastUpdated: combinedData.lastUpdated
-              })
-            }
-          } catch (e) {
-            // Skip invalid entries
-          }
-        }
-      })
-
-      // Load timestamped history keys and current data keys
-      allKeys.forEach(key => {
-        // Check for timestamped keys: ev_calculator_form_data_${customerCode}_${timestamp}
-        if (key.startsWith('ev_calculator_form_data_') && key !== 'ev_calculator_form_data') {
-          try {
-            const data = JSON.parse(localStorage.getItem(key) || '{}')
-            if (data.customerCode) {
-              const existing = historyMap.get(data.customerCode)
-              if (!existing || new Date(data.savedAt || 0).getTime() > new Date(existing.savedAt).getTime()) {
-                historyMap.set(data.customerCode, {
-                  customerCode: data.customerCode,
-                  page: existing?.stationData ? 'combined' : 'home',
-                  data: data,
-                  homeData: data,
-                  stationData: existing?.stationData,
-                  savedAt: data.savedAt || new Date().toISOString()
-                })
-              } else if (existing && !existing.homeData) {
-                existing.homeData = data
-                if (existing.stationData) existing.page = 'combined'
-              }
-            }
-          } catch (e) {
-            // Skip invalid entries
-          }
-        }
-        // Check for timestamped keys: ev_station_accessory_form_data_${customerCode}_${timestamp}
-        if (key.startsWith('ev_station_accessory_form_data_') && key !== 'ev_station_accessory_form_data') {
-          try {
-            const data = JSON.parse(localStorage.getItem(key) || '{}')
-            if (data.customerCode) {
-              const existing = historyMap.get(data.customerCode)
-              if (!existing || new Date(data.savedAt || 0).getTime() > new Date(existing.savedAt).getTime()) {
-                historyMap.set(data.customerCode, {
-                  customerCode: data.customerCode,
-                  page: existing?.homeData ? 'combined' : 'station-accessory',
-                  data: data,
-                  homeData: existing?.homeData,
-                  stationData: data,
-                  savedAt: data.savedAt || new Date().toISOString()
-                })
-              } else if (existing && !existing.stationData) {
-                existing.stationData = data
-                if (existing.homeData) existing.page = 'combined'
-              }
-            }
-          } catch (e) {
-            // Skip invalid entries
-          }
-        }
-      })
-
-      // ไม่รวม current draft (key หลักที่ไม่มี timestamp) ในรายการ history
-      // เพื่อให้ popup Save/Load แสดงเฉพาะรายการที่ผู้ใช้กดบันทึกจริง
-
-      // Convert map to array and sort by savedAt (newest first)
-      const historyItems = Array.from(historyMap.values())
-      historyItems.sort((a, b) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime())
-      setHistory(historyItems)
+      const items = await getLatestHistory()
+      setHistory(items)
     } catch (error) {
       console.error('Error loading history:', error)
     }
@@ -212,8 +121,8 @@ export default function AppHeader(): React.JSX.Element {
     }
   }
 
-  const handleLoadHistory = (item: SavedHistory, targetPage?: 'home' | 'station-accessory') => {
-    const target = targetPage || item.page
+  const handleLoadHistory = (item: HistoryEntry, targetPage?: 'home' | 'station-accessory') => {
+    const target = targetPage || (item.dataType === 'combined' ? 'home' : item.dataType)
 
     if (target === 'home' || target === 'combined') {
       // Load home data
@@ -261,50 +170,21 @@ export default function AppHeader(): React.JSX.Element {
     }
   }
 
-  const handleDeleteHistory = (item: SavedHistory, e: React.MouseEvent) => {
-    e.stopPropagation() // ป้องกันไม่ให้ trigger การคลิกที่ parent
+  const handleDeleteHistory = async (item: HistoryEntry, e: React.MouseEvent) => {
+    e.stopPropagation()
 
-    // เฉพาะ Sales, Manager, และ Admin เท่านั้นที่สามารถลบได้
     if (!canDeleteHistory(currentUser)) {
-      alert('⚠️ คุณไม่มีสิทธิ์ลบประวัติ (Read-only mode)')
+      alert('⚠️ คุณไม่มีสิทธิ์ลบประวัติ')
       return
     }
 
-    if (!confirm(`คุณต้องการลบประวัติของรหัสลูกค้า "${item.customerCode}" หรือไม่?`)) {
-      return
-    }
+    if (!confirm(`คุณต้องการลบประวัติของรหัสลูกค้า "${item.customerCode}" หรือไม่?`)) return
 
-    try {
-      // ลบ combined data
-      const combinedKey = `ev_combined_data_${item.customerCode}`
-      localStorage.removeItem(combinedKey)
-
-      // ลบ individual page data
-      localStorage.removeItem('ev_calculator_form_data')
-      localStorage.removeItem('ev_station_accessory_form_data')
-
-      // ลบข้อมูลที่มี customerCode ตรงกันทั้งหมด
-      const allKeys = Object.keys(localStorage)
-      allKeys.forEach(key => {
-        if (key.startsWith('ev_calculator_form_data_') ||
-          key.startsWith('ev_station_accessory_form_data_') ||
-          key.startsWith('ev_combined_form_data_')) {
-          try {
-            const data = JSON.parse(localStorage.getItem(key) || '{}')
-            if (data.customerCode === item.customerCode) {
-              localStorage.removeItem(key)
-            }
-          } catch (e) {
-            // Skip invalid entries
-          }
-        }
-      })
-
-      // Reload history
-      loadHistory()
+    const { ok } = await deleteHistory(item.customerCode)
+    if (ok) {
+      await loadHistory()
       alert('✅ ลบประวัติสำเร็จ!')
-    } catch (error) {
-      console.error('Error deleting history:', error)
+    } else {
       alert('❌ เกิดข้อผิดพลาดในการลบประวัติ')
     }
   }
@@ -390,9 +270,9 @@ export default function AppHeader(): React.JSX.Element {
                           <div className="flex-1">
                             <div className="font-semibold text-lg">{item.customerCode}</div>
                             <div className="text-sm text-gray-500 mt-1">
-                              {item.page === 'combined'
+                              {item.dataType === 'combined'
                                 ? 'ทั้ง 2 หน้า (Home + Station Accessory)'
-                                : item.page === 'home'
+                                : item.dataType === 'home'
                                   ? 'หน้าแรก (Home)'
                                   : 'ถอดต้นทุน (Station Accessory)'}
                             </div>
@@ -413,7 +293,7 @@ export default function AppHeader(): React.JSX.Element {
                           )}
                         </div>
                         <div className="flex gap-2 mt-3">
-                          {(item.page === 'home' || item.page === 'combined') && (
+                          {(item.dataType === 'home' || item.dataType === 'combined') && (
                             <Button
                               variant="outline"
                               size="sm"
@@ -423,7 +303,7 @@ export default function AppHeader(): React.JSX.Element {
                               เปิดหน้า Home
                             </Button>
                           )}
-                          {(item.page === 'station-accessory' || item.page === 'combined') && (
+                          {(item.dataType === 'station-accessory' || item.dataType === 'combined') && (
                             <Button
                               variant="outline"
                               size="sm"

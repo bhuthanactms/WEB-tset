@@ -4,6 +4,7 @@ import { Zap, Car, Paintbrush, Shield, Home, Wrench, MapPin, ChevronDown, Chevro
 
 import { useLocation, useNavigate } from 'react-router-dom'
 import { getCurrentUserSync as getCurrentUser, canSaveHistory } from '@/utils/auth'
+import { saveHistory } from '@/utils/historyService'
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
@@ -555,60 +556,21 @@ function MoreDetailCard(props: any) {
     };
 
     try {
-      // Save Home data to localStorage (ข้อมูลจาก props/state)
-      const homeDataKey = 'ev_calculator_form_data';
-      localStorage.setItem(homeDataKey, JSON.stringify(homeDataParsed));
-      console.log('💾 Saved Home data to localStorage:', homeDataParsed);
+      const code = (customerCode || props.customerCode || '').trim()
 
-      // Save StationAccessory data
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(stationData));
-      console.log('💾 Saved StationAccessory data to localStorage:', stationData);
+      // Save draft ใน localStorage สำหรับ session ปัจจุบัน
+      localStorage.setItem('ev_calculator_form_data', JSON.stringify(homeDataParsed))
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(stationData))
 
-      // Save combined data with customer code as key
-      const combinedKey = `ev_combined_data_${(customerCode || props.customerCode || '').trim()}`;
-      const combinedData = {
-        customerCode: (customerCode || props.customerCode || '').trim(),
-        home: homeDataParsed,
-        stationAccessory: stationData,
-        savedAt: new Date().toISOString(),
-        lastUpdated: 'station-accessory'
-      };
-      localStorage.setItem(combinedKey, JSON.stringify(combinedData));
-      console.log('💾 Saved combined data to localStorage:', combinedData);
+      // Save ลง Supabase
+      const result = await saveHistory(code, 'combined', homeDataParsed, stationData)
 
-      // Also save with timestamp for history
-      const historyKey = `${STORAGE_KEY}_${(customerCode || props.customerCode || '').trim()}_${Date.now()}`;
-      localStorage.setItem(historyKey, JSON.stringify(stationData));
-
-      // Also save Home data with timestamp for history
-      const homeHistoryKey = `${homeDataKey}_${(customerCode || props.customerCode || '').trim()}_${Date.now()}`;
-      localStorage.setItem(homeHistoryKey, JSON.stringify(homeDataParsed));
-
-      // บันทึกลงเซิร์ฟเวอร์
-      try {
-        console.log('🌐 Attempting to save data to server...');
-        const response = await axios.post(`${API_BASE_URL}/save-data`, combinedData, {
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (response.data.success) {
-          console.log('✅ Data saved to server successfully:', response.data);
-          alert('✅ บันทึกข้อมูลสำเร็จ! (บันทึกทั้งในเครื่องและเซิร์ฟเวอร์)');
-        } else {
-          console.warn('⚠️ Server returned error:', response.data.error);
-          alert('⚠️ บันทึกข้อมูลในเครื่องสำเร็จ แต่บันทึกลงเซิร์ฟเวอร์ไม่สำเร็จ: ' + (response.data.error || 'Unknown error'));
-        }
-      } catch (serverError: any) {
-        console.error('❌ Error saving to server:', serverError);
-        // แสดง error แต่ไม่บล็อกการใช้งาน (เพราะบันทึก localStorage สำเร็จแล้ว)
-        const errorMessage = serverError.response?.data?.error || serverError.message || 'Unknown error';
-        console.warn('⚠️ Failed to save to server, but data is saved locally. Error:', errorMessage);
-        alert('✅ บันทึกข้อมูลในเครื่องสำเร็จ แต่ไม่สามารถบันทึกลงเซิร์ฟเวอร์ได้\nกรุณาตรวจสอบว่าเซิร์ฟเวอร์ทำงานอยู่\n(ข้อมูลยังสามารถใช้ได้ในเครื่องนี้)');
+      if (!result.ok) {
+        alert('❌ ' + (result.message || 'บันทึกไม่สำเร็จ'))
+        return
       }
 
-      console.log('✅ All data saved successfully!');
+      alert('✅ บันทึกข้อมูลสำเร็จ! (บันทึกทั้ง 2 หน้า)')
     } catch (error) {
       console.error('❌ Error saving data:', error);
       alert('❌ เกิดข้อผิดพลาดในการบันทึกข้อมูล');

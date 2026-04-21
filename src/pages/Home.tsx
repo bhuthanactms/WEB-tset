@@ -27,6 +27,7 @@ import axios from 'axios'
 import * as XLSX from 'xlsx'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { getCurrentUserSync as getCurrentUser, canAccessStationAccessory, canSaveHistory } from '@/utils/auth'
+import { saveHistory } from '@/utils/historyService'
 
 /** Form state interface */
 interface CalculatorForm {
@@ -489,42 +490,32 @@ export default function Home(): React.JSX.Element {
       savedAt: new Date().toISOString()
     };
     try {
-      // Save Home data
+      // Save draft ใน localStorage สำหรับ session ปัจจุบัน
       localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
 
-      // Check if StationAccessory data exists for this customer
+      // ดึง station data ของ customer เดียวกัน (ถ้ามี)
       const stationKey = 'ev_station_accessory_form_data';
       const stationData = localStorage.getItem(stationKey);
       let stationDataParsed = null;
       if (stationData) {
         try {
           stationDataParsed = JSON.parse(stationData);
-          // Only use if same customer code
           if (stationDataParsed.customerCode !== customerCode.trim()) {
             stationDataParsed = null;
           }
-        } catch (e) {
-          console.error('Error parsing station data:', e);
-        }
+        } catch (e) {}
       }
 
-      // Save combined data with customer code as key
-      const combinedKey = `ev_combined_data_${customerCode.trim()}`;
-      const combinedData = {
-        customerCode: customerCode.trim(),
-        home: dataToSave,
-        stationAccessory: stationDataParsed,
-        savedAt: new Date().toISOString(),
-        lastUpdated: 'home'
-      };
-      localStorage.setItem(combinedKey, JSON.stringify(combinedData));
+      // Save ลง Supabase
+      const dataType = stationDataParsed ? 'combined' : 'home'
+      const result = await saveHistory(customerCode.trim(), dataType, dataToSave, stationDataParsed)
 
-      // Also save with timestamp for history
-      const key = `${STORAGE_KEY}_${customerCode.trim()}_${Date.now()}`;
-      localStorage.setItem(key, JSON.stringify(dataToSave));
+      if (!result.ok) {
+        alert('❌ ' + (result.message || 'บันทึกไม่สำเร็จ'))
+        return
+      }
 
-      alert('✅ บันทึกข้อมูลสำเร็จ!' + (stationDataParsed ? ' (รวมข้อมูลทั้ง 2 หน้า)' : ''));
-      console.log('💾 Saved combined data:', combinedData);
+      alert('✅ บันทึกข้อมูลสำเร็จ!' + (stationDataParsed ? ' (รวมข้อมูลทั้ง 2 หน้า)' : ''))
     } catch (error) {
       console.error('❌ Error saving data:', error);
       alert('❌ เกิดข้อผิดพลาดในการบันทึกข้อมูล');
