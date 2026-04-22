@@ -19122,11 +19122,11 @@ function StationAccessory() {
     // สร้าง mapping สำหรับหลังคาคุมช่องจอดตามจำนวนช่องจอด
     const parkingRoofRows = [
       { key: 'parking-roof-1-2', rowNum: 3, slots: '1-2' },
-      { key: 'parking-roof-3-4', rowNum: 5, slots: '3-4' },
-      { key: 'parking-roof-5-6', rowNum: 7, slots: '5-6' },
-      { key: 'parking-roof-7-8', rowNum: 9, slots: '7-8' },
-      { key: 'parking-roof-9-10', rowNum: 11, slots: '9-10' },
-      { key: 'parking-roof-11-12', rowNum: 13, slots: '11-12' }
+      { key: 'parking-roof-3-4', rowNum: 6, slots: '3-4' },
+      { key: 'parking-roof-5-6', rowNum: 9, slots: '5-6' },
+      { key: 'parking-roof-7-8', rowNum: 12, slots: '7-8' },
+      { key: 'parking-roof-9-10', rowNum: 15, slots: '9-10' },
+      { key: 'parking-roof-11-12', rowNum: 18, slots: '11-12' }
     ];
 
     parkingRoofRows.forEach(item => {
