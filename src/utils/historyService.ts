@@ -24,14 +24,31 @@ export async function saveHistory(
 
   const code = customerCode.trim()
 
-  // 1. upsert customer
-  const { data: customer, error: customerError } = await supabaseAdmin
-    .from('customers')
-    .upsert({ customer_code: code }, { onConflict: 'customer_code' })
-    .select('id')
-    .single()
+  // 1. find or create customer
+  let customerId: number | null = null
 
-  if (customerError || !customer) {
+  const { data: existing } = await supabaseAdmin
+    .from('customers')
+    .select('id')
+    .eq('customer_code', code)
+    .maybeSingle()
+
+  if (existing) {
+    customerId = existing.id
+  } else {
+    const now = new Date().toISOString()
+    const { data: created, error: createError } = await supabaseAdmin
+      .from('customers')
+      .insert({ customer_code: code, created_at: now, updated_at: now })
+      .select('id')
+      .single()
+    if (createError || !created) {
+      return { ok: false, message: 'บันทึก customer ไม่สำเร็จ: ' + createError?.message }
+    }
+    customerId = created.id
+  }
+
+  if (!customerId) {
     return { ok: false, message: 'บันทึก customer ไม่สำเร็จ' }
   }
 
@@ -45,7 +62,7 @@ export async function saveHistory(
 
   // 3. insert history
   const { error } = await supabaseAdmin.from('customer_histories').insert({
-    customer_id: customer.id,
+    customer_id: customerId,
     customer_code: code,
     data_type: dataType,
     data,

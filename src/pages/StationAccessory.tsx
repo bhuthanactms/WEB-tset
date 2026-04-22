@@ -18708,6 +18708,8 @@ function StationAccessory() {
       if (loadData.customerCode) setCustomerCode(loadData.customerCode);
       if (loadData.home) {
         setHomeData(normalizeHomeDataPayload(loadData.home));
+      } else if (stateObj.homeData) {
+        setHomeData(normalizeHomeDataPayload(stateObj.homeData));
       }
       if (loadData.trDistance !== undefined || loadData.jobName || loadData.concreteSelection !== undefined || loadData.travelCostResult !== undefined || loadData.highVoltageSystem !== undefined || loadData.transformerType !== undefined || loadData.parkingSlots !== undefined) {
         setInitialStationData(loadData);
