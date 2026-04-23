@@ -40,6 +40,7 @@ interface CalculatorForm {
   landToMdb: string
   numberOfTerminals?: string // สำหรับ Group Charger
   terminalSize?: string // ขนาดTerminal
+  terminalSizes?: string[] // ขนาดTerminal แยกแต่ละชิ้น
   terminalWiringType?: string // การเดินสายไปTerminal
 }
 
@@ -65,6 +66,7 @@ export default function Home(): React.JSX.Element {
     landToMdb: '',
     numberOfTerminals: '',
     terminalSize: '',
+    terminalSizes: [],
     terminalWiringType: ''
   })
 
@@ -82,6 +84,9 @@ export default function Home(): React.JSX.Element {
     chargerWiringType: Array.isArray(rawForm?.chargerWiringType)
       ? rawForm.chargerWiringType
       : (rawForm?.chargerWiringType ? [rawForm.chargerWiringType] : []),
+    terminalSizes: Array.isArray(rawForm?.terminalSizes)
+      ? rawForm.terminalSizes
+      : (rawForm?.terminalSize ? [rawForm.terminalSize] : []),
     numberOfChargers: sanitizeNonNegativeString(rawForm?.numberOfChargers),
     numberOfTerminals: sanitizeNonNegativeString(rawForm?.numberOfTerminals)
   })
@@ -92,6 +97,19 @@ export default function Home(): React.JSX.Element {
   const [multiChargers, setMultiChargers] = useState<string[]>([]);
 
   const [form, setForm] = useState<CalculatorForm>(createEmptyForm());
+  const terminalCount = parseInt(form.numberOfTerminals || '0', 10) || 0;
+  const selectedTerminalSizes = (() => {
+    const sizes = Array.isArray(form.terminalSizes) ? form.terminalSizes : [];
+    if (terminalCount > 0) {
+      return Array.from({ length: terminalCount }, (_, idx) => {
+        if (sizes[idx]) return sizes[idx];
+        if (idx === 0 && form.terminalSize) return form.terminalSize;
+        return '';
+      });
+    }
+    if (sizes.some(Boolean)) return sizes;
+    return form.terminalSize ? [form.terminalSize] : [];
+  })();
 
   const [results, setResults] = useState<CalculatorResults | null>(null)
   const [excelData, setExcelData] = useState<any[]>([]);
@@ -447,6 +465,17 @@ export default function Home(): React.JSX.Element {
       const n = parseInt(form.numberOfChargers) || 1;
       return Array(n).fill(norm((v as unknown as string) || ''));
     })();
+    const terminalWiringDetails = selectedTerminalSizes
+      .map((size, idx) => {
+        const detail = getTerminalWiringData(size);
+        return {
+          terminalIndex: idx,
+          terminalSize: size,
+          cable: detail?.cable || '',
+          conduitTray: detail?.conduitTray || '',
+        };
+      })
+      .filter((item) => item.terminalSize);
 
     const dataToSave = {
       customerCode: customerCode.trim(),
@@ -467,6 +496,7 @@ export default function Home(): React.JSX.Element {
       chargerWireConduit: chargerWireConduit,
       chargerWiringCableAll: chargerWiringCableAll,
       chargerWireConduitAll: chargerWireConduitAll,
+      terminalWiringDetails: terminalWiringDetails,
       chargerSummary: (() => {
         if (chargerTypeMode === 'any') {
           return multiChargers.filter(name => name !== '').map((chargerName, idx) => {
@@ -858,7 +888,10 @@ export default function Home(): React.JSX.Element {
       chargerWiringType: [], // เปลี่ยนเป็น array
       trToLand: '',
       landToMdb: '',
-      numberOfTerminals: ''
+      numberOfTerminals: '',
+      terminalSize: '',
+      terminalSizes: [],
+      terminalWiringType: ''
     });
     setResults(null);
     setCustomerCode('');
@@ -2009,8 +2042,9 @@ export default function Home(): React.JSX.Element {
   }
 
   // ฟังก์ชันดึงข้อมูล Terminal wiring จาก Excel
-  const getTerminalWiringData = () => {
-    if (!form.terminalSize || !form.terminalWiringType) return null;
+  const getTerminalWiringData = (terminalSizeValue?: string) => {
+    const resolvedTerminalSize = terminalSizeValue || selectedTerminalSizes[0] || '';
+    if (!resolvedTerminalSize || !form.terminalWiringType) return null;
 
     // Mapping terminal size ไปยัง row number
     const terminalSizeToRow: Record<string, Record<string, number>> = {
@@ -2037,7 +2071,7 @@ export default function Home(): React.JSX.Element {
     const rowMapping = terminalSizeToRow[form.terminalWiringType];
     if (!rowMapping) return null;
 
-    const rowNum = rowMapping[form.terminalSize];
+    const rowNum = rowMapping[resolvedTerminalSize];
     if (!rowNum) return null;
 
     const sheet = excelSheets[sheetName];
@@ -2100,6 +2134,18 @@ export default function Home(): React.JSX.Element {
       localStorage.setItem('ev_calculator_form_data', JSON.stringify(currentData));
 
       // ส่งข้อมูลที่ต้องการไปหน้า StationAccessory
+      const terminalWiringDetails = selectedTerminalSizes
+        .map((size, idx) => {
+          const detail = getTerminalWiringData(size);
+          return {
+            terminalIndex: idx,
+            terminalSize: size,
+            cable: detail?.cable || '',
+            conduitTray: detail?.conduitTray || '',
+          };
+        })
+        .filter((item) => item.terminalSize);
+
       const navigationState = {
         customerCode: customerCode,
         powerAuthority: form.powerAuthority,
@@ -2125,8 +2171,10 @@ export default function Home(): React.JSX.Element {
         trToLand: form.trToLand,
         landToMdb: form.landToMdb,
         numberOfTerminals: form.numberOfTerminals || '',
-        terminalSize: form.terminalSize || '',
+        terminalSize: selectedTerminalSizes.filter(Boolean).join(', ') || form.terminalSize || '',
+        terminalSizes: selectedTerminalSizes.filter(Boolean),
         terminalWiringType: form.terminalWiringType || '',
+        terminalWiringDetails: terminalWiringDetails,
         terminalWireConduit: (() => {
           const terminalData = getTerminalWiringData();
           return terminalData?.conduitTray || '';
@@ -2737,7 +2785,17 @@ export default function Home(): React.JSX.Element {
                       </Label>
                       <Select
                         value={form.numberOfTerminals || ''}
-                        onValueChange={(value) => setForm(f => ({ ...f, numberOfTerminals: value }))}
+                        onValueChange={(value) => setForm(f => {
+                          const nextCount = parseInt(value || '0', 10) || 0;
+                          const currentSizes = Array.isArray(f.terminalSizes) ? f.terminalSizes : [];
+                          const resizedSizes = Array.from({ length: nextCount }, (_, idx) => currentSizes[idx] || '');
+                          return {
+                            ...f,
+                            numberOfTerminals: value,
+                            terminalSizes: resizedSizes,
+                            terminalSize: resizedSizes[0] || '',
+                          };
+                        })}
                       >
                         <SelectTrigger className="h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500">
                           <SelectValue placeholder={
@@ -2798,30 +2856,45 @@ export default function Home(): React.JSX.Element {
 
                   {/* ขนาดTerminal - แสดงเฉพาะกรณี Group Charger และมี numberOfTerminals */}
                   {chargerInstallationType === 'group' && form.numberOfTerminals && (
-                  <div className="space-y-3">
-                    <Label className="text-sm font-medium text-gray-700">
+                    <div className="space-y-3">
+                      <Label className="text-sm font-medium text-gray-700">
                         ขนาดTerminal
-                    </Label>
-                      <Select
-                        value={form.terminalSize || ''}
-                        onValueChange={(value) => setForm(f => ({ ...f, terminalSize: value }))}
-                      >
-                      <SelectTrigger className="h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500">
-                          <SelectValue placeholder="Select terminal size" />
-                      </SelectTrigger>
-                      <SelectContent>
-                          <SelectItem value="300A">300A</SelectItem>
-                          <SelectItem value="350A">350A</SelectItem>
-                          <SelectItem value="380A">380A</SelectItem>
-                          <SelectItem value="500A">500A</SelectItem>
-                          <SelectItem value="600A">600A</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      </Label>
+                      {Array.from({ length: terminalCount }, (_, idx) => (
+                        <Select
+                          key={`terminal-size-${idx}`}
+                          value={Array.isArray(form.terminalSizes) ? (form.terminalSizes[idx] || '') : ''}
+                          onValueChange={(value) => setForm(f => {
+                            const count = parseInt(f.numberOfTerminals || '0', 10) || 0;
+                            const nextSizes = Array.from(
+                              { length: count },
+                              (_, i) => (Array.isArray(f.terminalSizes) ? f.terminalSizes[i] : '') || ''
+                            );
+                            nextSizes[idx] = value;
+                            return {
+                              ...f,
+                              terminalSizes: nextSizes,
+                              terminalSize: nextSizes[0] || '',
+                            };
+                          })}
+                        >
+                          <SelectTrigger className="h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500">
+                            <SelectValue placeholder={`Select terminal ${idx + 1} size`} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="300A">300A</SelectItem>
+                            <SelectItem value="350A">350A</SelectItem>
+                            <SelectItem value="380A">380A</SelectItem>
+                            <SelectItem value="500A">500A</SelectItem>
+                            <SelectItem value="600A">600A</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ))}
                     </div>
                   )}
 
                   {/* การเดินสายไปTerminal - แสดงเฉพาะกรณี Group Charger และมี terminalSize */}
-                  {chargerInstallationType === 'group' && form.terminalSize && (
+                  {chargerInstallationType === 'group' && selectedTerminalSizes.some(Boolean) && (
                     <div className="space-y-3">
                       <Label className="text-sm font-medium text-gray-700">
                         การเดินสายไปTerminal
@@ -4020,11 +4093,15 @@ export default function Home(): React.JSX.Element {
                           </span>
                         </div>
                         {/* Terminal Size */}
-                        {form.terminalSize && (
+                        {selectedTerminalSizes.some(Boolean) && (
                           <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                             <span className="font-medium text-gray-700">ขนาดTerminal:</span>
-                            <span className="font-semibold text-gray-900">
-                              {form.terminalSize}
+                            <span className="font-semibold text-gray-900 text-sm text-right">
+                              {selectedTerminalSizes.map((size, idx) => (
+                                <span key={`terminal-size-summary-${idx}`} className="block">
+                                  Terminal{idx + 1}: {size || '-'}
+                                </span>
+                              ))}
                             </span>
                           </div>
                         )}
@@ -4038,31 +4115,44 @@ export default function Home(): React.JSX.Element {
                           </div>
                         )}
                         {/* Terminal Wiring Cable */}
-                        {form.terminalSize && form.terminalWiringType && (() => {
-                          const terminalData = getTerminalWiringData();
-                          console.log('[Terminal Card] Terminal Wiring Cable - terminalData:', terminalData);
+                        {selectedTerminalSizes.some(Boolean) && form.terminalWiringType && (() => {
+                          const terminalDataList = selectedTerminalSizes.map((size, idx) => ({
+                            idx,
+                            data: getTerminalWiringData(size),
+                          }));
+                          console.log('[Terminal Card] Terminal Wiring Cable - terminalDataList:', terminalDataList);
                           return (
                             <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                               <span className="font-medium text-gray-700">Terminal Wiring Cable:</span>
-                              <span className="font-semibold text-gray-900 text-sm">
-                                {terminalData?.cable || '-'}
+                              <span className="font-semibold text-gray-900 text-sm text-right">
+                                {terminalDataList.map(({ idx, data }) => (
+                                  <span key={`terminal-cable-${idx}`} className="block">
+                                    Terminal{idx + 1}: {data?.cable || '-'}
+                                  </span>
+                                ))}
                               </span>
                             </div>
                           );
                         })()}
                         {/* Terminal Wiring Conduit / Terminal Wire Tray */}
-                        {form.terminalSize && form.terminalWiringType && (() => {
-                          const terminalData = getTerminalWiringData();
-                          console.log('[Terminal Card] Terminal Wiring Conduit/Tray - terminalData:', terminalData);
-                          if (!terminalData || !terminalData.conduitTray) return null;
+                        {selectedTerminalSizes.some(Boolean) && form.terminalWiringType && (() => {
+                          const terminalDataList = selectedTerminalSizes.map((size, idx) => ({
+                            idx,
+                            data: getTerminalWiringData(size),
+                          }));
+                          console.log('[Terminal Card] Terminal Wiring Conduit/Tray - terminalDataList:', terminalDataList);
                           const label = form.terminalWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน'
                             ? 'Terminal Wiring conduit:'
                             : 'Terminal Wire tray:';
                           return (
                             <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                               <span className="font-medium text-gray-700">{label}</span>
-                              <span className="font-semibold text-gray-900 text-sm">
-                                {terminalData.conduitTray}
+                              <span className="font-semibold text-gray-900 text-sm text-right">
+                                {terminalDataList.map(({ idx, data }) => (
+                                  <span key={`terminal-conduit-${idx}`} className="block">
+                                    Terminal{idx + 1}: {data?.conduitTray || '-'}
+                                  </span>
+                                ))}
                               </span>
                             </div>
                           );

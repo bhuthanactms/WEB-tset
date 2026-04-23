@@ -655,7 +655,7 @@ function MoreDetailCard(props: any) {
       setTerminalLineDistances(parsed.terminalLineDistances);
       const distances = parsed.terminalLineDistances.map((d: any) => parseFloat(d) || 0);
       const totalDistance = distances.reduce((sum: number, d: number) => sum + d, 0);
-      if (totalDistance > 0 && props.terminalSize && props.terminalWiringType) {
+      if (totalDistance > 0 && resolvedTerminalSizes.length > 0 && props.terminalWiringType) {
         calculateTerminalResult(distances);
       }
     } else if (parsed.terminalDistance !== undefined) {
@@ -664,7 +664,7 @@ function MoreDetailCard(props: any) {
       const next = Array(terminalCount).fill(legacyDistanceStr);
       setTerminalLineDistances(next);
       const d = parseFloat(legacyDistanceStr) || 0;
-      if (d > 0 && props.terminalSize && props.terminalWiringType) {
+      if (d > 0 && resolvedTerminalSizes.length > 0 && props.terminalWiringType) {
         calculateTerminalResult(next.map((x) => parseFloat(x) || 0));
       }
     }
@@ -1548,6 +1548,88 @@ function MoreDetailCard(props: any) {
 
   // State สำหรับ Terminal
   const terminalCount = Math.max(1, parseInt(props.numberOfTerminals || '1') || 1);
+  const resolvedTerminalSizes = useMemo(() => {
+    const fromArray = Array.isArray(props.terminalSizes)
+      ? props.terminalSizes.map((size: any) => String(size || '').trim()).filter(Boolean)
+      : [];
+    const fromString = String(props.terminalSize || '')
+      .split(',')
+      .map((size: string) => size.trim())
+      .filter(Boolean);
+    const base = fromArray.length > 0 ? fromArray : fromString;
+    if (base.length === 0) return [];
+    return Array.from({ length: terminalCount }, (_, idx) => base[idx] || base[0] || '');
+  }, [props.terminalSizes, props.terminalSize, terminalCount]);
+
+  const getTerminalWiringInfoBySize = useCallback((terminalSizeValue: string) => {
+    if (!props.terminalWiringType || !terminalSizeValue) return null;
+
+    const terminalSizeToRow: Record<string, Record<string, number>> = {
+      'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน': {
+        '300A': 17,
+        '350A': 18,
+        '380A': 18,
+        '500A': 23,
+        '600A': 24
+      },
+      'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา': {
+        '300A': 11,
+        '350A': 12,
+        '380A': 12,
+        '500A': 17,
+        '600A': 18
+      }
+    };
+
+    const sheetName = props.terminalWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน'
+      ? 'แบบ 9.12'
+      : 'แบบ 9.15';
+    const rowMapping = terminalSizeToRow[props.terminalWiringType];
+    const rowNum = rowMapping?.[terminalSizeValue];
+    if (!rowNum) return null;
+
+    const sheet = getExcelData(sheetName);
+    if (!sheet || sheet.length === 0) return null;
+    const row = sheet.find((r: any) => r.__rowNum__ === rowNum);
+    if (!row) return null;
+
+    const cableCols = ['__EMPTY_1', '__EMPTY_2', '__EMPTY_3', '__EMPTY_4', '__EMPTY_5', '__EMPTY_6', '__EMPTY_7', '__EMPTY_8', '__EMPTY_9', '__EMPTY_10', '__EMPTY_11', '__EMPTY_12'];
+    const cableValues = cableCols.map(col => row[col]).filter(Boolean);
+    const cable = cableValues.join(' ');
+
+    let conduitTray = '';
+    if (props.terminalWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน') {
+      const conduitCols = ['__EMPTY_14', '__EMPTY_15', '__EMPTY_16'];
+      const conduitValues = conduitCols.map(col => row[col]).filter(Boolean);
+      conduitTray = conduitValues.length > 0 ? `${conduitValues.join(' ')} มม.` : '';
+    } else if (props.terminalWiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา') {
+      const trayValue = row['__EMPTY_14'];
+      conduitTray = trayValue ? `${trayValue} ซม.` : '';
+    }
+
+    return {
+      row,
+      code: row['__EMPTY'] || '-',
+      cable,
+      conduitTray
+    };
+  }, [props.terminalWiringType, getExcelData]);
+
+  const getTerminalWiringInfoByIndex = useCallback((terminalIndex: number, terminalSizeValue: string) => {
+    const details = Array.isArray(props.terminalWiringDetails) ? props.terminalWiringDetails : [];
+    const detail = details.find((item: any) => Number(item?.terminalIndex) === terminalIndex)
+      || details.find((item: any) => String(item?.terminalSize || '').trim() === String(terminalSizeValue || '').trim());
+    if (detail) {
+      return {
+        row: null,
+        code: '-',
+        cable: String(detail.cable || ''),
+        conduitTray: String(detail.conduitTray || '')
+      };
+    }
+    return getTerminalWiringInfoBySize(terminalSizeValue);
+  }, [props.terminalWiringDetails, getTerminalWiringInfoBySize]);
+
   const [terminalLineDistances, setTerminalLineDistances] = useState<string[]>(
     Array(terminalCount).fill('')
   );
@@ -1568,7 +1650,7 @@ function MoreDetailCard(props: any) {
 
   // ฟังก์ชันคำนวณผลลัพธ์ Terminal
   const calculateTerminalResult = (distances: number[]) => {
-    if (!props.terminalSize || !props.terminalWiringType) {
+    if (!props.terminalWiringType || resolvedTerminalSizes.length === 0) {
       setTerminalResult(null);
       setTerminalLineResults([]);
       return;
@@ -1610,13 +1692,6 @@ function MoreDetailCard(props: any) {
       return;
     }
 
-    const rowNum = rowMapping[props.terminalSize];
-    if (!rowNum) {
-      setTerminalResult(null);
-      setTerminalLineResults([]);
-      return;
-    }
-
     const sheet = getExcelData(sheetName);
     if (!sheet || sheet.length === 0) {
       setTerminalResult(null);
@@ -1624,31 +1699,29 @@ function MoreDetailCard(props: any) {
       return;
     }
 
-    const row = sheet.find((r: any) => r.__rowNum__ === rowNum);
-    if (!row) {
-      setTerminalResult(null);
-      setTerminalLineResults([]);
-      return;
-    }
-
-    // ดึงข้อมูล Terminal Wiring Cable เพื่อตรวจสอบว่ามี "2 SET OF" หรือไม่
-    const cableCols = ['__EMPTY_1', '__EMPTY_2', '__EMPTY_3', '__EMPTY_4', '__EMPTY_5', '__EMPTY_6', '__EMPTY_7', '__EMPTY_8', '__EMPTY_9', '__EMPTY_10', '__EMPTY_11', '__EMPTY_12'];
-    const cableValues = cableCols.map(col => row[col]).filter(Boolean);
-    const cableString = cableValues.join(' ');
-
-    // เช็คว่ามี "2 SET OF" ใน Terminal Wiring Cable หรือไม่
-    const isTwoSet = cableString && (cableString.includes('2 SET OF') || cableString.includes('2SET OF') || cableString.includes('2 SETOF'));
-    const multiplier = isTwoSet ? 2 : 1; // คูณด้วย 2 ถ้ามี "2 SET OF"
-
-    // ดึงข้อมูล
-    const code = row['__EMPTY'] || '-';
-    const materialUnit = parsePrice(row['__EMPTY_16'] || 0);
-    const laborUnit = parsePrice(row['__EMPTY_17'] || 0);
-    const totalUnit = parsePrice(row['__EMPTY_18'] || 0);
-
     // คำนวณผลลัพธ์แยกตามเส้น Terminal
+    let firstCode = '-';
     const lineResults = (distances || [])
       .map((distance, idx) => {
+        const selectedSize = resolvedTerminalSizes[idx] || resolvedTerminalSizes[0] || '';
+        const rowNum = rowMapping[selectedSize];
+        const row = rowNum ? sheet.find((r: any) => r.__rowNum__ === rowNum) : null;
+
+        if (!row) return null;
+
+        // ดึงข้อมูล Terminal Wiring Cable เพื่อตรวจสอบว่ามี "2 SET OF" หรือไม่
+        const cableCols = ['__EMPTY_1', '__EMPTY_2', '__EMPTY_3', '__EMPTY_4', '__EMPTY_5', '__EMPTY_6', '__EMPTY_7', '__EMPTY_8', '__EMPTY_9', '__EMPTY_10', '__EMPTY_11', '__EMPTY_12'];
+        const cableValues = cableCols.map(col => row[col]).filter(Boolean);
+        const cableString = cableValues.join(' ');
+        const isTwoSet = cableString && (cableString.includes('2 SET OF') || cableString.includes('2SET OF') || cableString.includes('2 SETOF'));
+        const multiplier = isTwoSet ? 2 : 1; // คูณด้วย 2 ถ้ามี "2 SET OF"
+
+        const rowCode = row['__EMPTY'] || '-';
+        if (firstCode === '-' && rowCode && rowCode !== '-') firstCode = rowCode;
+
+        const materialUnit = parsePrice(row['__EMPTY_16'] || 0);
+        const laborUnit = parsePrice(row['__EMPTY_17'] || 0);
+        const totalUnit = parsePrice(row['__EMPTY_18'] || 0);
         const inputDistance = Number(distance) || 0;
         const calcDistance = inputDistance > 0 ? inputDistance + 2.5 : 0; // เผื่อระยะ +2.5 เมตร/Terminal
         return {
@@ -1660,14 +1733,14 @@ function MoreDetailCard(props: any) {
           totalCost: totalUnit * calcDistance * multiplier
         };
       })
-      .filter((item) => item.inputDistance > 0);
+      .filter((item): item is NonNullable<typeof item> => !!item && item.inputDistance > 0);
 
     const materialCost = lineResults.reduce((sum, item) => sum + item.materialCost, 0);
     const laborCost = lineResults.reduce((sum, item) => sum + item.laborCost, 0);
     const totalCost = lineResults.reduce((sum, item) => sum + item.totalCost, 0);
 
     setTerminalResult({
-      code,
+      code: firstCode,
       materialCost,
       laborCost,
       totalCost
@@ -1924,7 +1997,7 @@ function MoreDetailCard(props: any) {
 
   // useEffect สำหรับคำนวณ Terminal Result อัตโนมัติ
   useEffect(() => {
-    if (props.chargerInstallationType === 'group' && props.numberOfTerminals && props.terminalSize && props.terminalWiringType) {
+    if (props.chargerInstallationType === 'group' && props.numberOfTerminals && resolvedTerminalSizes.length > 0 && props.terminalWiringType) {
       const distances = (terminalLineDistances || []).map((d) => parseFloat(d) || 0);
       const totalDistance = distances.reduce((sum, d) => sum + d, 0);
       if (totalDistance > 0) {
@@ -1937,7 +2010,7 @@ function MoreDetailCard(props: any) {
       setTerminalResult(null);
       setTerminalLineResults([]);
     }
-  }, [terminalLineDistances, props.chargerInstallationType, props.numberOfTerminals, props.terminalSize, props.terminalWiringType]);
+  }, [terminalLineDistances, props.chargerInstallationType, props.numberOfTerminals, resolvedTerminalSizes, props.terminalWiringType]);
 
   const [additionalSelection, setAdditionalSelection] = useState(props.additionalSelection || 'no');
 
@@ -3924,10 +3997,6 @@ function MoreDetailCard(props: any) {
 
     const results = Object.entries(chargerResults || {});
 
-    if (!results.length) {
-      return emptyTotals;
-    }
-
     // รวมทั้ง wiringTypes และ additional รวมถึงอุปกรณ์เสริม
     let material = 0;
     let labor = 0;
@@ -4051,10 +4120,14 @@ function MoreDetailCard(props: any) {
     });
 
     // เพิ่ม Terminal totals (ถ้ามี)
-    if (props.chargerInstallationType === 'group' && props.numberOfTerminals && props.terminalSize && props.terminalWiringType && terminalResult) {
+    if (props.chargerInstallationType === 'group' && props.numberOfTerminals && resolvedTerminalSizes.length > 0 && props.terminalWiringType && terminalResult) {
       material += terminalResult.materialCost || 0;
       labor += terminalResult.laborCost || 0;
       total += terminalResult.totalCost || 0;
+    }
+
+    if (total <= 0) {
+      return emptyTotals;
     }
 
     return {
@@ -4062,7 +4135,7 @@ function MoreDetailCard(props: any) {
       labor,
       total,
     };
-  }, [chargerSelection, chargerResults, props.chargerWiringType, props.chargerSummary, props.powerAuthority, props.chargerInstallationType, props.numberOfTerminals, props.terminalSize, props.terminalWiringType, terminalResult, getMdbToChargerRowMapping, getExcelData]);
+  }, [chargerSelection, chargerResults, props.chargerWiringType, props.chargerSummary, props.powerAuthority, props.chargerInstallationType, props.numberOfTerminals, resolvedTerminalSizes, props.terminalWiringType, terminalResult, getMdbToChargerRowMapping, getExcelData]);
 
   const travelTotals = React.useMemo(() => {
     const total = parsePrice(travelCostResult);
@@ -5906,82 +5979,22 @@ function MoreDetailCard(props: any) {
       }
 
       // เพิ่ม Terminal Configuration ใน section 6 (แยกตามเส้น Terminal)
-      if (props.chargerInstallationType === 'group' && props.numberOfTerminals && props.terminalSize && props.terminalWiringType && terminalLineResults.length > 0) {
-        // ดึงข้อมูล Terminal Wiring Cable
-        const terminalSizeToRow: Record<string, Record<string, number>> = {
-          'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน': {
-            '300A': 17,
-            '350A': 18,
-            '380A': 18,
-            '500A': 23,
-            '600A': 24
-          },
-          'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา': {
-            '300A': 11,
-            '350A': 12,
-            '380A': 12,
-            '500A': 17,
-            '600A': 18
-          }
-        };
-
-        const sheetName = props.terminalWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน'
-          ? 'แบบ 9.12'
-          : 'แบบ 9.15';
-
-        const rowMapping = terminalSizeToRow[props.terminalWiringType];
-        let terminalCable = '';
-        let terminalWireConduit = props.terminalWireConduit || '';
-
-        if (rowMapping) {
-          const rowNum = rowMapping[props.terminalSize];
-          if (rowNum) {
-            const sheet = getExcelData(sheetName);
-            if (sheet && sheet.length > 0) {
-              const row = sheet.find((r: any) => r.__rowNum__ === rowNum);
-              if (row) {
-                // ดึงข้อมูล Cable จาก __EMPTY_1 ถึง __EMPTY_12
-                const cableCols = ['__EMPTY_1', '__EMPTY_2', '__EMPTY_3', '__EMPTY_4', '__EMPTY_5', '__EMPTY_6', '__EMPTY_7', '__EMPTY_8', '__EMPTY_9', '__EMPTY_10', '__EMPTY_11', '__EMPTY_12'];
-                const cableValues = cableCols.map(col => row[col]).filter(Boolean);
-                let cableString = cableValues.join(' ');
-
-                // Format: เพิ่ม "/" ถ้าไม่มี และใส่ () รอบ HDPE
-                // ลบ * ออกจาก HDPE ก่อน (ถ้ามี)
-                cableString = cableString.replace(/\bHDPE\s*\*/g, 'HDPE');
-                // ถ้ามี HDPE ให้ใส่ () รอบ
-                cableString = cableString.replace(/\bHDPE\b/g, '(HDPE)');
-                // ถ้าไม่มี "/" ในข้อมูล แต่มีรูปแบบที่ควรมี "/" ให้เพิ่ม
-                // เช่น "CV 4 x 120 70 THW" -> "CV 4 x 120 / 70 THW"
-                // หรือ "CV 4 x 185 95 THW" -> "CV 4 x 185 / 95 THW"
-                if (!cableString.includes('/')) {
-                  // หา pattern ที่ควรมี "/" เช่น "x 120 70" -> "x 120 / 70"
-                  // หรือ "x 185 95" -> "x 185 / 95"
-                  // Pattern: ตัวเลข ตัวเลข THW หรือ (HDPE)
-                  cableString = cableString.replace(/(\d+)\s+(\d+)\s+(THW|\(HDPE\))/g, '$1 / $2 $3');
-                  // ถ้ายังไม่มี "/" ลอง pattern อื่น เช่น "x 185 95 THW" -> "x 185 / 95 THW"
-                  cableString = cableString.replace(/(x\s+\d+)\s+(\d+)\s+(THW)/g, '$1 / $2 $3');
-                }
-
-                terminalCable = cableString;
-              }
-            }
-          }
-        }
-
-        // สร้างรายการสินค้า: Terminal Wiring Cable + Terminal Wire conduit/tray
-        const productNameParts: string[] = [];
-        if (terminalCable) {
-          productNameParts.push(`${terminalCable}`);
-        }
-        if (terminalWireConduit) {
-          productNameParts.push(`${terminalWireConduit}`);
-        }
-        const productName = productNameParts.length > 0 ? productNameParts.join(', ') : 'Terminal Configuration';
-
+      if (props.chargerInstallationType === 'group' && props.numberOfTerminals && resolvedTerminalSizes.length > 0 && props.terminalWiringType && terminalLineResults.length > 0) {
         terminalLineResults.forEach((line) => {
+          const size = resolvedTerminalSizes[line.terminalIndex] || resolvedTerminalSizes[0] || '';
+          const wiringInfo = getTerminalWiringInfoByIndex(line.terminalIndex, size);
+          const productNameParts: string[] = [];
+          if (wiringInfo?.cable) productNameParts.push(`${wiringInfo.cable}`);
+          if (wiringInfo?.conduitTray) {
+            productNameParts.push(`${wiringInfo?.conduitTray}`);
+          }
+          const productName = productNameParts.length > 0
+            ? `(${size || '-'}) - ${productNameParts.join(',')}`
+            : `(${size || '-'})`;
+
           products.push({
-            type: `Terminal ${line.terminalIndex + 1} Cable config`,
-            code: terminalResult?.code || '-',
+            type: `Terminal ${line.terminalIndex + 1} Cable config (${props.terminalWiringType || '-'})`,
+            code: wiringInfo?.code || terminalResult?.code || '-',
             productName: productName,
             distance: `${line.distance}(${line.inputDistance})`,
             materialTotal: line.materialCost,
@@ -6694,7 +6707,7 @@ function MoreDetailCard(props: any) {
             typeValue = `(TR to MDB) ${typeValue}`;
           }
         } else if (sectionKey === 'mdb-to-charger') {
-          typeValue = `(MDB to Charger) ${stripChargerKwPrefix(typeValue)}`;
+          typeValue = stripChargerKwPrefix(typeValue);
         }
       }
 
@@ -7184,7 +7197,8 @@ function MoreDetailCard(props: any) {
     stationTotals, profitPercent, profitAmount, cfPercent, cfAmount,
     stationTotalWithProfit, travelTotals, travelDistance,
     stationCostSections, terminalResult, terminalLineResults,
-    props.chargerInstallationType, props.numberOfTerminals, props.terminalSize, props.terminalWiringType,
+    props.chargerInstallationType, props.numberOfTerminals, resolvedTerminalSizes, props.terminalWiringType,
+    getTerminalWiringInfoByIndex,
     extraItems
   ]);
 
@@ -13309,14 +13323,14 @@ function MoreDetailCard(props: any) {
                       })}
 
                       {/* แสดงผลลัพธ์ Terminal รวมในส่วน MDB to Charger (กรณี Group Charger) */}
-                      {props.chargerInstallationType === 'group' && props.numberOfTerminals && props.terminalSize && props.terminalWiringType && terminalResult && (
+                      {props.chargerInstallationType === 'group' && props.numberOfTerminals && resolvedTerminalSizes.length > 0 && props.terminalWiringType && terminalResult && (
                         <div className="bg-purple-50 rounded-lg border border-purple-200 p-4 space-y-4">
                           <div className="text-lg font-semibold text-purple-800">
                             Terminal Configuration
                           </div>
                           <div className="text-xs text-gray-600">
                             <span className="font-medium text-gray-700">ขนาดTerminal:</span>
-                            <span className="ml-1">{props.terminalSize}</span>
+                            <span className="ml-1">{resolvedTerminalSizes.filter(Boolean).join(', ') || '-'}</span>
                             <span className="text-gray-400 mx-2">|</span>
                             <span className="font-medium text-gray-700">ประเภท:</span>
                             <span className="ml-1">{props.terminalWiringType}</span>
@@ -13480,7 +13494,7 @@ function MoreDetailCard(props: any) {
           )}
 
           {/* Terminal Configuration Card - แสดงเฉพาะกรณี Group Charger */}
-          {props.chargerInstallationType === 'group' && props.numberOfTerminals && props.terminalSize && props.terminalWiringType && (
+          {chargerSelection === 'yes' && props.chargerInstallationType === 'group' && props.numberOfTerminals && resolvedTerminalSizes.length > 0 && props.terminalWiringType && (
             <Card className="shadow-xl border-0 overflow-hidden mt-6">
               <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 border-b">
                 <CardTitle className="flex items-center gap-2 text-purple-800">
@@ -13490,171 +13504,80 @@ function MoreDetailCard(props: any) {
               </CardHeader>
               <CardContent className="p-6">
                 <div className="space-y-4">
-                  {/* ข้อมูลพื้นฐาน Terminal */}
-                  <div className="space-y-3">
-                    <h5 className="text-sm font-semibold text-gray-700 mb-3">ข้อมูล Terminal</h5>
-
-                    {/* จำนวนTerminal + ขนาดTerminal (บรรทัดเดียวกัน) */}
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border border-purple-100">
-                        <span className="font-medium text-gray-700 flex items-center gap-2">
-                          <Package className="h-4 w-4 text-purple-600" />
-                          จำนวนTerminal:
-                        </span>
-                        <span className="font-semibold text-purple-900">{props.numberOfTerminals}</span>
-                      </div>
-                      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border border-purple-100">
-                        <span className="font-medium text-gray-700 flex items-center gap-2">
-                          <Settings className="h-4 w-4 text-purple-600" />
-                          ขนาดTerminal:
-                        </span>
-                        <span className="font-semibold text-purple-900">{props.terminalSize}</span>
-                      </div>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border border-purple-100">
+                      <span className="font-medium text-gray-700 flex items-center gap-2">
+                        <Package className="h-4 w-4 text-purple-600" />
+                        จำนวนTerminal:
+                      </span>
+                      <span className="font-semibold text-purple-900">{props.numberOfTerminals}</span>
                     </div>
-
-                    {/* การเดินสายไปTerminal */}
                     <div className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border border-purple-100">
                       <span className="font-medium text-gray-700 flex items-center gap-2">
                         <Cable className="h-4 w-4 text-purple-600" />
-                        ประเภท:
+                        ประเภทการเดินสาย:
                       </span>
                       <span className="font-semibold text-purple-900 text-sm text-right max-w-[60%]">{props.terminalWiringType}</span>
                     </div>
                   </div>
 
-                  <Separator />
-
-                  {/* Terminal Wiring Information */}
                   <div className="space-y-3">
-                    <h5 className="text-sm font-semibold text-gray-700 mb-3">ข้อมูลการเดินสาย Terminal</h5>
-
-                    {/* Terminal Wiring Cable */}
-                    {(() => {
-                      // Mapping terminal size ไปยัง row number
-                      const terminalSizeToRow: Record<string, Record<string, number>> = {
-                        'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน': {
-                          '300A': 17,
-                          '350A': 18,
-                          '380A': 18,
-                          '500A': 23,
-                          '600A': 24
-                        },
-                        'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา': {
-                          '300A': 11,
-                          '350A': 12,
-                          '380A': 12,
-                          '500A': 17,
-                          '600A': 18
-                        }
-                      };
-
-                      const sheetName = props.terminalWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน'
-                        ? 'แบบ 9.12'
-                        : 'แบบ 9.15';
-
-                      const rowMapping = terminalSizeToRow[props.terminalWiringType];
-                      if (!rowMapping) return null;
-
-                      const rowNum = rowMapping[props.terminalSize];
-                      if (!rowNum) return null;
-
-                      const sheet = getExcelData(sheetName);
-                      if (!sheet || sheet.length === 0) return null;
-
-                      const row = sheet.find((r: any) => r.__rowNum__ === rowNum);
-                      if (!row) return null;
-
-                      // ดึงข้อมูล Cable จาก __EMPTY_1 ถึง __EMPTY_12
-                      const cableCols = ['__EMPTY_1', '__EMPTY_2', '__EMPTY_3', '__EMPTY_4', '__EMPTY_5', '__EMPTY_6', '__EMPTY_7', '__EMPTY_8', '__EMPTY_9', '__EMPTY_10', '__EMPTY_11', '__EMPTY_12'];
-                      const cableValues = cableCols.map(col => row[col]).filter(Boolean);
-                      let cableString = cableValues.join(' ');
-
-                      // Format: เพิ่ม "/" ถ้าไม่มี และใส่ () รอบ HDPE
-                      // ลบ * ออกจาก HDPE ก่อน (ถ้ามี)
-                      cableString = cableString.replace(/\bHDPE\s*\*/g, 'HDPE');
-                      // ถ้ามี HDPE ให้ใส่ () รอบ
-                      cableString = cableString.replace(/\bHDPE\b/g, '(HDPE)');
-                      // ถ้าไม่มี "/" ในข้อมูล แต่มีรูปแบบที่ควรมี "/" ให้เพิ่ม
-                      // เช่น "CV 4 x 120 70 THW" -> "CV 4 x 120 / 70 THW"
-                      // หรือ "CV 4 x 185 95 THW" -> "CV 4 x 185 / 95 THW"
-                      if (!cableString.includes('/')) {
-                        // หา pattern ที่ควรมี "/" เช่น "x 120 70" -> "x 120 / 70"
-                        // หรือ "x 185 95" -> "x 185 / 95"
-                        // Pattern: ตัวเลข ตัวเลข THW หรือ (HDPE)
-                        cableString = cableString.replace(/(\d+)\s+(\d+)\s+(THW|\(HDPE\))/g, '$1 / $2 $3');
-                        // ถ้ายังไม่มี "/" ลอง pattern อื่น เช่น "x 185 95 THW" -> "x 185 / 95 THW"
-                        cableString = cableString.replace(/(x\s+\d+)\s+(\d+)\s+(THW)/g, '$1 / $2 $3');
-                      }
-
+                    <h5 className="text-sm font-semibold text-gray-700">ข้อมูลราย Terminal (รวมการตั้งค่า + การเดินสาย + ระยะคำนวณ)</h5>
+                    {resolvedTerminalSizes.map((size: string, idx: number) => {
+                      const info = getTerminalWiringInfoByIndex(idx, size);
+                      const distanceValue = terminalLineDistances[idx] || '';
                       return (
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                          <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-100">
-                            <span className="font-medium text-gray-700 flex items-center gap-2">
-                              <Cable className="h-4 w-4 text-blue-600" />
-                              ขนาดสาย (CV/THW):
-                            </span>
-                            <span className="font-semibold text-blue-900 text-sm text-right max-w-[60%]">{cableString || '-'}</span>
-                          </div>
-                          {/* conduit size อยู่บรรทัดเดียวกันกับขนาดสาย */}
-                          {props.terminalWireConduit ? (
-                            <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-100">
-                              <span className="font-medium text-gray-700 flex items-center gap-2">
-                                <Cable className="h-4 w-4 text-green-600" />
-                                {props.terminalWiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา'
-                                  ? 'tray size:'
-                                  : 'conduit size:'}
-                              </span>
-                              <span className="font-semibold text-green-900 text-sm text-right max-w-[60%]">{props.terminalWireConduit}</span>
+                        <div key={`terminal-unified-${idx}`} className="p-4 bg-white rounded-lg border border-purple-100 space-y-3">
+                          <div className="text-sm font-semibold text-purple-800">Terminal{idx + 1}</div>
+                          <div className="space-y-3">
+                            <div className="p-3 bg-gradient-to-r from-slate-50 to-purple-50 rounded-lg border border-purple-100">
+                              <div className="flex flex-wrap items-center gap-2 text-sm">
+                                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-purple-200">
+                                  <Settings className="h-4 w-4 text-purple-600" />
+                                  <span className="font-medium text-gray-700">ขนาดTerminal:</span>
+                                  <span className="font-semibold text-purple-900">{size || '-'}</span>
+                                </div>
+                                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-blue-200">
+                                  <Cable className="h-4 w-4 text-blue-600" />
+                                  <span className="font-medium text-gray-700">ขนาดสาย (CV/THW):</span>
+                                  <span className="font-semibold text-blue-900">{info?.cable || '-'}</span>
+                                </div>
+                                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-green-200">
+                                  <Cable className="h-4 w-4 text-green-600" />
+                                  <span className="font-medium text-gray-700">
+                                    {props.terminalWiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' ? 'tray size:' : 'conduit size:'}
+                                  </span>
+                                  <span className="font-semibold text-green-900">{info?.conduitTray || '-'}</span>
+                                </div>
+                              </div>
                             </div>
-                          ) : (
-                            <div />
-                          )}
+                            <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
+                              <Label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                                <Ruler className="h-4 w-4 text-purple-600" />
+                                ระยะสาย Terminal{idx + 1} (เมตร)
+                              </Label>
+                              <Input
+                                type="number"
+                                value={distanceValue}
+                                onChange={(e) => {
+                                  const next = [...terminalLineDistances];
+                                  next[idx] = e.target.value;
+                                  setTerminalLineDistances(next);
+                                }}
+                                placeholder="กรอกระยะ (เมตร)"
+                                className="h-11 border-purple-200 focus:border-purple-500 focus:ring-purple-500"
+                              />
+                            </div>
+                          </div>
                         </div>
                       );
-                    })()}
-                  </div>
-
-                  <Separator />
-
-                  {/* ช่องกรอกระยะ */}
-                  <div className="space-y-3">
-                    <h5 className="text-sm font-semibold text-gray-700 mb-2">กรอกข้อมูลสำหรับคำนวณ</h5>
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                        <Ruler className="h-4 w-4 text-purple-600" />
-                        ระยะทาง: <span className="text-xs text-gray-500 font-normal">(เมตร) — อิงตาม จำนวนTerminal</span>
-                      </Label>
-
-                      <div className="space-y-3">
-                        {terminalLineDistances.map((value, idx) => (
-                          <div key={idx} className="flex items-center gap-3">
-                            <Label className="min-w-[140px] text-sm text-gray-700">
-                              ระยะสาย Terminal{idx + 1}:
-                            </Label>
-                            <Input
-                              type="number"
-                              value={value}
-                              onChange={(e) => {
-                                const next = [...terminalLineDistances];
-                                next[idx] = e.target.value;
-                                setTerminalLineDistances(next);
-                                // ไม่ต้องเรียก calculateTerminalResult ตรงนี้ เพราะ useEffect จะคำนวณให้อัตโนมัติ
-                              }}
-                              placeholder="กรอกระยะ (เมตร)"
-                              className="h-12 border-purple-200 focus:border-purple-500 focus:ring-purple-500"
-                            />
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* แสดงผลรวมระยะ */}
-                      <div className="mt-2 text-xs text-gray-500">
-                        รวมระยะทั้งหมด:{" "}
-                        <span className="font-semibold text-gray-700">
-                          {terminalLineDistances.reduce((sum, d) => sum + (parseFloat(d) || 0), 0).toLocaleString('th-TH')}
-                        </span>{" "}
-                        เมตร
-                      </div>
+                    })}
+                    <div className="mt-1 text-xs text-gray-500">
+                      รวมระยะทั้งหมด:{" "}
+                      <span className="font-semibold text-gray-700">
+                        {terminalLineDistances.reduce((sum, d) => sum + (parseFloat(d) || 0), 0).toLocaleString('th-TH')}
+                      </span>{" "}
+                      เมตร
                     </div>
                   </div>
 
@@ -13670,7 +13593,7 @@ function MoreDetailCard(props: any) {
                 ผลลัพธ์การคำนวณ MDB to Group Charger Configuration
               </h4>
 
-              {Object.keys(chargerResults).length > 0 ? (
+              {(Object.keys(chargerResults).length > 0 || !!terminalResult) ? (
                 <div className="space-y-4">
                   {Object.entries(chargerResults).map(([index, result]) => {
                     const chargerIndex = parseInt(index);
@@ -13858,80 +13781,56 @@ function MoreDetailCard(props: any) {
                         <CollapsibleContent>
                           <div className="px-4 pb-4 space-y-3">
                             {(() => {
-                              const terminalSizeToRow: Record<string, Record<string, number>> = {
-                                'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน': {
-                                  '300A': 17, '350A': 18, '380A': 18, '500A': 23, '600A': 24
-                                },
-                                'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา': {
-                                  '300A': 11, '350A': 12, '380A': 12, '500A': 17, '600A': 18
-                                }
-                              };
-
-                              const sheetName = props.terminalWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน'
-                                ? 'แบบ 9.12'
-                                : 'แบบ 9.15';
-
-                              const rowMapping = terminalSizeToRow[props.terminalWiringType || ''];
-                              const rowNum = rowMapping?.[props.terminalSize || ''];
-                              const sheet = rowNum ? getExcelData(sheetName) : [];
-                              const row = rowNum ? sheet.find((r: any) => r.__rowNum__ === rowNum) : null;
-                              if (!row) return null;
-
-                              const cableCols = ['__EMPTY_1', '__EMPTY_2', '__EMPTY_3', '__EMPTY_4', '__EMPTY_5', '__EMPTY_6', '__EMPTY_7', '__EMPTY_8', '__EMPTY_9', '__EMPTY_10', '__EMPTY_11', '__EMPTY_12'];
-                              const cableValues = cableCols.map(col => row[col]).filter(Boolean);
-                              let cableString = cableValues.join(' ');
-                              cableString = cableString.replace(/\bHDPE\s*\*/g, 'HDPE');
-                              cableString = cableString.replace(/\bHDPE\b/g, '(HDPE)');
-                              if (!cableString.includes('/')) {
-                                cableString = cableString.replace(/(\d+)\s+(\d+)\s+(THW|\(HDPE\))/g, '$1 / $2 $3');
-                                cableString = cableString.replace(/(x\s+\d+)\s+(\d+)\s+(THW)/g, '$1 / $2 $3');
-                              }
-
                               return (
                                 <div className="text-xs text-gray-600">
-                                  <span className="font-medium text-gray-700">ประเภท:</span>
-                                  <span className="ml-1">{props.terminalWiringType || '-'}</span>
-                                  <span className="text-gray-400 mx-2">|</span>
-                                  <span className="font-medium text-gray-700">ขนาดสาย (CV/THW):</span>
-                                  <span className="ml-1">{cableString || '-'}</span>
-                                  <span className="text-gray-400 mx-2">|</span>
-                                  <span className="font-medium text-gray-700">
-                                    {props.terminalWiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา'
-                                      ? 'tray size:'
-                                      : 'conduit size:'}
-                                  </span>
-                                  <span className="ml-1">{props.terminalWireConduit || '-'}</span>
+                                  <div>
+                                    <span className="font-medium text-gray-700">ประเภท:</span>
+                                    <span className="ml-1">{props.terminalWiringType || '-'}</span>
+                                  </div>
                                 </div>
                               );
                             })()}
-                            {terminalLineResults.map((line) => (
-                              <div key={line.terminalIndex} className="p-3 bg-white rounded-lg border border-purple-100">
-                                <div className="text-sm font-semibold text-purple-800 mb-1">
-                                  Terminal {line.terminalIndex + 1}
-                                  <span className="ml-2 text-xs font-normal text-gray-600">ระยะ {line.distance.toLocaleString('th-TH')} เมตร</span>
+                            {terminalLineResults.map((line) => {
+                              const size = resolvedTerminalSizes[line.terminalIndex] || resolvedTerminalSizes[0] || '-';
+                              const info = getTerminalWiringInfoByIndex(line.terminalIndex, size);
+                              return (
+                                <div key={line.terminalIndex} className="p-3 bg-white rounded-lg border border-purple-100">
+                                  <div className="text-sm font-semibold text-purple-800 mb-1">
+                                    Terminal {line.terminalIndex + 1}
+                                    <span className="ml-2 text-xs font-normal text-gray-600">
+                                      ระยะ {line.distance.toLocaleString('th-TH')}({line.inputDistance.toLocaleString('th-TH')})
+                                    </span>
+                                  </div>
+                                  <div className="text-xs text-gray-600 mb-2">
+                                    <span className="font-medium text-gray-700">ขนาดสาย:</span>
+                                    <span className="ml-1">{info?.cable || '-'}</span>
+                                    <span className="text-gray-400 mx-2">|</span>
+                                    <span className="font-medium text-gray-700">{props.terminalWiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' ? 'tray:' : 'conduit:'}</span>
+                                    <span className="ml-1">{info?.conduitTray || '-'}</span>
+                                  </div>
+                                  <div className="grid grid-cols-3 gap-4">
+                                    <div>
+                                      <div className="text-xs text-gray-600 mb-1">ค่าของ:</div>
+                                      <div className="text-sm font-semibold text-gray-800">
+                                        {line.materialCost.toLocaleString('th-TH')} บาท
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <div className="text-xs text-gray-600 mb-1">ค่าแรง:</div>
+                                      <div className="text-sm font-semibold text-gray-800">
+                                        {line.laborCost.toLocaleString('th-TH')} บาท
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <div className="text-xs text-purple-700 font-semibold mb-1">ค่าใช้จ่าย:</div>
+                                      <div className="text-sm font-semibold text-purple-700">
+                                        {line.totalCost.toLocaleString('th-TH')} บาท
+                                      </div>
+                                    </div>
+                                  </div>
                                 </div>
-                                <div className="grid grid-cols-3 gap-4">
-                                  <div>
-                                    <div className="text-xs text-gray-600 mb-1">ค่าของ:</div>
-                                    <div className="text-sm font-semibold text-gray-800">
-                                      {line.materialCost.toLocaleString('th-TH')} บาท
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <div className="text-xs text-gray-600 mb-1">ค่าแรง:</div>
-                                    <div className="text-sm font-semibold text-gray-800">
-                                      {line.laborCost.toLocaleString('th-TH')} บาท
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <div className="text-xs text-purple-700 font-semibold mb-1">ค่าใช้จ่าย:</div>
-                                    <div className="text-sm font-semibold text-purple-700">
-                                      {line.totalCost.toLocaleString('th-TH')} บาท
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                             <div className="pt-2 border-t border-purple-200">
                               <div className="grid grid-cols-3 gap-4">
                                 <div>
@@ -18106,7 +18005,7 @@ function MoreDetailCard(props: any) {
                                             ? (product.type === 'TR to Land' ? 'Wh-Meter to MDB ( บนดิน )' : product.type === 'Land to MDB' ? 'Wh-Meter to MDB ( ใต้ดิน )' : product.type)
                                             : `(TR to MDB) ${product.type}`)
                                           : section.key === 'mdb-to-charger' && product.type && product.type !== '-'
-                                            ? `(MDB to Charger) ${product.type.replace(/:\s*\d+\s*kW\s*-\s*/i, ': ').trim()}`
+                                            ? product.type.replace(/:\s*\d+\s*kW\s*-\s*/i, ': ').trim()
                                             : product.type || '-'}
                                       </td>
                                       <td className="p-3 text-xs text-slate-800">{product.productName || product.code || '-'}</td>
@@ -18782,7 +18681,9 @@ function StationAccessory() {
         chargerInstallationType: homeData.chargerInstallationType || homeData.form?.chargerInstallationType || 'stand-alone',
         numberOfTerminals: homeData.form?.numberOfTerminals || homeData.numberOfTerminals || '',
         terminalSize: homeData.form?.terminalSize || homeData.terminalSize || '',
+        terminalSizes: homeData.form?.terminalSizes || homeData.terminalSizes || [],
         terminalWiringType: homeData.form?.terminalWiringType || homeData.terminalWiringType || '',
+        terminalWiringDetails: homeData.form?.terminalWiringDetails || homeData.terminalWiringDetails || [],
         terminalWireConduit: homeData.terminalWireConduit || ''
       };
     }
@@ -18799,7 +18700,9 @@ function StationAccessory() {
       chargerInstallationType: homeData.chargerInstallationType || homeData.form?.chargerInstallationType || 'stand-alone',
       numberOfTerminals: homeData.numberOfTerminals || homeData.form?.numberOfTerminals || '',
       terminalSize: homeData.terminalSize || homeData.form?.terminalSize || '',
+      terminalSizes: homeData.terminalSizes || homeData.form?.terminalSizes || [],
       terminalWiringType: homeData.terminalWiringType || homeData.form?.terminalWiringType || '',
+      terminalWiringDetails: homeData.terminalWiringDetails || homeData.form?.terminalWiringDetails || [],
       terminalWireConduit: homeData.terminalWireConduit || ''
     };
   }, [homeData]);
