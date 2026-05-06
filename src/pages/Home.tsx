@@ -116,6 +116,8 @@ export default function Home(): React.JSX.Element {
   const [excelSheets, setExcelSheets] = useState<Record<string, any[]>>({});
   const [customerCode, setCustomerCode] = useState<string>('');
   const [noCustomerCodeStationDialogOpen, setNoCustomerCodeStationDialogOpen] = useState(false);
+  const [isEditingTransformerSize, setIsEditingTransformerSize] = useState(false);
+  const [manualTransformerSize, setManualTransformerSize] = useState<string>('');
   const navigateToStationAccessoryRef = useRef<() => void>(() => {});
   const navigate = useNavigate()
   const location = useLocation()
@@ -131,6 +133,19 @@ export default function Home(): React.JSX.Element {
     const draft = { form, chargerInstallationType, chargerTypeMode, multiChargers, customerCode }
     localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
   }, [form, chargerInstallationType, chargerTypeMode, multiChargers, customerCode])
+
+  useEffect(() => {
+    setManualTransformerSize('');
+    setIsEditingTransformerSize(false);
+  }, [form.powerAuthority]);
+
+  useEffect(() => {
+    if (!manualTransformerSize) return;
+    const allowedOptions = getTransformerSizeOptions();
+    if (!allowedOptions.includes(manualTransformerSize)) {
+      setManualTransformerSize('');
+    }
+  }, [manualTransformerSize, form.powerAuthority, chargerTypeMode, multiChargers, results?.kWAllCharger, excelData.length]);
 
   // Load saved data on mount
   useEffect(() => {
@@ -361,21 +376,16 @@ export default function Home(): React.JSX.Element {
       }, 0)
       : calculatedResults?.kWAllCharger || 0;
 
-    const transformerSize = form.powerAuthority && kWAllChargerValue > 0
-      ? getTRSizeFromExcel(kWAllChargerValue)
+    const selectedTransformer = form.powerAuthority && kWAllChargerValue > 0
+      ? getSelectedTransformerLabel(kWAllChargerValue)
       : '';
 
-    // คำนวณ transformer (ค่าที่แสดงใน UI) - เหมือนกับที่ส่งไปหน้า StationAccessory
-    const transformer = form.powerAuthority && kWAllChargerValue > 0
-      ? (() => {
-        // ถ้าเป็น Row 32 (≤ 280 kW) ให้ส่ง "มิเตอร์แรงต่ำ 400 A"
-        if (isRow32(kWAllChargerValue)) {
-          return 'มิเตอร์แรงต่ำ 400 A';
-        }
-        // ถ้าไม่ใช่ ให้ส่งค่าจาก getTRSizeFromExcel
-        return getTRSizeFromExcel(kWAllChargerValue);
-      })()
-      : '';
+    const transformerSize = selectedTransformer === 'มิเตอร์แรงต่ำ 400 A'
+      ? '400'
+      : selectedTransformer;
+
+    // ค่าที่แสดงใน UI / ส่งต่อไปหน้า StationAccessory
+    const transformer = selectedTransformer;
 
     // คำนวณข้อมูลเพิ่มเติม (ต้องมี form.trWiringType และ form.powerAuthority)
     const trWiringSize = form.trWiringType && form.powerAuthority
@@ -403,41 +413,7 @@ export default function Home(): React.JSX.Element {
     })() : '';
 
     const mdbMainAf = form.powerAuthority ? (() => {
-      let trRowNum: number | undefined = undefined;
-      if (form.powerAuthority === 'MEA') {
-        const steps = [
-          { max: 280, row: 32 },
-          { max: 320, row: 33 },
-          { max: 400, row: 34 },
-          { max: 504, row: 35 },
-          { max: 640, row: 36 },
-          { max: 800, row: 37 },
-          { max: 1000, row: 38 },
-          { max: 1200, row: 39 },
-          { max: 1600, row: 40 },
-          { max: 2000, row: 41 },
-        ];
-        const found = steps.find(s => kWAllChargerValue <= s.max);
-        trRowNum = found?.row;
-      } else if (form.powerAuthority === 'PEA') {
-        const steps = [
-          { max: 80, row: 76 },
-          { max: 128, row: 77 },
-          { max: 200, row: 78 },
-          { max: 252, row: 79 },
-          { max: 320, row: 80 },
-          { max: 400, row: 81 },
-          { max: 504, row: 82 },
-          { max: 640, row: 83 },
-          { max: 800, row: 84 },
-          { max: 1000, row: 85 },
-          { max: 1200, row: 86 },
-          { max: 1600, row: 87 },
-          { max: 2000, row: 88 },
-        ];
-        const found = steps.find(s => kWAllChargerValue <= s.max);
-        trRowNum = found?.row;
-      }
+      const trRowNum = getTRWiringSizeCVsRowNumber();
       const trRow = excelData.find(r => r.__rowNum__ === trRowNum);
       const main2 = trRow ? trRow.__EMPTY_10 : '';
       return main2 ? `${main2} A` : '';
@@ -777,6 +753,14 @@ export default function Home(): React.JSX.Element {
     return form.powerAuthority === 'MEA' && kWAllCharger <= 280;
   };
 
+  const getCurrentKWAllCharger = (): number => {
+    return chargerTypeMode === 'any'
+      ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
+        return sum + extractPowerValue(chargerName);
+      }, 0)
+      : results?.kWAllCharger || 0;
+  };
+
   // ฟังก์ชันเลือก TR size ตาม Power Authority และผลรวม kW All charger
   const getTRSizeFromExcel = (kWAllCharger: number) => {
     if (form.powerAuthority === 'MEA') {
@@ -822,6 +806,68 @@ export default function Home(): React.JSX.Element {
       return '-';
     }
     return '-';
+  };
+
+  const getAutoTransformerLabel = (kWAllCharger: number): string => {
+    if (isRow32(kWAllCharger)) {
+      return 'มิเตอร์แรงต่ำ 400 A';
+    }
+    return String(getTRSizeFromExcel(kWAllCharger) || '-');
+  };
+
+  const getSelectedTransformerLabel = (kWAllCharger: number): string => {
+    return manualTransformerSize || getAutoTransformerLabel(kWAllCharger);
+  };
+
+  const getTransformerSizeOptions = (): string[] => {
+    const orderedOptions = form.powerAuthority === 'MEA'
+      ? ['มิเตอร์แรงต่ำ 400 A', '400', '500', '630', '800', '1000', '1250', '1500']
+      : form.powerAuthority === 'PEA'
+        ? ['100', '160', '250', '315', '400', '500', '630', '800', '1000', '1250', '1500']
+        : [];
+
+    if (orderedOptions.length === 0) return [];
+
+    const autoTransformer = getAutoTransformerLabel(getCurrentKWAllCharger());
+    const autoIndex = orderedOptions.indexOf(autoTransformer);
+
+    // อนุญาตให้ลดขนาดได้เพียง 1 step จากค่าที่คำนวณอัตโนมัติ และเลือกขนาดที่ใหญ่กว่าได้ทั้งหมด
+    if (autoIndex === -1) return orderedOptions;
+    const minAllowedIndex = Math.max(0, autoIndex - 1);
+    return orderedOptions.slice(minAllowedIndex);
+  };
+
+  const getTransformerRowByLabel = (transformerLabel: string): number | undefined => {
+    if (form.powerAuthority === 'MEA') {
+      if (transformerLabel === 'มิเตอร์แรงต่ำ 400 A') return 32;
+      const meaRowMapping: Record<string, number> = {
+        '400': 34,
+        '500': 35,
+        '630': 36,
+        '800': 37,
+        '1000': 38,
+        '1250': 39,
+        '1500': 40,
+      };
+      return meaRowMapping[transformerLabel];
+    }
+    if (form.powerAuthority === 'PEA') {
+      const peaRowMapping: Record<string, number> = {
+        '100': 76,
+        '160': 77,
+        '250': 78,
+        '315': 79,
+        '400': 80,
+        '500': 81,
+        '630': 82,
+        '800': 83,
+        '1000': 84,
+        '1250': 85,
+        '1500': 86,
+      };
+      return peaRowMapping[transformerLabel];
+    }
+    return undefined;
   };
 
   /** Calculate EV station requirements */
@@ -894,6 +940,8 @@ export default function Home(): React.JSX.Element {
       terminalWiringType: ''
     });
     setResults(null);
+    setIsEditingTransformerSize(false);
+    setManualTransformerSize('');
     setCustomerCode('');
     setChargerInstallationType('stand-alone');
     setChargerTypeMode('same');
@@ -1413,52 +1461,7 @@ export default function Home(): React.JSX.Element {
     const cols = wiringTypeToCols[form.trToLand];
     if (!cols) return '';
 
-    // หา rowNum ของ Transformer ที่เลือก
-    let trRowNum: number | undefined = undefined;
-    if (form.powerAuthority === 'MEA') {
-      const steps = [
-        { max: 280, row: 32 },
-        { max: 320, row: 33 },
-        { max: 400, row: 34 },
-        { max: 504, row: 35 },
-        { max: 640, row: 36 },
-        { max: 800, row: 37 },
-        { max: 1000, row: 38 },
-        { max: 1200, row: 39 },
-        { max: 1600, row: 40 },
-        { max: 2000, row: 41 },
-      ];
-      const inAll = chargerTypeMode === 'any'
-        ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
-          return sum + extractPowerValue(chargerName);
-        }, 0)
-        : results?.kWAllCharger || 0;
-      const found = steps.find(s => inAll <= s.max);
-      trRowNum = found?.row;
-    } else if (form.powerAuthority === 'PEA') {
-      const steps = [
-        { max: 80, row: 76 },
-        { max: 128, row: 77 },
-        { max: 200, row: 78 },
-        { max: 252, row: 79 },
-        { max: 320, row: 80 },
-        { max: 400, row: 81 },
-        { max: 504, row: 82 },
-        { max: 640, row: 83 },
-        { max: 800, row: 84 },
-        { max: 1000, row: 85 },
-        { max: 1200, row: 86 },
-        { max: 1600, row: 87 },
-        { max: 2000, row: 88 },
-      ];
-      const inAll = chargerTypeMode === 'any'
-        ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
-          return sum + extractPowerValue(chargerName);
-        }, 0)
-        : results?.kWAllCharger || 0;
-      const found = steps.find(s => inAll <= s.max);
-      trRowNum = found?.row;
-    }
+    const trRowNum = getTRWiringSizeCVsRowNumber();
     if (!trRowNum) return '';
 
     const trRow = excelData.find(r => r.__rowNum__ === trRowNum);
@@ -1496,52 +1499,7 @@ export default function Home(): React.JSX.Element {
     const cols = wiringTypeToCols[form.landToMdb];
     if (!cols) return '';
 
-    // หา rowNum ของ Transformer ที่เลือก
-    let trRowNum: number | undefined = undefined;
-    if (form.powerAuthority === 'MEA') {
-      const steps = [
-        { max: 280, row: 32 },
-        { max: 320, row: 33 },
-        { max: 400, row: 34 },
-        { max: 504, row: 35 },
-        { max: 640, row: 36 },
-        { max: 800, row: 37 },
-        { max: 1000, row: 38 },
-        { max: 1200, row: 39 },
-        { max: 1600, row: 40 },
-        { max: 2000, row: 41 },
-      ];
-      const inAll = chargerTypeMode === 'any'
-        ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
-          return sum + extractPowerValue(chargerName);
-        }, 0)
-        : results?.kWAllCharger || 0;
-      const found = steps.find(s => inAll <= s.max);
-      trRowNum = found?.row;
-    } else if (form.powerAuthority === 'PEA') {
-      const steps = [
-        { max: 80, row: 76 },
-        { max: 128, row: 77 },
-        { max: 200, row: 78 },
-        { max: 252, row: 79 },
-        { max: 320, row: 80 },
-        { max: 400, row: 81 },
-        { max: 504, row: 82 },
-        { max: 640, row: 83 },
-        { max: 800, row: 84 },
-        { max: 1000, row: 85 },
-        { max: 1200, row: 86 },
-        { max: 1600, row: 87 },
-        { max: 2000, row: 88 },
-      ];
-      const inAll = chargerTypeMode === 'any'
-        ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
-          return sum + extractPowerValue(chargerName);
-        }, 0)
-        : results?.kWAllCharger || 0;
-      const found = steps.find(s => inAll <= s.max);
-      trRowNum = found?.row;
-    }
+    const trRowNum = getTRWiringSizeCVsRowNumber();
     if (!trRowNum) return '';
 
     const trRow = excelData.find(r => r.__rowNum__ === trRowNum);
@@ -1670,6 +1628,13 @@ export default function Home(): React.JSX.Element {
 
   // ฟังก์ชันดึง row number สำหรับ TR Wiring Size CVs
   const getTRWiringSizeCVsRowNumber = (): number | undefined => {
+    const selectedTransformerLabel = getSelectedTransformerLabel(getCurrentKWAllCharger());
+    const selectedRow = getTransformerRowByLabel(selectedTransformerLabel);
+    if (selectedRow) {
+      console.log(`TR Wiring Size CVs Row Number Debug (selected transformer): ${selectedRow}`);
+      return selectedRow;
+    }
+
     let trRowNum: number | undefined = undefined;
 
     if (form.powerAuthority === 'MEA') {
@@ -2155,17 +2120,7 @@ export default function Home(): React.JSX.Element {
         multiChargers: multiChargers,
         charger: chargerTypeMode === 'any' ? '' : form.charger,
         transformer: (() => {
-          const kWAllChargerValue = chargerTypeMode === 'any'
-            ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
-              return sum + extractPowerValue(chargerName);
-            }, 0)
-            : results?.kWAllCharger || 0;
-          // ถ้าเป็น Row 32 (≤ 280 kW) ให้ส่ง "มิเตอร์แรงต่ำ 400 A"
-          if (isRow32(kWAllChargerValue)) {
-            return 'มิเตอร์แรงต่ำ 400 A';
-          }
-          // ถ้าไม่ใช่ ให้ส่งค่าจาก getTRSizeFromExcel
-          return getTRSizeFromExcel(kWAllChargerValue);
+          return getSelectedTransformerLabel(getCurrentKWAllCharger());
         })(),
         trWiringType: form.trWiringType,
         trToLand: form.trToLand,
@@ -3094,28 +3049,58 @@ export default function Home(): React.JSX.Element {
                 {/* Transformer Size */}
                 <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 shadow-sm">
                   <CardContent className="p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Battery className="h-5 w-5 text-green-600" />
-                      <span className="text-sm font-medium text-green-800">Transformer Size</span>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        <Battery className="h-5 w-5 text-green-600" />
+                        <span className="text-sm font-medium text-green-800">Transformer Size</span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 px-2 border-green-300 text-green-700 hover:bg-green-100"
+                        onClick={() => {
+                          alert('โหมดแก้ไข Transformer Size เปิดแล้ว\nสามารถลดขนาดได้เล็กลงสูงสุด 1 step จากค่าที่คำนวณอัตโนมัติ และเลือกขนาดที่ใหญ่กว่าได้ทั้งหมด');
+                          setIsEditingTransformerSize(true);
+                        }}
+                      >
+                        แก้ไข
+                      </Button>
                     </div>
                     <div className="text-2xl font-bold text-green-900 flex items-center">
                       {(() => {
-                        const kWAllChargerValue = chargerTypeMode === 'any'
-                          ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
-                            return sum + extractPowerValue(chargerName);
-                          }, 0)
-                          : results?.kWAllCharger || 0;
-                        if (isRow32(kWAllChargerValue)) {
-                          return 'มิเตอร์แรงต่ำ 400 A';
-                        }
+                        const selectedTransformer = getSelectedTransformerLabel(getCurrentKWAllCharger());
+                        if (selectedTransformer === 'มิเตอร์แรงต่ำ 400 A') return selectedTransformer;
                         return (
                           <>
-                            {getTRSizeFromExcel(kWAllChargerValue)}
+                            {selectedTransformer}
                             <span className="text-2xl font-bold text-green-900 ml-1">kVA</span>
                           </>
                         );
                       })()}
                     </div>
+                    {isEditingTransformerSize && (
+                      <div className="mt-3">
+                        <Select
+                          value={manualTransformerSize || '__auto__'}
+                          onValueChange={(value) => {
+                            setManualTransformerSize(value === '__auto__' ? '' : value);
+                          }}
+                        >
+                          <SelectTrigger className="h-10 border-green-300 focus:border-green-500 focus:ring-green-500">
+                            <SelectValue placeholder="เลือกขนาด Transformer" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__auto__">อัตโนมัติ (ตามผลคำนวณ)</SelectItem>
+                            {getTransformerSizeOptions().map((option) => (
+                              <SelectItem key={option} value={option}>
+                                {option === 'มิเตอร์แรงต่ำ 400 A' ? option : `${option} kVA`}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
                 {/* Power Authority Card */}
@@ -3499,17 +3484,11 @@ export default function Home(): React.JSX.Element {
                         <span className="font-medium text-gray-700">Transformer:</span>
                         <span className="font-semibold text-gray-900 text-base flex items-center">
                           {(() => {
-                            const kWAllChargerValue = chargerTypeMode === 'any'
-                              ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
-                                return sum + extractPowerValue(chargerName);
-                              }, 0)
-                              : results?.kWAllCharger || 0;
-                            if (isRow32(kWAllChargerValue)) {
-                              return 'มิเตอร์แรงต่ำ 400 A';
-                            }
+                            const selectedTransformer = getSelectedTransformerLabel(getCurrentKWAllCharger());
+                            if (selectedTransformer === 'มิเตอร์แรงต่ำ 400 A') return selectedTransformer;
                             return (
                               <>
-                                {getTRSizeFromExcel(kWAllChargerValue)}
+                                {selectedTransformer}
                                 <span className="text-base text-gray-900 ml-1">kVA</span>
                               </>
                             );
