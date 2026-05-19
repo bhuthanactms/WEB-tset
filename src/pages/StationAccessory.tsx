@@ -2596,7 +2596,7 @@ function MoreDetailCard(props: any) {
     ? getCommunicationPricing(routerCableRowNum, routerCableLengthValue)
     : null;
 
-  const cctvBaseRowNum = 9;
+  const cctvBaseRowNum = 10;
   const cctvBaseLabel = getCommunicationRowName(cctvBaseRowNum) || 'CCTV';
   // เริ่มต้น 4 ชิ้น, เพิ่มทีละ 4 ชิ้น ทุกครั้งที่เกิน 6 ช่อง
   // 6 ช่อง = 4, 7 ช่อง = 8, 13 ช่อง = 12
@@ -2605,7 +2605,6 @@ function MoreDetailCard(props: any) {
     ? getCommunicationPricing(cctvBaseRowNum, cctvQuantity)
     : null;
   const cctvCableRowNum = 11;
-  // ดึงชื่อจาก __EMPTY_1 ที่ row 10
   const cctvCableRow = communicationSheet.find((entry: any) => entry.__rowNum__ === cctvCableRowNum);
   const cctvCableLabel = cctvCableRow?.__EMPTY_1 || getCommunicationRowName(cctvCableRowNum);
   // ค่าเริ่มต้น: 42 (2ช่องจอด), เพิ่มทีละ 3 ต่อช่องจอด
