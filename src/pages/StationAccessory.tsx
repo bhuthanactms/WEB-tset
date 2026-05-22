@@ -2549,6 +2549,8 @@ function MoreDetailCard(props: any) {
   const fireExtinguisherQuantity = Math.ceil(parkingSlotsCount / 4);
   // 1.2 ป้ายสูง + วิธีใช้งาน: จำนวนชิ้น = จำนวนช่องจอด ÷ 4 (ปัดเศษขึ้น)
   const signageQuantity = Math.ceil(parkingSlotsCount / 4);
+  // 3.4 ปูนแท่นสถานี 2 ช่องจอด: จำนวนแท่น = จำนวนช่องจอด ÷ 2 (ปัดเศษขึ้น)
+  const stationPedestalQuantity = Math.ceil(parkingSlotsCount / 2);
 
   const bumperPoleRowNum = bumperPoleMaterial === 'steel' ? 8 : 9;
   const wheelStopRowNum = wheelStopMaterial === 'rubber' ? 6 : 7;
@@ -2748,14 +2750,9 @@ function MoreDetailCard(props: any) {
       }
     }
 
-    // 3.4 ปูนแท่นสถานี 2 ช่องจอด - rowNum: 7
-    // Group Charger: อิงตามจำนวน Terminal โดยคิดเป็นจำนวน "แท่น 2 ช่องจอด" = ceil(จำนวนTerminal / 2)
-    // Stand-alone: อิงจำนวน Charger
+    // 3.4 ปูนแท่นสถานี 2 ช่องจอด - rowNum: 7, จำนวนแท่น = ceil(จำนวนช่องจอด / 2)
     if (generalConcreteFloor === 'yes') {
-      const qty = props.chargerInstallationType === 'group'
-        ? Math.ceil(terminalsCount / 2)
-        : featureChargersCount;
-      const pricing = getConcretePricing(7, qty);
+      const pricing = getConcretePricing(7, stationPedestalQuantity);
       if (pricing) {
         totals.material += pricing.materialTotal;
         totals.labor += pricing.laborTotal;
@@ -6194,10 +6191,7 @@ function MoreDetailCard(props: any) {
           }
         }
         if (generalConcreteFloor === 'yes') {
-          const qty = props.chargerInstallationType === 'group'
-            ? Math.ceil(terminalsCount / 2)
-            : featureChargersCount;
-          const pricing = getConcretePricing(7, qty);
+          const pricing = getConcretePricing(7, stationPedestalQuantity);
           if (pricing) {
             products.push({
               type: 'งานปูน',
@@ -15556,12 +15550,11 @@ function MoreDetailCard(props: any) {
                                   <CollapsibleTrigger className="w-full p-3 text-left hover:bg-green-100 transition-colors rounded-lg">
                                     <div className="flex items-center justify-between">
                                       <span className="font-semibold">
-                                        {(props.chargerInstallationType === 'group' ? Math.ceil(terminalsCount / 2) : featureChargersCount)} <span className="text-sm">ชิ้น</span>
+                                        {stationPedestalQuantity} <span className="text-sm">ชิ้น</span>
                                       </span>
                                       <div className="flex items-center gap-3">
                                         {(() => {
-                                          const qty = props.chargerInstallationType === 'group' ? Math.ceil(terminalsCount / 2) : featureChargersCount;
-                                          const pricing = getConcretePricing(7, qty);
+                                          const pricing = getConcretePricing(7, stationPedestalQuantity);
                                           return pricing ? (
                                             <span className="font-semibold text-green-700">
                                               {pricing.total.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท
@@ -15581,8 +15574,7 @@ function MoreDetailCard(props: any) {
                                   <CollapsibleContent>
                                     <div className="px-3 pb-3">
                                       {(() => {
-                                        const qty = props.chargerInstallationType === 'group' ? Math.ceil(terminalsCount / 2) : featureChargersCount;
-                                        const pricing = getConcretePricing(7, qty);
+                                        const pricing = getConcretePricing(7, stationPedestalQuantity);
                                         if (!pricing) return <div className="text-xs text-red-500 mt-2">ไม่พบข้อมูล</div>;
                                         return (
                                           <div className="text-xs space-y-2 mt-2">
