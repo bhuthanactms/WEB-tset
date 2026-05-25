@@ -1841,9 +1841,9 @@ function MoreDetailCard(props: any) {
 
   const [transformerPrice, setTransformerPrice] = useState<any>(null);
 
-  const [mccbMainBrand, setMccbMainBrand] = useState(props.mccbMainBrand || 'ABB');
+  const [mccbMainBrand, setMccbMainBrand] = useState(props.mccbMainBrand ?? '');
 
-  const [mccbSubBrand, setMccbSubBrand] = useState('ABB');
+  const [mccbSubBrand, setMccbSubBrand] = useState(props.mccbSubBrand ?? '');
 
   const [mdbConfiguration, setMdbConfiguration] = useState<any>(null);
 
@@ -3937,12 +3937,12 @@ function MoreDetailCard(props: any) {
   const mdbTotals = React.useMemo(() => {
     const emptyTotals = { material: 0, labor: 0, total: 0 };
 
-    if (mdbSelection !== 'yes' || !mdbConfiguration) {
+    if (mdbSelection !== 'yes') {
       return emptyTotals;
     }
 
     let mainPrice = 0;
-    if (mdbConfiguration.product?.MDBMPric && mdbConfiguration.product.MDBMPric !== '-') {
+    if (mdbConfiguration?.product?.MDBMPric && mdbConfiguration.product.MDBMPric !== '-') {
       mainPrice = parsePrice(mdbConfiguration.product.MDBMPric);
     }
 
@@ -5534,30 +5534,31 @@ function MoreDetailCard(props: any) {
         }
       }
     } else if (sectionKey === 'mdb') {
-      if (mdbSelection === 'yes' && mdbConfiguration) {
-        let mainPrice = 0;
-        if (mdbConfiguration.product?.MDBMPric && mdbConfiguration.product.MDBMPric !== '-') {
-          mainPrice = parsePrice(mdbConfiguration.product.MDBMPric);
+      if (mdbSelection === 'yes') {
+        // 5.1 MDB MAIN - เฉพาะเมื่อเลือกยี่ห้อ (ไม่คิดราคาถ้าลูกค้ามีอยู่แล้ว)
+        if (mccbMainBrand && mdbConfiguration) {
+          let mainPrice = 0;
+          if (mdbConfiguration.product?.MDBMPric && mdbConfiguration.product.MDBMPric !== '-') {
+            mainPrice = parsePrice(mdbConfiguration.product.MDBMPric);
+          }
+
+          const mdbMainAt = props.mdbMainAt || '';
+          const mdbMainAf = props.mdbMainAf || '';
+          const listingValue = [
+            mdbMainAt ? `${mdbMainAt}` : '',
+            mdbMainAf ? `${mdbMainAf}` : ''
+          ].filter(Boolean).join('/') || '-';
+
+          products.push({
+            type: 'Main MCCB',
+            code: mdbConfiguration.header?.productCodeHeader || '',
+            productName: listingValue !== '-' ? `${mdbConfiguration.mccbBrand || ''} (${listingValue})` : (mdbConfiguration.mccbBrand || ''),
+            materialTotal: mainPrice,
+            laborTotal: 0,
+            totalPrice: mainPrice,
+            quantity: '1',
+          });
         }
-
-        // 5.1 MDB MAIN - เอาข้อมูลจาก MCCB Main
-        // สร้างค่าสำหรับรายการ (จาก mdbMainAt และ mdbMainAf)
-        const mdbMainAt = props.mdbMainAt || '';
-        const mdbMainAf = props.mdbMainAf || '';
-        const listingValue = [
-          mdbMainAt ? `${mdbMainAt}` : '',
-          mdbMainAf ? `${mdbMainAf}` : ''
-        ].filter(Boolean).join('/') || '-';
-
-        products.push({
-          type: 'Main MCCB',
-          code: mdbConfiguration.header?.productCodeHeader || '', // รหัสสินค้า
-          productName: listingValue !== '-' ? `${mdbConfiguration.mccbBrand || ''} (${listingValue})` : (mdbConfiguration.mccbBrand || ''), // ประเภท + (รายการ)
-          materialTotal: mainPrice,
-          laborTotal: 0,
-          totalPrice: mainPrice,
-          quantity: '1',
-        });
 
         // 5.2 MCCB SUB แต่ละอัน
         if (mccbSubBrand && Array.isArray(props.mdbSubs)) {
@@ -7524,22 +7525,21 @@ function MoreDetailCard(props: any) {
   // คำนวณ MDB Configuration เมื่อมีการเปลี่ยนแปลง mccb brand หรือ transformer size
 
   React.useEffect(() => {
+    if (!mccbMainBrand || !props.transformer || !props.getMDBConfiguration) {
+      setMdbConfiguration(null);
+      return;
+    }
 
-    if (mccbMainBrand && props.transformer && props.getMDBConfiguration) {
+    // ถ้าเป็น "มิเตอร์แรงต่ำ 400 A" ให้ใช้ 400 แทน (เพื่อดูราคาจาก 400A)
+    const transformerSize = props.transformer === 'มิเตอร์แรงต่ำ 400 A'
+      ? 400
+      : parseInt(props.transformer);
 
-      // ถ้าเป็น "มิเตอร์แรงต่ำ 400 A" ให้ใช้ 400 แทน (เพื่อดูราคาจาก 400A)
-      const transformerSize = props.transformer === 'มิเตอร์แรงต่ำ 400 A'
-        ? 400
-        : parseInt(props.transformer);
-
-      if (!isNaN(transformerSize)) {
-
-        const configData = props.getMDBConfiguration(transformerSize, mccbMainBrand);
-
-        setMdbConfiguration(configData);
-
-      }
-
+    if (!isNaN(transformerSize)) {
+      const configData = props.getMDBConfiguration(transformerSize, mccbMainBrand);
+      setMdbConfiguration(configData);
+    } else {
+      setMdbConfiguration(null);
     }
   }, [mccbMainBrand, props.transformer, props.getMDBConfiguration]);
   return (
@@ -11277,16 +11277,17 @@ function MoreDetailCard(props: any) {
                 <Label className="text-sm font-medium ">
 
                   ยี่ห้อ MCCB Main <span className="text-xs ">(MCCB Main Brand)</span>
+                  <span className="text-xs text-gray-500 font-normal ml-1">(ไม่บังคับ — กดซ้ำเพื่อยกเลิก)</span>
 
                 </Label>
 
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
 
                   <div
 
                     className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-red-50 cursor-pointer ${mccbMainBrand === 'ABB' ? 'bg-red-100 border-red-300' : ''}`}
 
-                    onClick={() => setMccbMainBrand('ABB')}
+                    onClick={() => setMccbMainBrand(mccbMainBrand === 'ABB' ? '' : 'ABB')}
 
                   >
 
@@ -11296,11 +11297,7 @@ function MoreDetailCard(props: any) {
 
                       checked={mccbMainBrand === 'ABB'}
 
-                      onCheckedChange={(checked) => {
-
-                        if (checked) setMccbMainBrand('ABB');
-
-                      }}
+                      onCheckedChange={(checked) => setMccbMainBrand(checked ? 'ABB' : '')}
 
                       className="text-red-500 border-red-400 data-[state=checked]:bg-red-500"
 
@@ -11318,7 +11315,7 @@ function MoreDetailCard(props: any) {
 
                     className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-green-50 cursor-pointer ${mccbMainBrand === 'EATON' ? 'bg-green-100 border-green-300' : ''}`}
 
-                    onClick={() => setMccbMainBrand('EATON')}
+                    onClick={() => setMccbMainBrand(mccbMainBrand === 'EATON' ? '' : 'EATON')}
 
                   >
 
@@ -11328,11 +11325,7 @@ function MoreDetailCard(props: any) {
 
                       checked={mccbMainBrand === 'EATON'}
 
-                      onCheckedChange={(checked) => {
-
-                        if (checked) setMccbMainBrand('EATON');
-
-                      }}
+                      onCheckedChange={(checked) => setMccbMainBrand(checked ? 'EATON' : '')}
 
                       className="text-green-500 border-green-400 data-[state=checked]:bg-green-500"
 
@@ -11350,7 +11343,7 @@ function MoreDetailCard(props: any) {
 
                     className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-blue-50 cursor-pointer ${mccbMainBrand === 'LS' ? 'bg-blue-100 border-blue-300' : ''}`}
 
-                    onClick={() => setMccbMainBrand('LS')}
+                    onClick={() => setMccbMainBrand(mccbMainBrand === 'LS' ? '' : 'LS')}
 
                   >
 
@@ -11360,11 +11353,7 @@ function MoreDetailCard(props: any) {
 
                       checked={mccbMainBrand === 'LS'}
 
-                      onCheckedChange={(checked) => {
-
-                        if (checked) setMccbMainBrand('LS');
-
-                      }}
+                      onCheckedChange={(checked) => setMccbMainBrand(checked ? 'LS' : '')}
 
                       className="text-blue-500 border-blue-400 data-[state=checked]:bg-blue-500"
 
@@ -11378,7 +11367,39 @@ function MoreDetailCard(props: any) {
 
                   </div>
 
+                  <div
+
+                    className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer ${!mccbMainBrand ? 'bg-gray-100 border-gray-400' : ''}`}
+
+                    onClick={() => setMccbMainBrand('')}
+
+                  >
+
+                    <Checkbox
+
+                      id="mccb-main-existing"
+
+                      checked={!mccbMainBrand}
+
+                      onCheckedChange={(checked) => { if (checked) setMccbMainBrand(''); }}
+
+                      className="border-gray-400 data-[state=checked]:bg-gray-500"
+
+                    />
+
+                    <Label htmlFor="mccb-main-existing" className="font-medium cursor-pointer text-gray-700 text-sm">
+
+                      ลูกค้ามีอยู่แล้ว
+
+                    </Label>
+
+                  </div>
+
                 </div>
+
+                {!mccbMainBrand && (
+                  <p className="text-xs text-gray-500">ไม่คิดราคา MCCB Main — ใช้เมื่อลูกค้ามีอุปกรณ์อยู่แล้ว</p>
+                )}
 
                 {/* แสดงข้อมูล MDB Configuration */}
                 {mdbConfiguration && (
@@ -11500,18 +11521,17 @@ function MoreDetailCard(props: any) {
                   <div className="space-y-3">
                     <Label className="text-sm font-medium">
                       ยี่ห้อ MCCB Sub <span className="text-xs">(MCCB Sub Brand)</span>
+                      <span className="text-xs text-gray-500 font-normal ml-1">(ไม่บังคับ — กดซ้ำเพื่อยกเลิก)</span>
                     </Label>
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <div
                         className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-red-50 cursor-pointer ${mccbSubBrand === 'ABB' ? 'bg-red-100 border-red-300' : ''}`}
-                        onClick={() => setMccbSubBrand('ABB')}
+                        onClick={() => setMccbSubBrand(mccbSubBrand === 'ABB' ? '' : 'ABB')}
                       >
                         <Checkbox
                           id="mccb-sub-abb"
                           checked={mccbSubBrand === 'ABB'}
-                          onCheckedChange={(checked) => {
-                            if (checked) setMccbSubBrand('ABB');
-                          }}
+                          onCheckedChange={(checked) => setMccbSubBrand(checked ? 'ABB' : '')}
                           className="text-red-500 border-red-400 data-[state=checked]:bg-red-500"
                         />
                         <Label htmlFor="mccb-sub-abb" className="font-medium cursor-pointer text-red-700">
@@ -11520,14 +11540,12 @@ function MoreDetailCard(props: any) {
                       </div>
                       <div
                         className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-green-50 cursor-pointer ${mccbSubBrand === 'EATON' ? 'bg-green-100 border-green-300' : ''}`}
-                        onClick={() => setMccbSubBrand('EATON')}
+                        onClick={() => setMccbSubBrand(mccbSubBrand === 'EATON' ? '' : 'EATON')}
                       >
                         <Checkbox
                           id="mccb-sub-eaton"
                           checked={mccbSubBrand === 'EATON'}
-                          onCheckedChange={(checked) => {
-                            if (checked) setMccbSubBrand('EATON');
-                          }}
+                          onCheckedChange={(checked) => setMccbSubBrand(checked ? 'EATON' : '')}
                           className="text-green-500 border-green-400 data-[state=checked]:bg-green-500"
                         />
                         <Label htmlFor="mccb-sub-eaton" className="font-medium cursor-pointer text-green-700">
@@ -11536,21 +11554,36 @@ function MoreDetailCard(props: any) {
                       </div>
                       <div
                         className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-blue-50 cursor-pointer ${mccbSubBrand === 'LS' ? 'bg-blue-100 border-blue-300' : ''}`}
-                        onClick={() => setMccbSubBrand('LS')}
+                        onClick={() => setMccbSubBrand(mccbSubBrand === 'LS' ? '' : 'LS')}
                       >
                         <Checkbox
                           id="mccb-sub-ls"
                           checked={mccbSubBrand === 'LS'}
-                          onCheckedChange={(checked) => {
-                            if (checked) setMccbSubBrand('LS');
-                          }}
+                          onCheckedChange={(checked) => setMccbSubBrand(checked ? 'LS' : '')}
                           className="text-blue-500 border-blue-400 data-[state=checked]:bg-blue-500"
                         />
                         <Label htmlFor="mccb-sub-ls" className="font-medium cursor-pointer text-blue-700">
                           LS
                         </Label>
                       </div>
+                      <div
+                        className={`flex items-center space-x-2 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer ${!mccbSubBrand ? 'bg-gray-100 border-gray-400' : ''}`}
+                        onClick={() => setMccbSubBrand('')}
+                      >
+                        <Checkbox
+                          id="mccb-sub-existing"
+                          checked={!mccbSubBrand}
+                          onCheckedChange={(checked) => { if (checked) setMccbSubBrand(''); }}
+                          className="border-gray-400 data-[state=checked]:bg-gray-500"
+                        />
+                        <Label htmlFor="mccb-sub-existing" className="font-medium cursor-pointer text-gray-700 text-sm">
+                          ลูกค้ามีอยู่แล้ว
+                        </Label>
+                      </div>
                     </div>
+                    {!mccbSubBrand && (
+                      <p className="text-xs text-gray-500">ไม่คิดราคา MCCB Sub — ใช้เมื่อลูกค้ามีอุปกรณ์อยู่แล้ว</p>
+                    )}
 
                     {/* แสดงข้อมูลราคา MCCB Sub */}
                     {mccbSubBrand && (
@@ -11696,7 +11729,7 @@ function MoreDetailCard(props: any) {
                 )}
 
                 {/* ราคารวม MDB */}
-                {mdbConfiguration && (() => {
+                {(() => {
                   // คำนวณราคา MDB Main
                   let mainPrice = 0;
                   if (mdbConfiguration.product?.MDBMPric && mdbConfiguration.product.MDBMPric !== '-') {
