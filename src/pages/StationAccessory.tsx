@@ -689,7 +689,11 @@ function MoreDetailCard(props: any) {
     // โหลดข้อมูล MDB
     if (parsed.mccbMainBrand !== undefined) setMccbMainBrand(parsed.mccbMainBrand);
     if (parsed.mccbSubBrand !== undefined) setMccbSubBrand(parsed.mccbSubBrand);
-    if (parsed.mdbConfiguration) setMdbConfiguration(parsed.mdbConfiguration);
+    if (parsed.mdbConfiguration && parsed.mccbMainBrand) {
+      setMdbConfiguration(parsed.mdbConfiguration);
+    } else {
+      setMdbConfiguration(null);
+    }
     if (parsed.mdbSelection !== undefined) setMdbSelection(parsed.mdbSelection);
     if (parsed.trMdbSelection !== undefined) setTrMdbSelection(parsed.trMdbSelection);
     if (parsed.installationLocation !== undefined) setInstallationLocation(parsed.installationLocation);
@@ -11732,7 +11736,7 @@ function MoreDetailCard(props: any) {
                 {(() => {
                   // คำนวณราคา MDB Main
                   let mainPrice = 0;
-                  if (mdbConfiguration.product?.MDBMPric && mdbConfiguration.product.MDBMPric !== '-') {
+                  if (mdbConfiguration?.product?.MDBMPric && mdbConfiguration.product.MDBMPric !== '-') {
                     const mainPriceStr = String(mdbConfiguration.product.MDBMPric).replace(/[\,\s]/g, '');
                     const mainPriceNum = parseFloat(mainPriceStr);
                     if (!isNaN(mainPriceNum)) {
@@ -18634,9 +18638,7 @@ function StationAccessory() {
       } else if (stateObj.homeData) {
         setHomeData(normalizeHomeDataPayload(stateObj.homeData));
       }
-      if (loadData.trDistance !== undefined || loadData.jobName || loadData.concreteSelection !== undefined || loadData.travelCostResult !== undefined || loadData.highVoltageSystem !== undefined || loadData.transformerType !== undefined || loadData.parkingSlots !== undefined) {
-        setInitialStationData(loadData);
-      }
+      setInitialStationData(loadData);
       return;
     }
 
