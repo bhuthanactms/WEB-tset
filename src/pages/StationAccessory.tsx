@@ -204,6 +204,21 @@ function MoreDetailCard(props: any) {
     return match ? parseInt(match[1]) : 1; // ถ้าไม่เจอให้คืนค่า 1 (ชุดเดียว)
   };
 
+  const formatMccbMainPhaseLabel = (value: string, phase: 'AT' | 'AF'): string => {
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    const base = trimmed.replace(/\s*(AT|AF)\s*$/i, '').trim();
+    const withUnit = /\sA\s*$/i.test(base) ? base : `${base} A`;
+    return `${withUnit} (${phase})`;
+  };
+
+  const formatMccbMainListing = (at?: string, af?: string): string => {
+    return [
+      at?.trim() ? formatMccbMainPhaseLabel(at, 'AT') : '',
+      af?.trim() ? formatMccbMainPhaseLabel(af, 'AF') : '',
+    ].filter(Boolean).join('/');
+  };
+
   // ฟังก์ชันดึงข้อมูล MCCB Sub จาก Excel sheet "ราคา MCCB ของ CHARGER"
   const getMccbSubData = (mccbSubValue: string, brand: string) => {
     // Mapping สำหรับกรณีพิเศษ (ต้องเช็คก่อน)
@@ -5546,12 +5561,7 @@ function MoreDetailCard(props: any) {
             mainPrice = parsePrice(mdbConfiguration.product.MDBMPric);
           }
 
-          const mdbMainAt = props.mdbMainAt || '';
-          const mdbMainAf = props.mdbMainAf || '';
-          const listingValue = [
-            mdbMainAt ? `${mdbMainAt}` : '',
-            mdbMainAf ? `${mdbMainAf}` : ''
-          ].filter(Boolean).join('/') || '-';
+          const listingValue = formatMccbMainListing(props.mdbMainAt, props.mdbMainAf) || '-';
 
           products.push({
             type: 'Main MCCB',
@@ -11050,13 +11060,7 @@ function MoreDetailCard(props: any) {
                     <span className="text-sm  min-w-[160px]">MCCB Main</span>
 
                     <span className="font-semibold ">
-
-                      {props.mdbMainAt || '-'}
-
-                      {props.mdbMainAf ? <span className="mx-2">/</span> : null}
-
-                      {props.mdbMainAf || ''}
-
+                      {formatMccbMainListing(props.mdbMainAt, props.mdbMainAf) || '-'}
                     </span>
 
                   </div>
@@ -11458,12 +11462,7 @@ function MoreDetailCard(props: any) {
                                 </div>
                               )}
                               {(() => {
-                                const mdbMainAt = props.mdbMainAt || '';
-                                const mdbMainAf = props.mdbMainAf || '';
-                                const listingValue = [
-                                  mdbMainAt ? `${mdbMainAt}AT` : '',
-                                  mdbMainAf ? `${mdbMainAf}AF` : ''
-                                ].filter(Boolean).join('/') || '-';
+                                const listingValue = formatMccbMainListing(props.mdbMainAt, props.mdbMainAf) || '-';
                                 return listingValue !== '-' && (
                                   <div className="mt-2 text-sm">
                                     <span className="font-medium text-gray-700">รายการ:</span>

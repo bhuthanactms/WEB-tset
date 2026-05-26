@@ -397,7 +397,7 @@ export default function Home(): React.JSX.Element {
       : '';
 
     const trWiringRowNum = form.trWiringType && form.powerAuthority
-      ? getTRWiringSizeCVsRowNumber()
+      ? getSelectedTransformerRowNumber()
       : undefined;
 
     const mdb = trWiringRowNum ? (() => {
@@ -840,14 +840,15 @@ export default function Home(): React.JSX.Element {
   const getTransformerRowByLabel = (transformerLabel: string): number | undefined => {
     if (form.powerAuthority === 'MEA') {
       if (transformerLabel === 'มิเตอร์แรงต่ำ 400 A') return 32;
+      // ต้องตรงกับคอลัมน์ Charger ใน Sheet1 (เดิมเลื่อนแถว +1 ทำให้ MCCB Main ผิด)
       const meaRowMapping: Record<string, number> = {
-        '400': 34,
-        '500': 35,
-        '630': 36,
-        '800': 37,
-        '1000': 38,
-        '1250': 39,
-        '1500': 40,
+        '400': 33,
+        '500': 34,
+        '630': 35,
+        '800': 36,
+        '1000': 37,
+        '1250': 38,
+        '1500': 39,
       };
       return meaRowMapping[transformerLabel];
     }
@@ -1686,6 +1687,12 @@ export default function Home(): React.JSX.Element {
     return trRowNum;
   };
 
+  // ฟังก์ชันดึง row number ของ "ขนาดหม้อแปลงที่เลือก" (ใช้เป็นฐานสำหรับ MCCB Main AT/AF)
+  const getSelectedTransformerRowNumber = (): number | undefined => {
+    const label = getSelectedTransformerLabel(getCurrentKWAllCharger());
+    return getTransformerRowByLabel(label);
+  };
+
   // เพิ่มฟังก์ชันดึง Charger Wiring cable ตาม Power Authority และ Charger Wiring Type
   // รองรับการเลือกหลายประเภท (array)
   const getChargerWiringCable = () => {
@@ -2138,70 +2145,27 @@ export default function Home(): React.JSX.Element {
         trWireConduit: form.landToMdb ? getLandToMdbWireConduit() : (form.trToLand ? getTRToLandWireConduit() : (getTRWireConduit() || '')),
         // Legacy MDB summary for backward compatibility
         mdb: (() => {
-          // ใช้ row number จาก TR Wiring Size CVs แทน Transformer Size
-          const trWiringRowNum = getTRWiringSizeCVsRowNumber();
-          const trRow = excelData.find(r => r.__rowNum__ === trWiringRowNum);
+          // ใช้ row number เดียวกับขนาดหม้อแปลงที่เลือก
+          const trRowNum = getSelectedTransformerRowNumber();
+          const trRow = excelData.find(r => r.__rowNum__ === trRowNum);
           const mccbMain = trRow ? trRow.__EMPTY_7 : '-';
-          console.log(`MDB (MCCB Main) Debug - Using TR Wiring Row ${trWiringRowNum}:`, trRow);
+          console.log(`MDB (MCCB Main) Debug - Using TR Row ${trRowNum}:`, trRow);
           console.log(`MCCB Main value (__EMPTY_7): ${mccbMain}`);
           return mccbMain ? `${mccbMain} A` : '-';
         })(),
         // New detailed MDB fields
         mdbMainAt: (() => {
-          // ใช้ row number จาก TR Wiring Size CVs แทน Transformer Size
-          const trWiringRowNum = getTRWiringSizeCVsRowNumber();
-          const trRow = excelData.find(r => r.__rowNum__ === trWiringRowNum);
+          // AT: __EMPTY_7, row เดียวกับขนาดหม้อแปลงที่เลือก
+          const trRowNum = getSelectedTransformerRowNumber();
+          const trRow = excelData.find(r => r.__rowNum__ === trRowNum);
           const mccbMain = trRow ? trRow.__EMPTY_7 : '';
-          console.log(`MDB Main AT Debug - Using TR Wiring Row ${trWiringRowNum}:`, trRow);
+          console.log(`MDB Main AT Debug - Using TR Row ${trRowNum}:`, trRow);
           console.log(`MCCB Main AT value (__EMPTY_7): ${mccbMain}`);
           return mccbMain ? `${mccbMain} A` : '';
         })(),
         mdbMainAf: (() => {
-          let trRowNum: number | undefined = undefined;
-          if (form.powerAuthority === 'MEA') {
-            const steps = [
-              { max: 280, row: 32 },
-              { max: 320, row: 33 },
-              { max: 400, row: 34 },
-              { max: 504, row: 35 },
-              { max: 640, row: 36 },
-              { max: 800, row: 37 },
-              { max: 1000, row: 38 },
-              { max: 1200, row: 39 },
-              { max: 1600, row: 40 },
-              { max: 2000, row: 41 },
-            ];
-            const inAll = chargerTypeMode === 'any'
-              ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
-                return sum + extractPowerValue(chargerName);
-              }, 0)
-              : results?.kWAllCharger || 0;
-            const found = steps.find(s => inAll <= s.max);
-            trRowNum = found?.row;
-          } else if (form.powerAuthority === 'PEA') {
-            const steps = [
-              { max: 80, row: 76 },
-              { max: 128, row: 77 },
-              { max: 200, row: 78 },
-              { max: 252, row: 79 },
-              { max: 320, row: 80 },
-              { max: 400, row: 81 },
-              { max: 504, row: 82 },
-              { max: 640, row: 83 },
-              { max: 800, row: 84 },
-              { max: 1000, row: 85 },
-              { max: 1200, row: 86 },
-              { max: 1600, row: 87 },
-              { max: 2000, row: 88 },
-            ];
-            const inAll = chargerTypeMode === 'any'
-              ? multiChargers.filter(name => name !== '').reduce((sum, chargerName) => {
-                return sum + extractPowerValue(chargerName);
-              }, 0)
-              : results?.kWAllCharger || 0;
-            const found = steps.find(s => inAll <= s.max);
-            trRowNum = found?.row;
-          }
+          // AF: __EMPTY_10, row เดียวกับขนาดหม้อแปลงที่เลือก
+          const trRowNum = getSelectedTransformerRowNumber();
           const trRow = excelData.find(r => r.__rowNum__ === trRowNum);
           const main2 = trRow ? trRow.__EMPTY_10 : '';
           return main2 ? `${main2} A` : '';
@@ -3142,11 +3106,11 @@ export default function Home(): React.JSX.Element {
                     </div>
                     <div className="text-2xl font-bold text-yellow-700">
                       {(() => {
-                        // ใช้ row number จาก TR Wiring Size CVs แทน Transformer Size
-                        const trWiringRowNum = getTRWiringSizeCVsRowNumber();
-                        const trRow = excelData.find(r => r.__rowNum__ === trWiringRowNum);
+                        // ใช้ row number เดียวกับขนาดหม้อแปลงที่เลือก
+                        const trRowNum = getSelectedTransformerRowNumber();
+                        const trRow = excelData.find(r => r.__rowNum__ === trRowNum);
                         const mccbMain = trRow ? trRow.__EMPTY_7 : '-';
-                        console.log(`MDB (MCCB Main) UI Debug - Using TR Wiring Row ${trWiringRowNum}:`, trRow);
+                        console.log(`MDB (MCCB Main) UI Debug - Using TR Row ${trRowNum}:`, trRow);
                         console.log(`MCCB Main UI value (__EMPTY_7): ${mccbMain}`);
                         return mccbMain ? `${mccbMain} A` : '-';
                       })()}
