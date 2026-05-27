@@ -5590,7 +5590,7 @@ function MoreDetailCard(props: any) {
                     materialTotal: basePrice * setCount, // คูณด้วยจำนวนชุด
                     laborTotal: 0,
                     totalPrice: basePrice * setCount, // คูณด้วยจำนวนชุด
-                    quantity: setCount > 1 ? String(setCount) : (item.quantity || '1'),
+                    quantity: String(setCount),
                   });
                 }
               });

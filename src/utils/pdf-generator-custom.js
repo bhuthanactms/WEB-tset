@@ -158,6 +158,23 @@ export function createCostPDF(jsonData) {
   // Calculate starting Y position after header
   let currentY = separatorY + 5; // ห่างจากเส้นขีด 5mm
 
+  // ขอบล่างที่ใช้ได้ (A4 ≈ 297mm, เว้นที่สำหรับเลขหน้า)
+  const PAGE_BOTTOM_Y = 285;
+  const ensurePageSpace = (y, neededMm) => {
+    if (y + neededMm > PAGE_BOTTOM_Y) {
+      doc.addPage();
+      return 20;
+    }
+    return y;
+  };
+
+  const estimateTailBlockHeight = () => {
+    const distanceTable = tables.find((t) => t.type === 'distance');
+    const distanceHeight = distanceTable?.rows?.length ? 28 : 0;
+    const summaryHeight = jsonData.summary ? 95 : 0;
+    return 12 + 55 + distanceHeight + summaryHeight;
+  };
+
   // Column definitions (same for all tables)
   const columns = [
     { header: 'รหัส', dataKey: 'code' },
@@ -173,6 +190,11 @@ export function createCostPDF(jsonData) {
   // Process each table
   tables.forEach((table, index) => {
     const { tablename, rows, type = 'default' } = table;
+
+    // หัวข้อ 4–5 + สรุปราคา: เริ่มหน้าใหม่ถ้าพื้นที่ไม่พอทั้งก้อน (ลดช่องว่างจากตารางซ้าย-ขวาไม่เท่ากัน)
+    if (type === 'cost') {
+      currentY = ensurePageSpace(currentY, estimateTailBlockHeight());
+    }
 
     // Track starting page for this table
     const tableStartPage = doc.internal.getNumberOfPages();
@@ -359,37 +381,28 @@ export function createCostPDF(jsonData) {
       const finalY = doc.lastAutoTable.finalY || currentY;
       currentY = finalY + 5; // Add spacing after table
     } else if (type === 'cost') {
-      // Cost table type - ตารางซ้าย-ขวา ข้างละ 7 แถว (ขยายจาก 6 เป็น 7)
+      // Cost table type - ตารางซ้าย-ขวา แบ่งแถวเท่าๆ กัน (ลดปัญหาตารางขวาสูงกว่าซ้ายแล้วเว้นช่องว่าง)
       const costRows = rows.rows || [];
       const summaryMaterial = rows.summary_material || 0;
       const summaryLabor = rows.summary_labor || 0;
       const summaryTotal = rows.summary_total || 0;
 
-      // สร้างข้อมูลสำหรับตารางซ้าย (หัวข้อ 1-7)
-      const leftTableData = costRows.slice(0, 7).map(row => [
+      const mapCostRow = (row) => [
         row.type || '',
         formatCurrency(row.material || 0),
         formatCurrency(row.labor || 0),
-        formatCurrency(row.total || 0)
-      ]);
+        formatCurrency(row.total || 0),
+      ];
 
-      // สร้างข้อมูลสำหรับตารางขวา (หัวข้อที่เหลือทั้งหมด + แถวสรุป)
-      const rightTableData = [];
-      // แสดงหัวข้อทั้งหมดที่เหลือ (เริ่มจาก index 7)
-      const remainingRows = costRows.slice(7);
-      remainingRows.forEach(row => {
-        rightTableData.push([
-          row.type || '',
-          formatCurrency(row.material || 0),
-          formatCurrency(row.labor || 0),
-          formatCurrency(row.total || 0)
-        ]);
-      });
+      const splitIndex = Math.ceil(costRows.length / 2);
+      const leftTableData = costRows.slice(0, splitIndex).map(mapCostRow);
+      const rightTableData = costRows.slice(splitIndex).map(mapCostRow);
 
-      // เพิ่มแถวว่างเพื่อให้ตารางขวามีความสูงพอๆ กับตารางซ้าย (อย่างน้อย 7 แถว)
-      // แต่ถ้ามีหัวข้อมากกว่า 7 แถวแล้ว ก็ไม่ต้องเพิ่มแถวว่าง
-      const minRows = 7; // ขยายจาก 6 เป็น 7
-      while (rightTableData.length < minRows - 1) { // -1 เพราะจะเพิ่มแถวสรุป
+      const maxDataRows = Math.max(leftTableData.length, rightTableData.length, 1);
+      while (leftTableData.length < maxDataRows) {
+        leftTableData.push(['', '', '', '']);
+      }
+      while (rightTableData.length < maxDataRows) {
         rightTableData.push(['', '', '', '']);
       }
 
@@ -510,7 +523,7 @@ export function createCostPDF(jsonData) {
       });
 
       // ใช้ตำแหน่งที่ตารางขวาจบ (หรือตารางซ้ายถ้าสูงกว่า)
-      currentY = Math.max(leftTableEndY, doc.lastAutoTable.finalY);
+      currentY = Math.max(leftTableEndY, doc.lastAutoTable.finalY) + 8;
 
     } else if (type === 'distance') {
       // Distance table type
@@ -721,11 +734,16 @@ export function createCostPDF(jsonData) {
       currentY = doc.lastAutoTable.finalY + 8;
     }
 
-    // Add new page if needed and there are more tables
-    // ปรับ threshold ให้ใช้หน้ากระดาษได้ดีขึ้น (A4 height = 297mm, margin top/bottom = 20mm, usable = ~257mm)
-    if (index < tables.length - 1 && currentY > 250) {
-      doc.addPage();
-      currentY = 20;
+    // ถ้าตารางถัดไปเป็นส่วนท้าย (สรุปต้นทุน/เดินทาง) ให้จองพื้นที่ก่อนเริ่ม
+    if (index < tables.length - 1) {
+      const nextType = tables[index + 1]?.type || 'default';
+      let reserveMm = 40;
+      if (nextType === 'cost') {
+        reserveMm = estimateTailBlockHeight();
+      } else if (nextType === 'distance' && jsonData.summary) {
+        reserveMm = 28 + 95;
+      }
+      currentY = ensurePageSpace(currentY, reserveMm);
     }
   });
 
@@ -733,12 +751,7 @@ export function createCostPDF(jsonData) {
   if (jsonData.summary) {
     const summary = jsonData.summary;
 
-    // Check if we need a new page
-    // ปรับ threshold ให้ใช้หน้ากระดาษได้ดีขึ้น
-    if (currentY > 250) {
-      doc.addPage();
-      currentY = 20;
-    }
+    currentY = ensurePageSpace(currentY, 95);
 
     // ลบคำว่า "สรุป" ออก
     // doc.setFontSize(12); // เพิ่ม 3 size จาก 9
@@ -1238,7 +1251,6 @@ export function createCostPDFSimple(jsonData, options = {}) {
 
     currentY = doc.lastAutoTable.finalY + 15;
 
-    // ปรับ threshold ให้ใช้หน้ากระดาษได้ดีขึ้น
     if (index < tables.length - 1 && currentY > 250) {
       doc.addPage();
       currentY = 20;
