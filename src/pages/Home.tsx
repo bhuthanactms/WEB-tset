@@ -984,6 +984,7 @@ export default function Home(): React.JSX.Element {
   // TR to Land options
   const trToLandOptions = [
     'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ',
+    'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน',
     'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา'
   ]
 
@@ -1345,6 +1346,10 @@ export default function Home(): React.JSX.Element {
         cols: ['__EMPTY_26', '__EMPTY_27', '__EMPTY_28'],
         unit: 'นิ้ว'
       },
+      'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน': {
+        cols: ['__EMPTY_47', '__EMPTY_48', '__EMPTY_49'],
+        unit: 'มม.'
+      },
       'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา': {
         cols: ['__EMPTY_68'],
         unit: 'ซม.'
@@ -1454,6 +1459,9 @@ export default function Home(): React.JSX.Element {
       'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ': [
         '__EMPTY_11', '__EMPTY_12', '__EMPTY_13', '__EMPTY_14', '__EMPTY_15', '__EMPTY_16', '__EMPTY_17', '__EMPTY_18', '__EMPTY_19'
       ], // __EMPTY_11 to __EMPTY_19
+      'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน': [
+        '__EMPTY_30', '__EMPTY_31', '__EMPTY_32', '__EMPTY_33', '__EMPTY_34', '__EMPTY_35', '__EMPTY_36', '__EMPTY_37', '__EMPTY_38', '__EMPTY_39'
+      ], // __EMPTY_30 to __EMPTY_39
       'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา': [
         '__EMPTY_51', '__EMPTY_52', '__EMPTY_53', '__EMPTY_54', '__EMPTY_55', '__EMPTY_56', '__EMPTY_57', '__EMPTY_58', '__EMPTY_59', '__EMPTY_60'
       ], // __EMPTY_51 to __EMPTY_60
