@@ -84,9 +84,11 @@ export default function Home(): React.JSX.Element {
     chargerWiringType: Array.isArray(rawForm?.chargerWiringType)
       ? rawForm.chargerWiringType
       : (rawForm?.chargerWiringType ? [rawForm.chargerWiringType] : []),
-    terminalSizes: Array.isArray(rawForm?.terminalSizes)
+    terminalSizes: (Array.isArray(rawForm?.terminalSizes)
       ? rawForm.terminalSizes
-      : (rawForm?.terminalSize ? [rawForm.terminalSize] : []),
+      : (rawForm?.terminalSize ? [rawForm.terminalSize] : [])
+    ).map((s: string) => (s === '300A' ? '' : s)),
+    terminalSize: rawForm?.terminalSize === '300A' ? '' : (rawForm?.terminalSize || ''),
     numberOfChargers: sanitizeNonNegativeString(rawForm?.numberOfChargers),
     numberOfTerminals: sanitizeNonNegativeString(rawForm?.numberOfTerminals)
   })
@@ -1009,6 +1011,14 @@ export default function Home(): React.JSX.Element {
     'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา'
   ]
 
+  // การเดินสายไป Terminal (Group Charger) — TRAY ซ่อนไว้ก่อนเผื่ออนาคต
+  const TERMINAL_WIRING_UNDERGROUND = 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน';
+  // const TERMINAL_WIRING_TRAY = 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา';
+  const terminalWiringTypeOptions = [
+    TERMINAL_WIRING_UNDERGROUND,
+    // TERMINAL_WIRING_TRAY,
+  ];
+
   // Charger wiring type options สำหรับ Group Charger (ไม่มี LADDER)
   const groupChargerWiringTypeOptions = [
     'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ',
@@ -1047,6 +1057,14 @@ export default function Home(): React.JSX.Element {
     });
   }, [isLowVoltageMeter400]);
 
+  // Terminal: บังคับใช้กลุ่ม 5 ฝังใต้ดิน (TRAY ปิดชั่วคราว)
+  useEffect(() => {
+    if (chargerInstallationType !== 'group' || !selectedTerminalSizes.some(Boolean)) return;
+    if (form.terminalWiringType !== TERMINAL_WIRING_UNDERGROUND) {
+      setForm((f) => ({ ...f, terminalWiringType: TERMINAL_WIRING_UNDERGROUND }));
+    }
+  }, [chargerInstallationType, selectedTerminalSizes, form.terminalWiringType]);
+
   const fetchExcelData = async () => {
     // Convert Google Sheets sharing URL to direct download URL
     const googleSheetsUrl = 'https://docs.google.com/spreadsheets/d/1yxZvBr0O9ZzFpQCgBeZIcQrKGq_x2wQz/edit?usp=sharing&ouid=111737986991833013743&rtpof=true&sd=true';
@@ -1074,11 +1092,76 @@ export default function Home(): React.JSX.Element {
 
       // อ่านทุก Sheet และเก็บไว้
       const allSheetsData: Record<string, any[]> = {};
+      const sheetLoadSummary: {
+        sheetName: string;
+        rowCount: number;
+        rowNumsSample: string;
+      }[] = [];
+
+      console.group('📚 สรุปการอ่าน Excel Sheets');
       workbook.SheetNames.forEach(sheetName => {
-        const sheetData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+        const sheetData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]) as any[];
         allSheetsData[sheetName] = sheetData;
-        console.log(`✅ อ่าน Sheet "${sheetName}" สำเร็จ: ${sheetData.length} แถว`);
+
+        const rowNums = sheetData
+          .map((r) => r.__rowNum__)
+          .filter((n): n is number => typeof n === 'number')
+          .sort((a, b) => a - b);
+        const rowNumsSample =
+          rowNums.length === 0
+            ? '-'
+            : rowNums.length <= 8
+              ? rowNums.join(', ')
+              : `${rowNums.slice(0, 4).join(', ')} … ${rowNums.slice(-4).join(', ')} (${rowNums.length} แถวมี __rowNum__)`;
+
+        sheetLoadSummary.push({
+          sheetName,
+          rowCount: sheetData.length,
+          rowNumsSample,
+        });
+        console.log(`✅ "${sheetName}" → ${sheetData.length} แถว`);
       });
+
+      console.table(sheetLoadSummary);
+      console.log(
+        '📋 รายชื่อ Sheet ทั้งหมด:',
+        workbook.SheetNames.map((name, i) => `${i + 1}. ${name}`).join(' | ')
+      );
+
+      const terminalSheets = ['แบบ 9.5', 'แบบ 9.12', 'แบบ 9.15'];
+      const terminalCheck = terminalSheets.map((name) => {
+        const rows = allSheetsData[name] || [];
+        const has = rows.length > 0;
+        return {
+          sheet: name,
+          loaded: has ? '✓' : '✗',
+          rows: rows.length,
+          row27: rows.find((r: any) => r.__rowNum__ === 27) ? '✓' : '-',
+          row25: rows.find((r: any) => r.__rowNum__ === 25) ? '✓' : '-',
+        };
+      });
+      console.log('🔌 Terminal wiring sheets (เช็คแถวสำคัญ):');
+      console.table(terminalCheck);
+
+      console.groupEnd();
+
+      // ข้อมูลทั้งหมดทุก Sheet (ขยายดูใน Console ได้)
+      console.log('📄 ข้อมูลทั้งหมดทุก Sheet (object):', allSheetsData);
+      console.group('📄 ข้อมูลทั้งหมดทุก Sheet (แยกตามชื่อ)');
+      workbook.SheetNames.forEach((sheetName) => {
+        const rows = allSheetsData[sheetName] || [];
+        console.groupCollapsed(`"${sheetName}" — ${rows.length} แถว`);
+        console.log(rows);
+        console.groupEnd();
+      });
+      console.groupEnd();
+
+      // เก็บไว้เช็คใน DevTools: window.__excelSheets / window.__excelSheetNames
+      if (typeof window !== 'undefined') {
+        (window as any).__excelSheets = allSheetsData;
+        (window as any).__excelSheetNames = workbook.SheetNames;
+        (window as any).__excelSheetSummary = sheetLoadSummary;
+      }
 
       // ระบุชื่อ Sheet โดยตรงเพื่อป้องกันการอ่านผิดเมื่อมี Sheet2
       // ลองหา Sheet1 ก่อน ถ้าไม่มีก็ใช้ Sheet แรก
@@ -1086,19 +1169,13 @@ export default function Home(): React.JSX.Element {
         name.toLowerCase() === 'sheet1' || name === 'Sheet1'
       ) || workbook.SheetNames[0];
 
-      console.log('📝 Sheet ที่ใช้สำหรับการคำนวณ:', targetSheetName);
+      console.log('📝 Sheet ที่ใช้สำหรับการคำนวณ (Sheet1):', targetSheetName);
 
       // เก็บข้อมูลทุก Sheet
       setExcelSheets(allSheetsData);
       // เก็บข้อมูล Sheet1 สำหรับการคำนวณ (backward compatibility)
       const sheet1Data = allSheetsData[targetSheetName] || [];
       setExcelData(sheet1Data);
-
-      // แสดงข้อมูลทั้งหมดของ Sheet1 เพื่อเช็คค่าและเขียนเงื่อนไข
-      console.log('📊 ========== Sheet1 Data (ทั้งหมด) ==========');
-      console.log('📋 จำนวนแถวทั้งหมด:', sheet1Data.length);
-      console.log('📄 ข้อมูลทั้งหมดของ Sheet1:', sheet1Data);
-      console.log('📊 ===========================================');
 
       console.log('✅ บันทึกข้อมูลลง state สำเร็จ');
     } catch (error) {
@@ -2021,39 +2098,43 @@ export default function Home(): React.JSX.Element {
     return 'TR Wire conduit :';
   }
 
+  // Sheet + แถวสำหรับ Terminal wiring ตามประเภทสายและขนาด Terminal
+  const resolveTerminalSheetRow = (
+    wiringType: string,
+    terminalSize: string
+  ): { sheetName: string; rowNum: number } | null => {
+    if (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน') {
+      if (terminalSize === '350A' || terminalSize === '380A') {
+        return { sheetName: 'แบบ 9.5', rowNum: 27 };
+      }
+      if (terminalSize === '500A' || terminalSize === '600A') {
+        return { sheetName: 'แบบ 9.12', rowNum: 25 };
+      }
+      return null;
+    }
+    if (wiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา') {
+      const trayRowBySize: Record<string, number> = {
+        '350A': 12,
+        '380A': 12,
+        '500A': 17,
+        '600A': 18,
+      };
+      const rowNum = trayRowBySize[terminalSize];
+      if (!rowNum) return null;
+      return { sheetName: 'แบบ 9.15', rowNum };
+    }
+    return null;
+  };
+
   // ฟังก์ชันดึงข้อมูล Terminal wiring จาก Excel
   const getTerminalWiringData = (terminalSizeValue?: string) => {
     const resolvedTerminalSize = terminalSizeValue || selectedTerminalSizes[0] || '';
     if (!resolvedTerminalSize || !form.terminalWiringType) return null;
 
-    // Mapping terminal size ไปยัง row number
-    const terminalSizeToRow: Record<string, Record<string, number>> = {
-      'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน': {
-        '300A': 17,
-        '350A': 18,
-        '380A': 18,
-        '500A': 23,
-        '600A': 24
-      },
-      'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา': {
-        '300A': 11,
-        '350A': 12,
-        '380A': 12,
-        '500A': 17,
-        '600A': 18
-      }
-    };
+    const sheetRow = resolveTerminalSheetRow(form.terminalWiringType, resolvedTerminalSize);
+    if (!sheetRow) return null;
 
-    const sheetName = form.terminalWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน'
-      ? 'แบบ 9.12'
-      : 'แบบ 9.15';
-
-    const rowMapping = terminalSizeToRow[form.terminalWiringType];
-    if (!rowMapping) return null;
-
-    const rowNum = rowMapping[resolvedTerminalSize];
-    if (!rowNum) return null;
-
+    const { sheetName, rowNum } = sheetRow;
     const sheet = excelSheets[sheetName];
     if (!sheet || sheet.length === 0) return null;
 
@@ -2074,10 +2155,9 @@ export default function Home(): React.JSX.Element {
     // ดึงข้อมูล Conduit/Tray
     let conduitTrayValue = '';
     if (form.terminalWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน') {
-      // ดึงจาก __EMPTY_14 ถึง __EMPTY_16 (3 คอลัมน์)
-      const conduitCols = ['__EMPTY_14', '__EMPTY_15', '__EMPTY_16'];
+      const conduitCols = ['__EMPTY_13', '__EMPTY_14', '__EMPTY_15', '__EMPTY_16'];
       const conduitValues = conduitCols.map(col => row[col]).filter(Boolean);
-      conduitTrayValue = conduitValues.join(' ') + ' มม.';
+      conduitTrayValue = conduitValues.length > 0 ? `${conduitValues.join(' ')} มม.` : '';
       console.log(`[getTerminalWiringData] Conduit values:`, conduitValues, '→', conduitTrayValue);
     } else if (form.terminalWiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา') {
       // ดึงจาก __EMPTY_14 (1 คอลัมน์)
@@ -2809,7 +2889,6 @@ export default function Home(): React.JSX.Element {
                             <SelectValue placeholder={`Select terminal ${idx + 1} size`} />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="300A">300A</SelectItem>
                             <SelectItem value="350A">350A</SelectItem>
                             <SelectItem value="380A">380A</SelectItem>
                             <SelectItem value="500A">500A</SelectItem>
@@ -2834,8 +2913,9 @@ export default function Home(): React.JSX.Element {
                           <SelectValue placeholder="Select terminal wiring type" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน">ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน</SelectItem>
-                          <SelectItem value="ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา">ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา</SelectItem>
+                          {terminalWiringTypeOptions.map((option) => (
+                            <SelectItem key={option} value={option}>{option}</SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>

@@ -1580,70 +1580,128 @@ function MoreDetailCard(props: any) {
     return Array.from({ length: terminalCount }, (_, idx) => base[idx] || base[0] || '');
   }, [props.terminalSizes, props.terminalSize, terminalCount]);
 
-  const getTerminalWiringInfoBySize = useCallback((terminalSizeValue: string) => {
-    if (!props.terminalWiringType || !terminalSizeValue) return null;
+  const TERMINAL_CABLE_COLS = [
+    '__EMPTY_1', '__EMPTY_2', '__EMPTY_3', '__EMPTY_4', '__EMPTY_5', '__EMPTY_6',
+    '__EMPTY_7', '__EMPTY_8', '__EMPTY_9', '__EMPTY_10', '__EMPTY_11', '__EMPTY_12',
+  ];
 
-    const terminalSizeToRow: Record<string, Record<string, number>> = {
-      'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน': {
-        '300A': 17,
-        '350A': 18,
-        '380A': 18,
-        '500A': 23,
-        '600A': 24
-      },
-      'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา': {
-        '300A': 11,
+  const resolveTerminalSheetRow = useCallback((wiringType: string, terminalSize: string): { sheetName: string; rowNum: number } | null => {
+    if (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน') {
+      if (terminalSize === '350A' || terminalSize === '380A') {
+        return { sheetName: 'แบบ 9.5', rowNum: 27 };
+      }
+      if (terminalSize === '500A' || terminalSize === '600A') {
+        return { sheetName: 'แบบ 9.12', rowNum: 25 };
+      }
+      return null;
+    }
+    if (wiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา') {
+      const trayRowBySize: Record<string, number> = {
         '350A': 12,
         '380A': 12,
         '500A': 17,
-        '600A': 18
-      }
-    };
-
-    const sheetName = props.terminalWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน'
-      ? 'แบบ 9.12'
-      : 'แบบ 9.15';
-    const rowMapping = terminalSizeToRow[props.terminalWiringType];
-    const rowNum = rowMapping?.[terminalSizeValue];
-    if (!rowNum) return null;
-
-    const sheet = getExcelData(sheetName);
-    if (!sheet || sheet.length === 0) return null;
-    const row = sheet.find((r: any) => r.__rowNum__ === rowNum);
-    if (!row) return null;
-
-    const cableCols = ['__EMPTY_1', '__EMPTY_2', '__EMPTY_3', '__EMPTY_4', '__EMPTY_5', '__EMPTY_6', '__EMPTY_7', '__EMPTY_8', '__EMPTY_9', '__EMPTY_10', '__EMPTY_11', '__EMPTY_12'];
-    const cableValues = cableCols.map(col => row[col]).filter(Boolean);
-    const cable = cableValues.join(' ');
-
-    let conduitTray = '';
-    if (props.terminalWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน') {
-      const conduitCols = ['__EMPTY_14', '__EMPTY_15', '__EMPTY_16'];
-      const conduitValues = conduitCols.map(col => row[col]).filter(Boolean);
-      conduitTray = conduitValues.length > 0 ? `${conduitValues.join(' ')} มม.` : '';
-    } else if (props.terminalWiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา') {
-      const trayValue = row['__EMPTY_14'];
-      conduitTray = trayValue ? `${trayValue} ซม.` : '';
+        '600A': 18,
+      };
+      const rowNum = trayRowBySize[terminalSize];
+      if (!rowNum) return null;
+      return { sheetName: 'แบบ 9.15', rowNum };
     }
+    return null;
+  }, []);
 
+  const getTerminalCableDisplay = (row: any) =>
+    TERMINAL_CABLE_COLS.map((col) => row[col]).filter(Boolean).join(' ');
+
+  const getTerminalConduitTrayDisplay = (wiringType: string, row: any) => {
+    if (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน') {
+      const conduitCols = ['__EMPTY_14', '__EMPTY_15', '__EMPTY_16'];
+      const conduitValues = conduitCols.map((col) => row[col]).filter(Boolean);
+      return conduitValues.length > 0 ? `${conduitValues.join(' ')} มม.` : '';
+    }
+    if (wiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา') {
+      const trayValue = row['__EMPTY_14'];
+      return trayValue ? `${trayValue} ซม.` : '';
+    }
+    return '';
+  };
+
+  const getTerminalPriceUnits = (sheetName: string, row: any) => {
+    if (sheetName === 'แบบ 9.10') {
+      return {
+        material: parsePrice(row['__EMPTY_14'] || 0),
+        labor: parsePrice(row['__EMPTY_15'] || 0),
+      };
+    }
+    if (sheetName === 'แบบ 9.11') {
+      return {
+        material: parsePrice(row['__EMPTY_13'] || 0),
+        labor: parsePrice(row['__EMPTY_14'] || 0),
+      };
+    }
+    if (sheetName === 'แบบ 9.16') {
+      return {
+        material: parsePrice(row['__EMPTY_14'] || 0),
+        labor: parsePrice(row['__EMPTY_15'] || 0),
+      };
+    }
+    // แบบ 9.5 (แถว Terminal 350/380A): __EMPTY_16–16 เป็นข้อมูลท่อ ไม่ใช่ราคา
+    if (sheetName === 'แบบ 9.5') {
+      return {
+        material: parsePrice(row['__EMPTY_17'] || 0),
+        labor: parsePrice(row['__EMPTY_18'] || 0),
+        total: parsePrice(row['__EMPTY_19'] || 0),
+      };
+    }
+    // แบบ 9.12 (แถว Terminal 500/600A): ค่าของ=16, ค่าแรง=17, ราคารวม=18
+    if (sheetName === 'แบบ 9.12') {
+      return {
+        material: parsePrice(row['__EMPTY_16'] || 0),
+        labor: parsePrice(row['__EMPTY_17'] || 0),
+        total: parsePrice(row['__EMPTY_18'] || 0),
+      };
+    }
+    // แบบ 9.15 TRAY
+    return {
+      material: parsePrice(row['__EMPTY_16'] || 0),
+      labor: parsePrice(row['__EMPTY_17'] || 0),
+    };
+  };
+
+  const getTerminalRowBySize = useCallback((terminalSizeValue: string) => {
+    if (!props.terminalWiringType || !terminalSizeValue) return null;
+    const sheetRow = resolveTerminalSheetRow(props.terminalWiringType, terminalSizeValue);
+    if (!sheetRow) return null;
+    const sheet = getExcelData(sheetRow.sheetName);
+    if (!sheet || sheet.length === 0) return null;
+    const row = sheet.find((r: any) => r.__rowNum__ === sheetRow.rowNum);
+    if (!row) return null;
+    return { ...sheetRow, row };
+  }, [props.terminalWiringType, getExcelData, resolveTerminalSheetRow]);
+
+  const getTerminalWiringInfoBySize = useCallback((terminalSizeValue: string) => {
+    const resolved = getTerminalRowBySize(terminalSizeValue);
+    if (!resolved || !props.terminalWiringType) return null;
+    const { sheetName, rowNum, row } = resolved;
     return {
       row,
+      sheetName,
+      rowNum,
       code: row['__EMPTY'] || '-',
-      cable,
-      conduitTray
+      cable: getTerminalCableDisplay(row),
+      conduitTray: getTerminalConduitTrayDisplay(props.terminalWiringType, row),
     };
-  }, [props.terminalWiringType, getExcelData]);
+  }, [props.terminalWiringType, getTerminalRowBySize]);
 
   const getTerminalWiringInfoByIndex = useCallback((terminalIndex: number, terminalSizeValue: string) => {
     const details = Array.isArray(props.terminalWiringDetails) ? props.terminalWiringDetails : [];
     const detail = details.find((item: any) => Number(item?.terminalIndex) === terminalIndex)
       || details.find((item: any) => String(item?.terminalSize || '').trim() === String(terminalSizeValue || '').trim());
-    if (detail) {
+    if (detail && (detail.cable || detail.conduitTray)) {
       return {
         row: null,
         code: '-',
         cable: String(detail.cable || ''),
-        conduitTray: String(detail.conduitTray || '')
+        conduitTray: String(detail.conduitTray || ''),
       };
     }
     return getTerminalWiringInfoBySize(terminalSizeValue);
@@ -1682,74 +1740,44 @@ function MoreDetailCard(props: any) {
       return;
     }
 
-    // Mapping terminal size ไปยัง row number
-    const terminalSizeToRow: Record<string, Record<string, number>> = {
-      'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน': {
-        '300A': 17,
-        '350A': 18,
-        '380A': 18,
-        '500A': 23,
-        '600A': 24
-      },
-      'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา': {
-        '300A': 11,
-        '350A': 12,
-        '380A': 12,
-        '500A': 17,
-        '600A': 18
-      }
-    };
-
-    const sheetName = props.terminalWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน'
-      ? 'แบบ 9.12'
-      : 'แบบ 9.15';
-
-    const rowMapping = terminalSizeToRow[props.terminalWiringType];
-    if (!rowMapping) {
-      setTerminalResult(null);
-      setTerminalLineResults([]);
-      return;
-    }
-
-    const sheet = getExcelData(sheetName);
-    if (!sheet || sheet.length === 0) {
-      setTerminalResult(null);
-      setTerminalLineResults([]);
-      return;
-    }
-
     // คำนวณผลลัพธ์แยกตามเส้น Terminal
     let firstCode = '-';
     const lineResults = (distances || [])
       .map((distance, idx) => {
         const selectedSize = resolvedTerminalSizes[idx] || resolvedTerminalSizes[0] || '';
-        const rowNum = rowMapping[selectedSize];
-        const row = rowNum ? sheet.find((r: any) => r.__rowNum__ === rowNum) : null;
+        const sheetRow = resolveTerminalSheetRow(props.terminalWiringType, selectedSize);
+        if (!sheetRow) return null;
+
+        const sheet = getExcelData(sheetRow.sheetName);
+        if (!sheet || sheet.length === 0) return null;
+
+        const row = sheet.find((r: any) => r.__rowNum__ === sheetRow.rowNum);
 
         if (!row) return null;
 
-        // ดึงข้อมูล Terminal Wiring Cable เพื่อตรวจสอบว่ามี "2 SET OF" หรือไม่
-        const cableCols = ['__EMPTY_1', '__EMPTY_2', '__EMPTY_3', '__EMPTY_4', '__EMPTY_5', '__EMPTY_6', '__EMPTY_7', '__EMPTY_8', '__EMPTY_9', '__EMPTY_10', '__EMPTY_11', '__EMPTY_12'];
-        const cableValues = cableCols.map(col => row[col]).filter(Boolean);
-        const cableString = cableValues.join(' ');
+        const cableString = getTerminalCableDisplay(row);
         const isTwoSet = cableString && (cableString.includes('2 SET OF') || cableString.includes('2SET OF') || cableString.includes('2 SETOF'));
-        const multiplier = isTwoSet ? 2 : 1; // คูณด้วย 2 ถ้ามี "2 SET OF"
+        const multiplier = isTwoSet ? 2 : 1;
 
         const rowCode = row['__EMPTY'] || '-';
         if (firstCode === '-' && rowCode && rowCode !== '-') firstCode = rowCode;
 
-        const materialUnit = parsePrice(row['__EMPTY_16'] || 0);
-        const laborUnit = parsePrice(row['__EMPTY_17'] || 0);
-        const totalUnit = parsePrice(row['__EMPTY_18'] || 0);
+        const priceUnits = getTerminalPriceUnits(sheetRow.sheetName, row);
         const inputDistance = Number(distance) || 0;
         const calcDistance = inputDistance > 0 ? inputDistance + 2.5 : 0; // เผื่อระยะ +2.5 เมตร/Terminal
+        const materialCost = priceUnits.material * calcDistance * multiplier;
+        const laborCost = priceUnits.labor * calcDistance * multiplier;
+        const totalCost =
+          priceUnits.total != null && priceUnits.total > 0
+            ? priceUnits.total * calcDistance * multiplier
+            : materialCost + laborCost;
         return {
           terminalIndex: idx,
           inputDistance,
           distance: calcDistance,
-          materialCost: materialUnit * calcDistance * multiplier,
-          laborCost: laborUnit * calcDistance * multiplier,
-          totalCost: totalUnit * calcDistance * multiplier
+          materialCost,
+          laborCost,
+          totalCost,
         };
       })
       .filter((item): item is NonNullable<typeof item> => !!item && item.inputDistance > 0);
