@@ -413,6 +413,10 @@ function MoreDetailCard(props: any) {
 
     // สร้างข้อมูล Home จาก props (ที่ส่งมาจาก state จาก Home.tsx) ก่อน
     // props มีข้อมูลทั้งหมดที่ส่งมาจาก Home.tsx ผ่าน {...state}
+    const terminalSizes = Array.isArray(props.terminalSizes)
+      ? props.terminalSizes
+      : (props.terminalSize ? String(props.terminalSize).split(',').map((s: string) => s.trim()).filter(Boolean) : []);
+
     let homeDataParsed = {
       customerCode: (customerCode || props.customerCode || '').trim(),
       form: {
@@ -422,8 +426,13 @@ function MoreDetailCard(props: any) {
         trWiringType: props.trWiringType || '',
         trToLand: props.trToLand || '',
         landToMdb: props.landToMdb || '',
-        chargerWiringType: Array.isArray(props.chargerWiringType) ? props.chargerWiringType : (props.chargerWiringType ? [props.chargerWiringType] : [])
+        chargerWiringType: Array.isArray(props.chargerWiringType) ? props.chargerWiringType : (props.chargerWiringType ? [props.chargerWiringType] : []),
+        numberOfTerminals: props.numberOfTerminals || '',
+        terminalSize: props.terminalSize || '',
+        terminalSizes: terminalSizes,
+        terminalWiringType: props.terminalWiringType || '',
       },
+      chargerInstallationType: props.chargerInstallationType || 'stand-alone',
       chargerTypeMode: props.chargerTypeMode || 'same',
       multiChargers: props.multiChargers || [],
       // เก็บข้อมูลอื่นๆ จาก props (ที่ส่งมาจาก Home.tsx)
@@ -441,6 +450,12 @@ function MoreDetailCard(props: any) {
       chargerWireConduit: props.chargerWireConduit || '',
       chargerWiringCableAll: props.chargerWiringCableAll || [],
       chargerWireConduitAll: props.chargerWireConduitAll || [],
+      terminalWiringDetails: props.terminalWiringDetails || [],
+      terminalWireConduit: props.terminalWireConduit || '',
+      numberOfTerminals: props.numberOfTerminals || '',
+      terminalSize: props.terminalSize || '',
+      terminalSizes: terminalSizes,
+      terminalWiringType: props.terminalWiringType || '',
       chargerDistance: props.chargerDistance || 0,
       trDistance: props.trDistance || 0,
       savedAt: new Date().toISOString()
@@ -3155,6 +3170,9 @@ function MoreDetailCard(props: any) {
     return emptyTotals;
   }, [props.powerAuthority, props.transformer, lowVoltageRequest, lowVoltageDistance2, lowVoltageDistance3, transformerSelection, transformerPrice]);
 
+  const calcHighVoltagePoleCount = (distance: number) =>
+    distance > 30 ? Math.floor((distance - 30) / 30) + 1 : 0;
+
   const highVoltageTotals = React.useMemo(() => {
     const emptyTotals = { material: 0, labor: 0, total: 0 };
     const transformerSize = parseInt(props.transformer || '0', 10) || 0;
@@ -3258,7 +3276,7 @@ function MoreDetailCard(props: any) {
     const distanceLaborPrice = distanceLaborPerUnit * distance;
     const distanceTotalPrice = distanceTotalPerUnit * distance;
 
-    const poleCount = distance > 30 ? Math.floor((distance - 30) / 30) + 1 : 0;
+    const poleCount = calcHighVoltagePoleCount(distance);
     let poleMaterialPrice = 0;
     let poleLaborPrice = 0;
     let poleTotalPrice = 0;
@@ -4776,8 +4794,8 @@ function MoreDetailCard(props: any) {
               });
             }
 
-            // ตรวจสอบเงื่อนไข: ถ้าระยะของชุดสายไฟแรงสูงไม่เกิน 6 เมตร
             const distanceForDetail = highVoltageDistance ? parseFloat(highVoltageDistance) : 0;
+            const poleCount = calcHighVoltagePoleCount(distanceForDetail);
             const isDistanceWithin6MetersForDetail = highVoltageDistance && distanceForDetail > 0 && distanceForDetail <= 6;
 
             // แถว 2: detailRow2 (แถว 4 เดิม) - ขีดค่าทุกฟิลด์
@@ -4797,7 +4815,7 @@ function MoreDetailCard(props: any) {
                   materialTotal: 0, // ขีดค่า (แสดงเป็น "-")
                   laborTotal: 0, // ขีดค่า (แสดงเป็น "-")
                   totalPrice: 0, // ขีดค่า (แสดงเป็น "-")
-                  quantity: detailRow2.__EMPTY_3 || undefined,
+                  quantity: poleCount > 0 ? String(poleCount) : (detailRow2.__EMPTY_3 || undefined),
                 });
               }
             }
@@ -4847,8 +4865,6 @@ function MoreDetailCard(props: any) {
             if (poleRow && highVoltageDistance) {
               const code5 = getCodeFromRow(poleRow);
 
-              const distance = parseFloat(highVoltageDistance) || 0;
-              const poleCount = distance > 30 ? Math.floor((distance - 30) / 30) + 1 : 0;
               if (poleCount > 0) {
                 const poleMaterialPerUnit = parseFloat(poleRow.__EMPTY_4 || 0) || 0;
                 const poleLaborPerUnit = parseFloat(poleRow.__EMPTY_5 || 0) || 0;
@@ -4859,7 +4875,7 @@ function MoreDetailCard(props: any) {
                   materialTotal: poleMaterialPerUnit * poleCount,
                   laborTotal: poleLaborPerUnit * poleCount,
                   totalPrice: (parseFloat(poleRow.__EMPTY_6 || 0) || 0) * poleCount,
-                  quantity: poleRow.__EMPTY_3 || undefined, // ใช้ __EMPTY_3 จาก row
+                  quantity: String(poleCount),
                 });
               }
             }
@@ -8414,7 +8430,7 @@ function MoreDetailCard(props: any) {
                 // คำนวณจำนวนเสา (เกินทุกๆ 30 เมตร)
                 // ตัวอย่าง: 62 เมตร = เกิน 30 เมตร ไป 2 รอบ
                 // 30 เมตร = 0 รอบ, 31 เมตร = 1 รอบ, 60 เมตร = 2 รอบ, 62 เมตร = 2 รอบ
-                const poleCount = distance > 30 ? Math.floor((distance - 30) / 30) + 1 : 0;
+                const poleCount = calcHighVoltagePoleCount(distance);
                 let poleMaterialPrice = 0;
                 let poleLaborPrice = 0;
                 let poleTotalPrice = 0;
@@ -8503,7 +8519,7 @@ function MoreDetailCard(props: any) {
                                     {hasDetailRow2 && (
                                       <div>
                                         {detailRow2Value}
-                                        {detailRow2.__EMPTY_3 && ` (จำนวน: ${detailRow2.__EMPTY_3})`}
+                                        {(poleCount > 0 || detailRow2.__EMPTY_3) && ` (จำนวน: ${poleCount > 0 ? poleCount : detailRow2.__EMPTY_3})`}
                                       </div>
                                     )}
                                   </div>
