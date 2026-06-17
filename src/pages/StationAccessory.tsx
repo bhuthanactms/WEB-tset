@@ -134,6 +134,15 @@ function resolveTrToMdbConduitBracketRowNum(
   return rowNum ?? null;
 }
 
+/** % Accessories จากต้นทุนเบื้องต้น (หัวข้อ 1–7 รวมค่าของ+ค่าแรง) */
+function getAccessoriesPercent(stationTotal: number): number {
+  if (stationTotal < 500000) return 7;
+  if (stationTotal < 1500000) return 6;
+  if (stationTotal <= 3000000) return 5;
+  if (stationTotal <= 5000000) return 4;
+  return 3;
+}
+
 function MoreDetailCard(props: any) {
   const { stationEquipmentPriceMapping, roofCostMapping, getParkingRoofData, getTrToMdbPrice, trToMdbMapping } = props;
 
@@ -4398,31 +4407,15 @@ function MoreDetailCard(props: any) {
     return { total, items, pricePerUnitTotal };
   }, [electricalOperationSheet, props.transformer, props.powerAuthority, props.chargerSummary]);
 
-  // คำนวณ Accessories จาก ราคารวมสร้างสถานี (stationTotal)
+  // คำนวณ Accessories จาก ต้นทุนเบื้องต้น (stationTotals.total = หัวข้อ 1–7)
+  const accessoriesPercent = React.useMemo(
+    () => getAccessoriesPercent(stationTotals.total),
+    [stationTotals.total]
+  );
+
   const accessoriesAmount = React.useMemo(() => {
-    const stationTotal = stationTotals.total;
-
-    let percentage = 0;
-    if (stationTotal < 500000) {
-      // ต่ำกว่า 5 แสนบาท: คูณ 7%
-      percentage = 7;
-    } else if (stationTotal < 1500000) {
-      // ต่ำกว่า 1.5 ล้านบาท: คูณ 6%
-      percentage = 6;
-    } else if (stationTotal >= 1500000 && stationTotal <= 3000000) {
-      // 1.5-3 ล้านบาท: คูณ 5%
-      percentage = 5;
-    } else if (stationTotal > 3000000 && stationTotal <= 5000000) {
-      // 3-5 ล้านบาท: คูณ 4%
-      percentage = 4;
-    } else {
-      // มากกว่า 5 ล้านบาท: คูณ 3%
-      percentage = 3;
-    }
-
-    // คำนวณเป็น % ของ ราคารวมสร้างสถานี แทน Additional Features Total
-    return (stationTotal * percentage) / 100;
-  }, [stationTotals]);
+    return (stationTotals.total * accessoriesPercent) / 100;
+  }, [stationTotals.total, accessoriesPercent]);
 
   // ตัวคูณปรับราคา: ผู้ใช้กรอกเป็น % ของต้นทุนเบื้องต้น (stationTotals.total)
   const priceAdjustAmount = React.useMemo(() => {
@@ -5745,9 +5738,9 @@ function MoreDetailCard(props: any) {
               conduitDisplay = `${conduitType} ${conduitDisplay}`.trim();
             }
 
-            // 2.2 ถ้า ประเภท: ขนาดสายไฟ 3P 4W ร้อยท่อฝังใต้ดิน กลุ่ม 5 ให้เพิ่ม __EMPTY_11 วางหน้าค่าเดิม
+            // 2.2 ถ้า ประเภท: ขนาดสายไฟ 3P 4W ร้อยท่อฝังใต้ดิน กลุ่ม 5 ให้เพิ่ม __EMPTY_12 วางหน้าค่าเดิม
             if (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน') {
-              // ดึงข้อมูล __EMPTY_11 จาก Excel data
+              // ดึงข้อมูล __EMPTY_12 จาก แบบ 9.12
               const chargerName = props.chargerSummary?.[idx]?.name || '';
               const kwMatch = chargerName.match(/(\d+)\s*kW/i);
               const kw = kwMatch ? parseInt(kwMatch[1]) : 0;
@@ -5758,9 +5751,9 @@ function MoreDetailCard(props: any) {
               if (rowNum) {
                 const sheet912 = getExcelData('แบบ 9.12');
                 const row = sheet912.find((r: any) => r.__rowNum__ === rowNum);
-                const empty11Value = row?.__EMPTY_11 || '';
-                if (empty11Value) {
-                  conduitDisplay = `${empty11Value} ${conduitDisplay}`.trim();
+                const empty12Value = row?.__EMPTY_12 || '';
+                if (empty12Value) {
+                  conduitDisplay = `${empty12Value} ${conduitDisplay}`.trim();
                 }
               }
             }
@@ -5848,9 +5841,9 @@ function MoreDetailCard(props: any) {
                 if (rowNum) {
                   const sheet912 = getExcelData('แบบ 9.12');
                   const row = sheet912.find((r: any) => r.__rowNum__ === rowNum);
-                  const empty11Value = row?.__EMPTY_11 || '';
-                  if (empty11Value) {
-                    additionalConduitDisplay = `${empty11Value} ${additionalConduitDisplay}`.trim();
+                  const empty12Value = row?.__EMPTY_12 || '';
+                  if (empty12Value) {
+                    additionalConduitDisplay = `${empty12Value} ${additionalConduitDisplay}`.trim();
                   }
                 }
               }
@@ -7070,21 +7063,7 @@ function MoreDetailCard(props: any) {
     }
 
     // Summary - ข้อมูลสำหรับส่วนสรุป
-    // คำนวณ accessoriesPercent
     const additionalFeaturesTotal = additionalFeaturesTotals.total;
-    const stationTotal = stationTotals.total;
-    let accessoriesPercent = 0;
-    if (stationTotal < 500000) {
-      accessoriesPercent = 7;
-    } else if (stationTotal < 1500000) {
-      accessoriesPercent = 6;
-    } else if (stationTotal >= 1500000 && stationTotal <= 3000000) {
-      accessoriesPercent = 5;
-    } else if (stationTotal > 3000000 && stationTotal <= 5000000) {
-      accessoriesPercent = 4;
-    } else {
-      accessoriesPercent = 3;
-    }
 
     // ดึงข้อมูลค่าเดินทาง
     const travelCost = travelType === 'construction'
@@ -7247,11 +7226,13 @@ function MoreDetailCard(props: any) {
   }, [
     jobName, location, salesPerson,
     stationTotals, profitPercent, profitAmount, cfPercent, cfAmount,
-    stationTotalWithProfit, travelTotals, travelDistance,
+    stationTotalWithProfit, stationTotalWithAccessories, travelTotals, travelDistance,
+    accessoriesPercent, accessoriesAmount, priceAdjustPercent, priceAdjustAmount, documentCost,
+    additionalFeaturesTotals, finalStationTotals,
     stationCostSections, terminalResult, terminalLineResults,
     props.chargerInstallationType, props.numberOfTerminals, resolvedTerminalSizes, props.terminalWiringType,
     getTerminalWiringInfoByIndex,
-    extraItems
+    extraItems, travelType, constructionTravelCost, installationTravelCost
   ]);
 
   // Export function สำหรับใช้ใน PDF generator
@@ -12212,6 +12193,25 @@ function MoreDetailCard(props: any) {
                                             conduitValue = `${typeConduitChoice} ${conduitValue}`.trim();
                                           }
 
+                                          // กลุ่ม 5 ฝังใต้ดิน: เพิ่ม __EMPTY_12 จาก แบบ 9.12 หน้าค่าท่อจาก Home
+                                          if (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน') {
+                                            const chargerName = props.chargerSummary?.[idx]?.name || '';
+                                            const kwMatch = chargerName.match(/(\d+)\s*kW/i);
+                                            const kw = kwMatch ? parseInt(kwMatch[1]) : 0;
+                                            const powerAuthority = props.powerAuthority || 'MEA';
+                                            const isGroupCharger = props.chargerInstallationType === 'group';
+                                            const rowMapping = getMdbToChargerRowMapping(wiringType, '', powerAuthority, isGroupCharger);
+                                            const rowNum = rowMapping[kw];
+                                            if (rowNum) {
+                                              const sheet912 = getExcelData('แบบ 9.12');
+                                              const row = sheet912.find((r: any) => r.__rowNum__ === rowNum);
+                                              const empty12Value = row?.__EMPTY_12 || '';
+                                              if (empty12Value) {
+                                                conduitValue = `${empty12Value} ${conduitValue}`.trim();
+                                              }
+                                            }
+                                          }
+
                                           return conduitValue;
                                         })()}
                                       </span>
@@ -12388,28 +12388,28 @@ function MoreDetailCard(props: any) {
                                       conduitDisplay = `${group2Selected} ${conduitDisplay}`.trim();
                                     }
 
-                                    // ถ้า ประเภท: ขนาดสายไฟ 3P 4W ร้อยท่อฝังใต้ดิน กลุ่ม 5 ให้เพิ่ม __EMPTY_11 วางหน้าค่า
+                                    // ถ้า ประเภท: ขนาดสายไฟ 3P 4W ร้อยท่อฝังใต้ดิน กลุ่ม 5 ให้เพิ่ม __EMPTY_12 วางหน้าค่า
                                     const wiringTypes = Array.isArray(props.chargerWiringType)
                                       ? props.chargerWiringType
                                       : (props.chargerWiringType ? [props.chargerWiringType] : []);
                                     if (wiringTypes.includes('ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน')) {
-                                      // ดึงข้อมูล __EMPTY_11 จาก Excel data
+                                      // ดึงข้อมูล __EMPTY_12 จาก แบบ 9.12
                                       const chargerName = props.chargerSummary?.[idx]?.name || '';
                                       const kwMatch = chargerName.match(/(\d+)\s*kW/i);
                                       const kw = kwMatch ? parseInt(kwMatch[1]) : 0;
                                       const powerAuthority = props.powerAuthority || 'MEA';
-                                      // ใช้ประเภทแรกจาก array (หรือ string เดียวถ้าเป็น backward compatibility)
+                                      const isGroupCharger = props.chargerInstallationType === 'group';
                                       const firstWiringType = Array.isArray(props.chargerWiringType)
                                         ? (props.chargerWiringType.length > 0 ? props.chargerWiringType[0] : '')
                                         : (props.chargerWiringType || '');
-                                      const rowMapping = getMdbToChargerRowMapping(firstWiringType, '', powerAuthority);
+                                      const rowMapping = getMdbToChargerRowMapping(firstWiringType, '', powerAuthority, isGroupCharger);
                                       const rowNum = rowMapping[kw];
                                       if (rowNum) {
                                         const sheet912 = getExcelData('แบบ 9.12');
                                         const row = sheet912.find((r: any) => r.__rowNum__ === rowNum);
-                                        const empty11Value = row?.__EMPTY_11 || '';
-                                        if (empty11Value) {
-                                          conduitDisplay = `${empty11Value} ${conduitDisplay}`.trim();
+                                        const empty12Value = row?.__EMPTY_12 || '';
+                                        if (empty12Value) {
+                                          conduitDisplay = `${empty12Value} ${conduitDisplay}`.trim();
                                         }
                                       }
                                     }
@@ -12590,9 +12590,9 @@ function MoreDetailCard(props: any) {
                                 conduitDisplayValue = `${groupConduitChoice} ${conduitDisplayValue}`.trim();
                               }
 
-                              // ถ้า ประเภท: ขนาดสายไฟ 3P 4W ร้อยท่อฝังใต้ดิน กลุ่ม 5 ให้เพิ่ม __EMPTY_11 วางหน้าค่า
+                              // ถ้า ประเภท: ขนาดสายไฟ 3P 4W ร้อยท่อฝังใต้ดิน กลุ่ม 5 ให้เพิ่ม __EMPTY_12 วางหน้าค่า
                               if (groupWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน') {
-                                // ดึงข้อมูล __EMPTY_11 จาก Excel data (ใช้ charger แรกในกลุ่ม)
+                                // ดึงข้อมูล __EMPTY_12 จาก แบบ 9.12 (ใช้ charger แรกในกลุ่ม)
                                 const firstChargerName = props.chargerSummary?.[idxs[0]]?.name || '';
                                 const kwMatch = firstChargerName.match(/(\d+)\s*kW/i);
                                 const kw = kwMatch ? parseInt(kwMatch[1]) : 0;
@@ -12603,9 +12603,9 @@ function MoreDetailCard(props: any) {
                                 if (rowNum) {
                                   const sheet912 = getExcelData('แบบ 9.12');
                                   const row = sheet912.find((r: any) => r.__rowNum__ === rowNum);
-                                  const empty11Value = row?.__EMPTY_11 || '';
-                                  if (empty11Value) {
-                                    conduitDisplayValue = `${empty11Value} ${conduitDisplayValue}`.trim();
+                                  const empty12Value = row?.__EMPTY_12 || '';
+                                  if (empty12Value) {
+                                    conduitDisplayValue = `${empty12Value} ${conduitDisplayValue}`.trim();
                                   }
                                 }
                               }
@@ -18165,20 +18165,7 @@ function MoreDetailCard(props: any) {
               <div className="text-sm text-purple-600 mb-2 font-semibold">Accessories</div>
               <div className="text-2xl font-semibold">{formatCurrency(accessoriesAmount)} บาท</div>
               <div className="text-xs text-purple-500 mt-2">
-                {(() => {
-                  const stationTotal = baseCost; // ใช้ baseCost (ต้นทุนเบื้องต้น) แทน
-                  let percentage = 0;
-                  if (stationTotal < 1500000) {
-                    percentage = 7;
-                  } else if (stationTotal >= 1500000 && stationTotal <= 3000000) {
-                    percentage = 6;
-                  } else if (stationTotal > 5000000) {
-                    percentage = 3;
-                  } else {
-                    percentage = 5;
-                  }
-                  return `${percentage}% ของ ราคารวมสร้างสถานี (${formatCurrency(stationTotal)} บาท)`;
-                })()}
+                {`${accessoriesPercent}% ของ ต้นทุนเบื้องต้น (${formatCurrency(baseCost)} บาท)`}
               </div>
             </div>
             <div className="p-5 rounded-xl bg-gradient-to-br from-teal-100 via-white to-teal-50 border border-teal-200 text-teal-800 shadow-sm">
