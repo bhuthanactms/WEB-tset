@@ -1213,15 +1213,7 @@ export default function Home(): React.JSX.Element {
     }
   }, [excelData]);
 
-  // เมื่อเลือก Number of Chargers ใหม่ ถ้าเลือก Any type kW ให้ reset multiChargers
-  useEffect(() => {
-    if (chargerTypeMode === 'any') {
-      const n = parseInt(form.numberOfChargers) || 1;
-      setMultiChargers(Array(n).fill(''));
-    }
-  }, [form.numberOfChargers, chargerTypeMode]);
-
-  // Sync multiChargers array size with numberOfChargers and mode
+  // Sync multiChargers array size กับ numberOfChargers (คงค่าที่เลือกไว้เมื่อโหลด/เปลี่ยนจำนวน)
   useEffect(() => {
     const n = parseInt(form.numberOfChargers) || 1;
     if (chargerTypeMode === 'any') {

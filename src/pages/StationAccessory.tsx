@@ -692,25 +692,17 @@ function MoreDetailCard(props: any) {
     // รองรับทั้งของใหม่ (terminalLineDistances) และของเก่า (terminalDistance)
     if (Array.isArray(parsed.terminalLineDistances)) {
       setTerminalLineDistances(parsed.terminalLineDistances);
-      const distances = parsed.terminalLineDistances.map((d: any) => parseFloat(d) || 0);
-      const totalDistance = distances.reduce((sum: number, d: number) => sum + d, 0);
-      if (totalDistance > 0 && resolvedTerminalSizes.length > 0 && props.terminalWiringType) {
-        calculateTerminalResult(distances);
-      }
     } else if (parsed.terminalDistance !== undefined) {
-      // legacy: เคยมีช่องเดียว
       const legacyDistanceStr = String(parsed.terminalDistance ?? '');
-      const next = Array(terminalCount).fill(legacyDistanceStr);
-      setTerminalLineDistances(next);
-      const d = parseFloat(legacyDistanceStr) || 0;
-      if (d > 0 && resolvedTerminalSizes.length > 0 && props.terminalWiringType) {
-        calculateTerminalResult(next.map((x) => parseFloat(x) || 0));
-      }
+      setTerminalLineDistances(Array(terminalCount).fill(legacyDistanceStr));
     }
-    // NOTE: terminalResult/terminalLineResults เปลี่ยนโครงสร้างหลายครั้ง (เช่น เพิ่ม inputDistance และเผื่อระยะ 2.5m)
-    // เพื่อให้ไฟล์เก่าก่อนอัปเดตยังใช้งานได้ ให้คำนวณใหม่จาก terminalLineDistances เสมอ
-    setTerminalResult(null);
-    setTerminalLineResults([]);
+    // แสดงราคาที่บันทึกไว้ทันที; useEffect จะคำนวณใหม่เมื่อ Excel/props พร้อม
+    if (parsed.terminalResult) {
+      setTerminalResult(parsed.terminalResult);
+    }
+    if (Array.isArray(parsed.terminalLineResults) && parsed.terminalLineResults.length > 0) {
+      setTerminalLineResults(parsed.terminalLineResults);
+    }
 
     // โหลดสถานะการเปิด/ปิด (ถ้ามี)
     if (parsed.openItems) setOpenItems(parsed.openItems);
@@ -2071,17 +2063,19 @@ function MoreDetailCard(props: any) {
     if (props.chargerInstallationType === 'group' && props.numberOfTerminals && resolvedTerminalSizes.length > 0 && props.terminalWiringType) {
       const distances = (terminalLineDistances || []).map((d) => parseFloat(d) || 0);
       const totalDistance = distances.reduce((sum, d) => sum + d, 0);
-      if (totalDistance > 0) {
+      const excelReady = props.excelData && Object.keys(props.excelData).length > 0;
+      if (totalDistance > 0 && excelReady) {
         calculateTerminalResult(distances);
-      } else {
+      } else if (totalDistance <= 0) {
         setTerminalResult(null);
         setTerminalLineResults([]);
       }
-    } else {
+      // totalDistance > 0 แต่ Excel ยังไม่โหลด: คงค่า terminalResult ที่ restore จาก save ไว้
+    } else if (props.chargerInstallationType && props.chargerInstallationType !== 'group') {
       setTerminalResult(null);
       setTerminalLineResults([]);
     }
-  }, [terminalLineDistances, props.chargerInstallationType, props.numberOfTerminals, resolvedTerminalSizes, props.terminalWiringType]);
+  }, [terminalLineDistances, props.chargerInstallationType, props.numberOfTerminals, resolvedTerminalSizes, props.terminalWiringType, props.excelData]);
 
   const [additionalSelection, setAdditionalSelection] = useState(props.additionalSelection || 'no');
 
