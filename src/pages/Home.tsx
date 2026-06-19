@@ -1968,9 +1968,11 @@ export default function Home(): React.JSX.Element {
           return value ? `${value} นิ้ว` : '';
         }
         if (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน') {
-        // Fields: __EMPTY_68 to __EMPTY_73
-        const cols = ['__EMPTY_68', '__EMPTY_69', '__EMPTY_70', '__EMPTY_71', '__EMPTY_72', '__EMPTY_73'];
-              const value = cols.map(col => row[col]).filter(Boolean).join(' ');
+          // Fields: __EMPTY_66 to __EMPTY_71 (Group Charger), __EMPTY_68 to __EMPTY_73 (Stand-alone)
+          const cols = chargerInstallationType === 'group'
+            ? ['__EMPTY_66', '__EMPTY_67', '__EMPTY_68', '__EMPTY_69', '__EMPTY_70', '__EMPTY_71']
+            : ['__EMPTY_68', '__EMPTY_69', '__EMPTY_70', '__EMPTY_71', '__EMPTY_72', '__EMPTY_73'];
+          const value = cols.map(col => row[col]).filter(Boolean).join(' ');
           return value ? `${value} มม.` : '';
         }
         if (wiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา') {
@@ -3284,7 +3286,9 @@ export default function Home(): React.JSX.Element {
                                       const val = conduitCols.map(col => row[col]).filter(Boolean).join(' ');
                                       if (val) conduitValue = `${val} นิ้ว`;
                                     } else if (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน') {
-                                      const conduitCols = ['__EMPTY_68', '__EMPTY_69', '__EMPTY_70', '__EMPTY_71', '__EMPTY_72', '__EMPTY_73'];
+                                      const conduitCols = chargerInstallationType === 'group'
+                                        ? ['__EMPTY_66', '__EMPTY_67', '__EMPTY_68', '__EMPTY_69', '__EMPTY_70', '__EMPTY_71']
+                                        : ['__EMPTY_68', '__EMPTY_69', '__EMPTY_70', '__EMPTY_71', '__EMPTY_72', '__EMPTY_73'];
                                       const val = conduitCols.map(col => row[col]).filter(Boolean).join(' ');
                                       if (val) conduitValue = `${val} มม.`;
                                     } else if (wiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา') {
@@ -3424,7 +3428,9 @@ export default function Home(): React.JSX.Element {
                                     const val = conduitCols.map(col => row[col]).filter(Boolean).join(' ');
                                     if (val) conduitValue = `${val} นิ้ว`;
                                   } else if (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน') {
-                                    const conduitCols = ['__EMPTY_68', '__EMPTY_69', '__EMPTY_70', '__EMPTY_71', '__EMPTY_72', '__EMPTY_73'];
+                                    const conduitCols = chargerInstallationType === 'group'
+                                      ? ['__EMPTY_66', '__EMPTY_67', '__EMPTY_68', '__EMPTY_69', '__EMPTY_70', '__EMPTY_71']
+                                      : ['__EMPTY_68', '__EMPTY_69', '__EMPTY_70', '__EMPTY_71', '__EMPTY_72', '__EMPTY_73'];
                                     const val = conduitCols.map(col => row[col]).filter(Boolean).join(' ');
                                     if (val) conduitValue = `${val} มม.`;
                                   } else if (wiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา') {
@@ -3951,7 +3957,9 @@ export default function Home(): React.JSX.Element {
                                 const val = conduitCols.map(col => row[col]).filter(Boolean).join(' ');
                                 if (val) conduitValue = `${val} นิ้ว`;
                               } else if (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน') {
-                                const conduitCols = ['__EMPTY_68', '__EMPTY_69', '__EMPTY_70', '__EMPTY_71', '__EMPTY_72', '__EMPTY_73'];
+                                const conduitCols = chargerInstallationType === 'group'
+                                  ? ['__EMPTY_66', '__EMPTY_67', '__EMPTY_68', '__EMPTY_69', '__EMPTY_70', '__EMPTY_71']
+                                  : ['__EMPTY_68', '__EMPTY_69', '__EMPTY_70', '__EMPTY_71', '__EMPTY_72', '__EMPTY_73'];
                                 const val = conduitCols.map(col => row[col]).filter(Boolean).join(' ');
                                 if (val) conduitValue = `${val} มม.`;
                               } else if (wiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา') {

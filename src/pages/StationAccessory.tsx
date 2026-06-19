@@ -60,6 +60,24 @@ function getTrMdbMappingLookupKey(powerAuthority: string, transformer: string, n
   return isMeaLowVoltageMeter400A(powerAuthority, transformer) ? TR_MDB_MAP_KEY_MEA_LOW_VOLT_400A : numericKva;
 }
 
+const THAI_MONTH_ABBR = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+
+/** วันที่สำหรับ PDF/ชื่อไฟล์ — พ.ศ. 2 หลักท้าย เช่น "18 ม.ค. 69" */
+function formatPdfDateTh(date = new Date()): string {
+  const day = date.getDate();
+  const month = THAI_MONTH_ABBR[date.getMonth()];
+  const year2 = String(date.getFullYear() + 543).slice(-2);
+  return `${day} ${month} ${year2}`;
+}
+
+function normalizeFilenamePart(value: string): string {
+  return (value || '')
+    .toString()
+    .trim()
+    .replace(/\s+/g, '_')
+    .replace(/[\\/:*?"<>|]/g, '');
+}
+
 /** __rowNum__ in sheets 9.10 / 9.11 for conduit triangle bracket — must match trToMdbTotals */
 function resolveTrToMdbConduitBracketRowNum(
   powerAuthority: string,
@@ -2603,6 +2621,8 @@ function MoreDetailCard(props: any) {
 
   const featureChargersCount = parseCount(props.numberOfChargers, 1);
   const terminalsCount = parseCount(props.numberOfTerminals, 1);
+  // Group Charger: หลังคาเครื่องชาร์จอิงจำนวน Terminal | Stand-alone: อิงจำนวน Charger
+  const chargerRoofQuantity = props.chargerInstallationType === 'group' ? terminalsCount : featureChargersCount;
 
   // 1.1 เสากันชน
   const isGroupChargerAccessory = props.chargerInstallationType === 'group';
@@ -2920,9 +2940,9 @@ function MoreDetailCard(props: any) {
     const totalUnit = toNumber(row.__EMPTY_6);
 
     return {
-      materialPrice: materialUnit * featureChargersCount,
-      laborPrice: laborUnit * featureChargersCount,
-      totalPrice: totalUnit * featureChargersCount
+      materialPrice: materialUnit * chargerRoofQuantity,
+      laborPrice: laborUnit * chargerRoofQuantity,
+      totalPrice: totalUnit * chargerRoofQuantity
     };
   })();
 
@@ -6530,7 +6550,7 @@ function MoreDetailCard(props: any) {
           materialTotal: chargerRoofTotals.material,
           laborTotal: chargerRoofTotals.labor,
           totalPrice: chargerRoofTotals.total,
-          quantity: featureChargersCount.toString(),
+          quantity: chargerRoofQuantity.toString(),
         });
       }
     } else if (sectionKey === 'travel') {
@@ -6686,18 +6706,13 @@ function MoreDetailCard(props: any) {
 
   // ฟังก์ชันสร้างข้อมูลสำหรับ PDF - ดึงข้อมูลจากตารางที่แสดงจริงๆ
   const generatePDFData = React.useCallback(() => {
-    // Format date
-    const currentDate = new Date();
-    const formattedDate = currentDate.toLocaleDateString('th-TH', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+    // Format date — พ.ศ. 2 หลักท้าย
+    const formattedDate = formatPdfDateTh();
 
     // Header - ดึงจากข้อมูลงาน
     // ถ้ายังไม่ได้กรอกค่าให้ส่งค่าว่าง เพื่อให้ PDF แสดง "____________" แทน
     const header = {
-      prefix: "1.1",
+      prefix: customerCode || "",
       data1: jobName || "",
       data2: location || "",
       data3: salesPerson || "",
@@ -7218,7 +7233,7 @@ function MoreDetailCard(props: any) {
       summary
     };
   }, [
-    jobName, location, salesPerson,
+    customerCode, jobName, location, salesPerson,
     stationTotals, profitPercent, profitAmount, cfPercent, cfAmount,
     stationTotalWithProfit, stationTotalWithAccessories, travelTotals, travelDistance,
     accessoriesPercent, accessoriesAmount, priceAdjustPercent, priceAdjustAmount, documentCost,
@@ -17472,6 +17487,7 @@ function MoreDetailCard(props: any) {
                       {chargerRoofData && (
                         <div className="mt-6 p-4 bg-green-50 rounded-lg border border-green-200 space-y-4">
                           <div className="text-lg font-semibold text-green-800">รวมค่าใช้จ่ายหลังคาเครื่องชาร์จ</div>
+                          <div className="text-sm text-gray-600">จำนวน: {chargerRoofQuantity.toLocaleString('th-TH')} ชิ้น</div>
 
                           {/* ราคารวม */}
                           <div className="grid grid-cols-3 gap-4">
@@ -19819,20 +19835,13 @@ function StationAccessory() {
                 // ดึงข้อมูลล่าสุดจาก StationAccessory component
                 const pdfData = getJsonData();
 
-                const normalizeFilenamePart = (value: string) =>
-                  (value || '')
-                    .toString()
-                    .trim()
-                    .replace(/\s+/g, '_')
-                    .replace(/[\\/:*?"<>|]/g, '');
-
                 const headerJobName = (pdfData as any)?.header?.data1 || '';
-                const headerSalesPerson = (pdfData as any)?.header?.data3 || '';
+                const headerLocation = (pdfData as any)?.header?.data2 || '';
                 const headerDate = (pdfData as any)?.header?.data4 || '';
                 const filename = [
                   normalizeFilenamePart(customerCode || ''),
                   normalizeFilenamePart(headerJobName),
-                  normalizeFilenamePart(headerSalesPerson),
+                  normalizeFilenamePart(headerLocation),
                   normalizeFilenamePart(headerDate),
                 ].filter(Boolean).join('_') || 'cost-report';
 
