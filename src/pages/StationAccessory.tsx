@@ -444,6 +444,19 @@ function MoreDetailCard(props: any) {
       ? props.terminalSizes
       : (props.terminalSize ? String(props.terminalSize).split(',').map((s: string) => s.trim()).filter(Boolean) : []);
 
+    let storedHomeSnapshot: any = null;
+    try {
+      const rawHome = localStorage.getItem('ev_calculator_form_data');
+      if (rawHome) {
+        const parsedHome = JSON.parse(rawHome);
+        if (parsedHome?.customerCode === (customerCode || props.customerCode || '').trim()) {
+          storedHomeSnapshot = parsedHome;
+        }
+      }
+    } catch {
+      storedHomeSnapshot = null;
+    }
+
     let homeDataParsed = {
       customerCode: (customerCode || props.customerCode || '').trim(),
       form: {
@@ -462,6 +475,8 @@ function MoreDetailCard(props: any) {
       chargerInstallationType: props.chargerInstallationType || 'stand-alone',
       chargerTypeMode: props.chargerTypeMode || 'same',
       multiChargers: props.multiChargers || [],
+      results: storedHomeSnapshot?.results ?? props.results ?? null,
+      manualTransformerSize: storedHomeSnapshot?.manualTransformerSize ?? props.manualTransformerSize ?? '',
       // เก็บข้อมูลอื่นๆ จาก props (ที่ส่งมาจาก Home.tsx)
       transformer: props.transformer || '',
       trWiringSize: props.trWiringSize || '',
@@ -2714,7 +2729,9 @@ function MoreDetailCard(props: any) {
 
   const lightingBaseRowNum = 13;
   const lightingBaseLabel = getCommunicationRowName(lightingBaseRowNum) || 'Lighting';
-  const lightingQuantity = Math.max(1, featureChargersCount) * 6;
+  // Group Charger: อิงจำนวน Terminal | Stand-alone: อิงจำนวน Charger (×6 หลอด/หน่วย)
+  const lightingUnitCount = isGroupChargerAccessory ? terminalsCount : featureChargersCount;
+  const lightingQuantity = Math.max(1, lightingUnitCount) * 6;
   const lightingBasePricing = lighting === 'yes'
     ? getCommunicationPricing(lightingBaseRowNum, lightingQuantity)
     : null;
@@ -4451,20 +4468,31 @@ function MoreDetailCard(props: any) {
     return baseCost + accessoriesAmount + priceAdjustAmount + documentCost + travelTotals.total;
   }, [baseCost, accessoriesAmount, priceAdjustAmount, documentCost, travelTotals]);
 
+  // คำนวณรายการเพิ่มเติมรวม (รวมก่อนคิดกำไร%)
+  const extraItemsTotal = React.useMemo(() => {
+    return extraItems.reduce((sum, item) => {
+      const price = parseFloat(item.price) || 0;
+      return sum + price;
+    }, 0);
+  }, [extraItems]);
+
+  // ฐานคำนวณกำไร% = ราคารวมสร้างสถานี + รายการเพิ่มเติม
+  const stationTotalBeforeProfit = React.useMemo(() => {
+    return stationTotalWithAccessories + extraItemsTotal;
+  }, [stationTotalWithAccessories, extraItemsTotal]);
+
   // คำนวณกำไร% และ CF% (คิดรวมค่าแรงด้วย)
-  // กำไร% (5-25%): เอาค่าจาก ราคารวมสร้างสถานี มาคิดได้เลย
+  // กำไร% (5-25%): คิดจาก ราคารวมสร้างสถานี + รายการเพิ่มเติม
   const profitAmount = React.useMemo(() => {
     const profit = parseFloat(profitPercent) || 0;
     if (profit < 5 || profit > 25) return 0;
-    // คิดกำไร% จาก ราคารวมสร้างสถานี เท่านั้น
-    return (stationTotalWithAccessories * profit) / 100;
-  }, [profitPercent, stationTotalWithAccessories]);
+    return (stationTotalBeforeProfit * profit) / 100;
+  }, [profitPercent, stationTotalBeforeProfit]);
 
   // ราคารวมสร้างสถานีรวมกำไร%
-  // ราคารวมสร้างสถานี + กำไร%
   const stationTotalWithProfit = React.useMemo(() => {
-    return stationTotalWithAccessories + profitAmount;
-  }, [stationTotalWithAccessories, profitAmount]);
+    return stationTotalBeforeProfit + profitAmount;
+  }, [stationTotalBeforeProfit, profitAmount]);
 
   // CF% (0-25%): เอาค่า ราคารวมสร้างสถานีรวมกำไร มาคิด
   const cfAmount = React.useMemo(() => {
@@ -4479,27 +4507,19 @@ function MoreDetailCard(props: any) {
     return stationTotalWithProfit + cfAmount;
   }, [stationTotalWithProfit, cfAmount]);
 
-  // คำนวณรายการเพิ่มเติมรวม
-  const extraItemsTotal = React.useMemo(() => {
-    return extraItems.reduce((sum, item) => {
-      const price = parseFloat(item.price) || 0;
-      return sum + price;
-    }, 0);
-  }, [extraItems]);
-
-  // เสนอราคา: เอาค่าจาก ราคารวมสร้างสถานีรวมกำไร% CF% + รายการเพิ่มเติม
+  // เสนอราคา: ราคารวมสร้างสถานีรวมกำไร% CF% (รายการเพิ่มเติมรวมในฐานกำไร% แล้ว)
   const finalStationTotals = React.useMemo(() => {
     return {
-      material: stationTotals.material + profitAmount + cfAmount,
+      material: stationTotals.material + profitAmount + cfAmount + extraItemsTotal,
       labor: stationTotals.labor, // ไม่รวมค่าเดินทางในค่าแรง
-      total: stationTotalWithProfitAndCF + extraItemsTotal, // เสนอราคา = ราคารวมสร้างสถานีรวมกำไร% CF% + รายการเพิ่มเติม
+      total: stationTotalWithProfitAndCF,
       profitAmount,
       cfAmount,
       travelTotal: travelTotals.total,
       accessoriesAmount,
       documentCost,
       electricalOperationTotal: electricalOperationTotals.pricePerUnitTotal, // เก็บไว้เพื่อแสดง แต่ไม่รวมใน total
-      extraItemsTotal, // รายการเพิ่มเติมรวม
+      extraItemsTotal,
     };
   }, [stationTotals, profitAmount, cfAmount, stationTotalWithProfitAndCF, travelTotals, accessoriesAmount, documentCost, electricalOperationTotals, extraItemsTotal]);
 
@@ -7104,7 +7124,7 @@ function MoreDetailCard(props: any) {
       total_travel_cost: travelTotals.total,
 
       // ฝั่งขวา
-      total_cost: stationTotalWithAccessories, // ต้นทุนรวม = ราคารวมสร้างสถานี
+      total_cost: stationTotalBeforeProfit, // ต้นทุนรวมก่อนกำไร% (รวมรายการเพิ่มเติม)
       station_total: stationTotals.total, // เก็บไว้สำหรับใช้ใน PDF (ต้นทุนเบื้องต้น)
       profit_percent: parseFloat(profitPercent) || 0,
       profit_amount: profitAmount,
@@ -7235,7 +7255,7 @@ function MoreDetailCard(props: any) {
   }, [
     customerCode, jobName, location, salesPerson,
     stationTotals, profitPercent, profitAmount, cfPercent, cfAmount,
-    stationTotalWithProfit, stationTotalWithAccessories, travelTotals, travelDistance,
+    stationTotalWithProfit, stationTotalWithAccessories, stationTotalBeforeProfit, travelTotals, travelDistance,
     accessoriesPercent, accessoriesAmount, priceAdjustPercent, priceAdjustAmount, documentCost,
     additionalFeaturesTotals, finalStationTotals,
     stationCostSections, terminalResult, terminalLineResults,
@@ -18516,7 +18536,7 @@ function MoreDetailCard(props: any) {
             <div className="text-sm text-green-200/80 mb-2">เสนอราคา</div>
             <div className="text-3xl font-bold tracking-tight">{formatCurrency(finalStationTotals.total)} บาท</div>
             <div className="text-xs text-green-200/60 mt-2">
-              รวมราคารวมสร้างสถานีรวมกำไร% CF% ค่าเดินทาง และรายการเพิ่มเติม (ไม่รวมค่าดำเนินการทางไฟฟ้า)
+              รวมราคารวมสร้างสถานี รายการเพิ่มเติม กำไร% CF% และค่าเดินทาง (ไม่รวมค่าดำเนินการทางไฟฟ้า)
             </div>
           </div>
 

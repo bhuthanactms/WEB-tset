@@ -121,6 +121,7 @@ export default function Home(): React.JSX.Element {
   const [isEditingTransformerSize, setIsEditingTransformerSize] = useState(false);
   const [manualTransformerSize, setManualTransformerSize] = useState<string>('');
   const navigateToStationAccessoryRef = useRef<() => void>(() => {});
+  const skipAutoCalculateRef = useRef(false);
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -132,9 +133,17 @@ export default function Home(): React.JSX.Element {
 
   // Auto-save draft on every form change (for back/forward navigation restore)
   useEffect(() => {
-    const draft = { form, chargerInstallationType, chargerTypeMode, multiChargers, customerCode }
+    const draft = {
+      form,
+      chargerInstallationType,
+      chargerTypeMode,
+      multiChargers,
+      customerCode,
+      results,
+      manualTransformerSize,
+    }
     localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
-  }, [form, chargerInstallationType, chargerTypeMode, multiChargers, customerCode])
+  }, [form, chargerInstallationType, chargerTypeMode, multiChargers, customerCode, results, manualTransformerSize])
 
   useEffect(() => {
     setManualTransformerSize('');
@@ -148,6 +157,43 @@ export default function Home(): React.JSX.Element {
       setManualTransformerSize('');
     }
   }, [manualTransformerSize, form.powerAuthority, chargerTypeMode, multiChargers, results?.kWAllCharger, excelData.length]);
+
+  const applyLoadedHomeData = (parsed: any) => {
+    if (!parsed || typeof parsed !== 'object') return;
+
+    skipAutoCalculateRef.current = true;
+    setTimeout(() => {
+      skipAutoCalculateRef.current = false;
+    }, 2000);
+
+    if (parsed.form) {
+      setForm(normalizeLoadedForm(parsed.form));
+    }
+    if (parsed.chargerInstallationType) {
+      setChargerInstallationType(parsed.chargerInstallationType);
+    }
+    if (parsed.chargerTypeMode) {
+      setChargerTypeMode(parsed.chargerTypeMode);
+    }
+    if (parsed.multiChargers) {
+      setMultiChargers(parsed.multiChargers);
+    }
+    if (parsed.customerCode) {
+      setCustomerCode(parsed.customerCode);
+    }
+    if (parsed.results) {
+      setResults(parsed.results);
+    } else {
+      setResults(null);
+    }
+    if (parsed.manualTransformerSize) {
+      setManualTransformerSize(String(parsed.manualTransformerSize));
+      setIsEditingTransformerSize(true);
+    } else {
+      setManualTransformerSize('');
+      setIsEditingTransformerSize(false);
+    }
+  };
 
   // Load saved data on mount
   useEffect(() => {
@@ -189,11 +235,7 @@ export default function Home(): React.JSX.Element {
       if (draftData) {
         try {
           const draft = JSON.parse(draftData)
-          if (draft.form) setForm(normalizeLoadedForm(draft.form))
-          if (draft.chargerInstallationType) setChargerInstallationType(draft.chargerInstallationType)
-          if (draft.chargerTypeMode) setChargerTypeMode(draft.chargerTypeMode)
-          if (draft.multiChargers) setMultiChargers(draft.multiChargers)
-          if (draft.customerCode) setCustomerCode(draft.customerCode)
+          applyLoadedHomeData(draft)
           console.log('✅ Restored draft on mount')
         } catch (e) {
           console.error('❌ Error restoring draft:', e)
@@ -212,102 +254,23 @@ export default function Home(): React.JSX.Element {
     if ((locationState as any).loadData) {
       const loadData = (locationState as any).loadData;
       console.log('📦 Loading data from navigation state:', loadData);
-      // ตั้ง flag ว่าโหลดจากประวัติ
       sessionStorage.setItem('loaded_from_history', 'true');
-
-      // โหลดข้อมูลทั้งหมด
-      if (loadData.form) {
-        const normalizedForm = normalizeLoadedForm(loadData.form);
-        setForm(normalizedForm);
-        console.log('✅ Set form:', normalizedForm);
-      }
-      if (loadData.chargerInstallationType) {
-        setChargerInstallationType(loadData.chargerInstallationType);
-        console.log('✅ Set chargerInstallationType:', loadData.chargerInstallationType);
-      }
-      if (loadData.chargerTypeMode) {
-        setChargerTypeMode(loadData.chargerTypeMode);
-        console.log('✅ Set chargerTypeMode:', loadData.chargerTypeMode);
-      }
-      if (loadData.multiChargers) {
-        setMultiChargers(loadData.multiChargers);
-        console.log('✅ Set multiChargers:', loadData.multiChargers);
-      }
-      if (loadData.customerCode) {
-        setCustomerCode(loadData.customerCode);
-        console.log('✅ Set customerCode:', loadData.customerCode);
-      }
-
-      // โหลด results ถ้ามี
-      if (loadData.results) {
-        setResults(loadData.results);
-        console.log('✅ Loaded results from navigation state:', loadData.results);
-      } else {
-        // ถ้าไม่มี results แต่มีข้อมูลครบถ้วน ให้คำนวณอัตโนมัติ
-        if (loadData.form && loadData.form.powerAuthority &&
-          ((loadData.form.charger && loadData.form.numberOfChargers) ||
-            (loadData.chargerTypeMode === 'any' && loadData.multiChargers && loadData.multiChargers.length > 0))) {
-          // เรียก calculateResults อัตโนมัติหลังจาก state อัพเดท
-          setTimeout(() => {
-            calculateResults();
-            console.log('✅ Auto-calculated results after loading from navigation');
-          }, 300);
-        }
-      }
-      // ล้าง flag หลังจากโหลดเสร็จแล้ว
+      applyLoadedHomeData(loadData);
       sessionStorage.removeItem('loaded_from_history');
     } else if (loadedFromHistory) {
-      // ถ้ามี flag แต่ไม่มี navigation state ให้โหลดจาก localStorage
       console.log('📦 Loading from localStorage (loaded_from_history flag set)');
       const savedData = localStorage.getItem(STORAGE_KEY);
       if (savedData) {
         try {
           const parsed = JSON.parse(savedData);
-          if (parsed.form) {
-            const normalizedForm = normalizeLoadedForm(parsed.form);
-            setForm(normalizedForm);
-            console.log('✅ Set form from localStorage:', normalizedForm);
-          }
-          if (parsed.chargerInstallationType) {
-            setChargerInstallationType(parsed.chargerInstallationType);
-            console.log('✅ Set chargerInstallationType from localStorage:', parsed.chargerInstallationType);
-          }
-          if (parsed.chargerTypeMode) {
-            setChargerTypeMode(parsed.chargerTypeMode);
-            console.log('✅ Set chargerTypeMode from localStorage:', parsed.chargerTypeMode);
-          }
-          if (parsed.multiChargers) {
-            setMultiChargers(parsed.multiChargers);
-            console.log('✅ Set multiChargers from localStorage:', parsed.multiChargers);
-          }
-          if (parsed.customerCode) {
-            setCustomerCode(parsed.customerCode);
-            console.log('✅ Set customerCode from localStorage:', parsed.customerCode);
-          }
-          // โหลด results ถ้ามี
-          if (parsed.results) {
-            setResults(parsed.results);
-            console.log('✅ Loaded results from localStorage:', parsed.results);
-          } else {
-            // ถ้าไม่มี results แต่มีข้อมูลครบถ้วน ให้คำนวณอัตโนมัติ
-            if (parsed.form && parsed.form.powerAuthority &&
-              ((parsed.form.charger && parsed.form.numberOfChargers) ||
-                (parsed.chargerTypeMode === 'any' && parsed.multiChargers && parsed.multiChargers.length > 0))) {
-              setTimeout(() => {
-                calculateResults();
-                console.log('✅ Auto-calculated results after loading from localStorage');
-              }, 300);
-            }
-          }
+          applyLoadedHomeData(parsed);
           console.log('✅ Loaded saved data from localStorage');
-          // ล้าง flag หลังจากโหลดเสร็จแล้ว
           sessionStorage.removeItem('loaded_from_history');
         } catch (error) {
           console.error('❌ Error loading saved data:', error);
           sessionStorage.removeItem('loaded_from_history');
         }
       } else {
-        // ถ้าไม่มีข้อมูลใน localStorage ให้ล้าง flag
         sessionStorage.removeItem('loaded_from_history');
       }
     }
@@ -315,6 +278,7 @@ export default function Home(): React.JSX.Element {
 
   // Auto-calculate results when form data is loaded and excel data is ready
   useEffect(() => {
+    if (skipAutoCalculateRef.current) return;
     // ถ้ามีข้อมูลครบถ้วนและยังไม่มี results และ excel data พร้อมแล้ว ให้คำนวณอัตโนมัติ
     if (form.powerAuthority && excelData.length > 0 && !results) {
       const hasEnoughData = chargerTypeMode === 'any'
@@ -389,16 +353,24 @@ export default function Home(): React.JSX.Element {
     // ค่าที่แสดงใน UI / ส่งต่อไปหน้า StationAccessory
     const transformer = selectedTransformer;
 
-    // คำนวณข้อมูลเพิ่มเติม (ต้องมี form.trWiringType และ form.powerAuthority)
-    const trWiringSize = form.trWiringType && form.powerAuthority
-      ? (getTRWiringSizeCVs()[0] || '')
+    // คำนวณข้อมูลเพิ่มเติม (TR / Land→MDB ตาม path ที่เลือก)
+    const trWiringSize = form.powerAuthority
+      ? (form.landToMdb
+        ? getLandToMdbWiringSizeCVs()
+        : (form.trToLand
+          ? getTRToLandWiringSizeCVs()
+          : (form.trWiringType ? (getTRWiringSizeCVs()[0] || '') : '')))
       : '';
 
-    const trWireConduit = form.trWiringType && form.powerAuthority
-      ? (getTRWireConduit() || '')
+    const trWireConduit = form.powerAuthority
+      ? (form.landToMdb
+        ? getLandToMdbWireConduit()
+        : (form.trToLand
+          ? getTRToLandWireConduit()
+          : (form.trWiringType ? (getTRWireConduit() || '') : '')))
       : '';
 
-    const trWiringRowNum = form.trWiringType && form.powerAuthority
+    const trWiringRowNum = form.powerAuthority && (form.trWiringType || form.trToLand || form.landToMdb)
       ? getSelectedTransformerRowNumber()
       : undefined;
 
@@ -462,6 +434,7 @@ export default function Home(): React.JSX.Element {
       chargerTypeMode,
       multiChargers,
       results: calculatedResults,
+      manualTransformerSize: manualTransformerSize || '',
       transformerSize: transformerSize,
       transformer: transformer, // เพิ่ม transformer (ค่าที่แสดงใน UI)
       // ข้อมูลเพิ่มเติมจากการคำนวณ
@@ -536,30 +509,7 @@ export default function Home(): React.JSX.Element {
     if (savedData) {
       try {
         const parsed = JSON.parse(savedData);
-        if (parsed.form) {
-          const normalizedForm = normalizeLoadedForm(parsed.form);
-          setForm(normalizedForm);
-        }
-        if (parsed.chargerInstallationType) setChargerInstallationType(parsed.chargerInstallationType);
-        if (parsed.chargerTypeMode) setChargerTypeMode(parsed.chargerTypeMode);
-        if (parsed.multiChargers) setMultiChargers(parsed.multiChargers);
-        if (parsed.customerCode) setCustomerCode(parsed.customerCode);
-        // โหลด results ถ้ามี
-        if (parsed.results) {
-          setResults(parsed.results);
-          console.log('✅ Loaded results from localStorage:', parsed.results);
-        } else {
-          // ถ้าไม่มี results แต่มีข้อมูลครบถ้วน ให้คำนวณอัตโนมัติ
-          if (parsed.form && parsed.form.powerAuthority &&
-            ((parsed.form.charger && parsed.form.numberOfChargers) ||
-              (parsed.chargerTypeMode === 'any' && parsed.multiChargers && parsed.multiChargers.length > 0))) {
-            // เรียก calculateResults อัตโนมัติหลังจาก state อัพเดท
-            setTimeout(() => {
-              calculateResults();
-              console.log('✅ Auto-calculated results after loading data');
-            }, 100);
-          }
-        }
+        applyLoadedHomeData(parsed);
         alert('✅ โหลดข้อมูลสำเร็จ!');
         console.log('📂 Loaded data from localStorage:', parsed);
       } catch (error) {
@@ -2177,15 +2127,16 @@ export default function Home(): React.JSX.Element {
       console.log('Charger Type Mode:', chargerTypeMode);
       console.log('Multi Chargers:', multiChargers);
 
-      // Save current form data before navigation
-      const currentData = {
-        customerCode: customerCode,
+      // Save current form + calculated snapshot before navigation
+      localStorage.setItem('ev_calculator_form_data', JSON.stringify({
+        customerCode: customerCode.trim(),
         form,
         chargerInstallationType,
         chargerTypeMode,
-        multiChargers
-      };
-      localStorage.setItem('ev_calculator_form_data', JSON.stringify(currentData));
+        multiChargers,
+        results,
+        manualTransformerSize: manualTransformerSize || '',
+      }));
 
       // ส่งข้อมูลที่ต้องการไปหน้า StationAccessory
       const terminalWiringDetails = selectedTerminalSizes
