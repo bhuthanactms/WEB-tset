@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useState, useCallback, useRef } from 'react'
 
-import { Zap, Car, Paintbrush, Shield, Home, Wrench, MapPin, ChevronDown, ChevronUp, Box, Package, Settings, Ruler, Printer, Save, FolderOpen, Trash2, Calculator, Cable, DollarSign } from 'lucide-react'
+import { Zap, Car, Paintbrush, Shield, Home, Wrench, MapPin, ChevronDown, ChevronUp, Box, Package, Settings, Ruler, Printer, Save, FolderOpen, Trash2, Calculator, Cable, DollarSign, FileSpreadsheet } from 'lucide-react'
 
 import { useLocation, useNavigate } from 'react-router-dom'
 import { getCurrentUserSync as getCurrentUser, canSaveHistory } from '@/utils/auth'
@@ -7187,6 +7187,26 @@ function MoreDetailCard(props: any) {
           quantity: `${data.count} เครื่อง`,
         });
       });
+
+      // เพิ่ม Dispenser breakdown สำหรับ Group Charger
+      if (props.chargerInstallationType === 'group' && resolvedTerminalSizes.length > 0) {
+        const dispenserMap = new Map<string, number>();
+        resolvedTerminalSizes.forEach((size: string) => {
+          const s = (size || '').trim();
+          if (s) dispenserMap.set(s, (dispenserMap.get(s) || 0) + 1);
+        });
+        // เรียงจาก A สูงสุดไปต่ำสุด
+        const sortedDisp = Array.from(dispenserMap.entries()).sort((a, b) => {
+          return (parseInt(b[0]) || 0) - (parseInt(a[0]) || 0);
+        });
+        sortedDisp.forEach(([size, count]) => {
+          chargerTableRows.push({
+            productName: `Dispenser ${size}`,
+            quantity: `${count} เครื่อง`,
+            isDispenser: true,
+          });
+        });
+      }
     }
 
     // สร้างตารางรายการเพิ่มเติม (หัวข้อ 6) - กรณีมีรายการเพิ่มเติม
@@ -7247,10 +7267,16 @@ function MoreDetailCard(props: any) {
       });
     }
 
+    // รายการเพิ่มเติมทั้งหมด (ไม่กรองตามราคา) สำหรับ Excel export
+    const allExtraItems = (extraItems || [])
+      .filter((item: any) => item.item && item.item.trim())
+      .map((item: any) => ({ productName: item.item.trim() }));
+
     return {
       header,
       tables,
-      summary
+      summary,
+      allExtraItems,
     };
   }, [
     customerCode, jobName, location, salesPerson,
@@ -19898,6 +19924,285 @@ function StationAccessory() {
           >
             <Printer className="h-5 w-5" />
             <span>Print</span>
+          </Button>
+
+          {/* ปุ่ม Export รายการสินค้า (Excel) - ไม่แสดงราคา */}
+          <Button
+            onClick={async () => {
+              try {
+                const pdfData = getJsonData();
+                if (!pdfData || !pdfData.tables || !Array.isArray(pdfData.tables)) {
+                  alert('ไม่สามารถดึงข้อมูลได้ กรุณาลองใหม่อีกครั้ง');
+                  return;
+                }
+
+                const h = pdfData.header || {};
+
+                // dynamic import เพื่อไม่เพิ่ม bundle size
+                const ExcelJSMod = await import('exceljs');
+                const ExcelJS: any = (ExcelJSMod as any).default || ExcelJSMod;
+                const workbook = new ExcelJS.Workbook();
+                const ws = workbook.addWorksheet('รายการสินค้า');
+
+                // ── Colors (ARGB) ──────────────────────────────────────────
+                const C_DARK       = 'FF1F3864';
+                const C_PRIMARY    = 'FF2E5B9A';
+                const C_PRIMARY_L  = 'FFDCE6F2';
+                const C_ACCENT     = 'FF1FA37A';
+                const C_ROW_ALT    = 'FFF4F7FB';
+                const C_BORDER     = 'FFB9C6D8';
+                const C_WHITE      = 'FFFFFFFF';
+                const C_TEXT       = 'FF1A1A1A';
+                const C_MUTED      = 'FF5B6B7F';
+                const C_CHARGER    = 'FFE9F7F1';
+                const FONT         = 'TH Sarabun New';
+
+                const solid = (argb: string) => ({ type: 'pattern', pattern: 'solid', fgColor: { argb } });
+                const border = (argb = C_BORDER) => ({
+                  top: { style: 'thin', color: { argb } },
+                  left: { style: 'thin', color: { argb } },
+                  bottom: { style: 'thin', color: { argb } },
+                  right: { style: 'thin', color: { argb } },
+                });
+
+                // Column widths
+                ws.columns = [
+                  { width: 9 },
+                  { width: 27 },
+                  { width: 52 },
+                  { width: 8 },
+                  { width: 13 },
+                ];
+                ws.views = [{ showGridLines: false }];
+
+                let r = 1;
+
+                // ── Title banner ──────────────────────────────────────────
+                ws.getRow(r).height = 8; r++;
+
+                const addTitleRow = (text: string, height: number) => {
+                  ws.mergeCells(r, 1, r, 5);
+                  const c = ws.getCell(r, 1);
+                  c.value = text;
+                  c.font = { name: FONT, size: 11, bold: true, color: { argb: C_WHITE } };
+                  c.fill = solid(C_DARK);
+                  c.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+                  ws.getRow(r).height = height; r++;
+                };
+                addTitleRow(`ใบถอดต้นทุน EV ${h.data1 || ''}`, 20);
+                addTitleRow(`${h.prefix || ''} | สถานที่: ${h.data2 || ''}`, 18);
+
+                // dark-blue thin spacer
+                ws.mergeCells(r, 1, r, 5);
+                ws.getCell(r, 1).fill = solid(C_DARK);
+                ws.getRow(r).height = 5; r++;
+                ws.getRow(r).height = 6; r++;  // empty gap
+
+                // ── Info row ──────────────────────────────────────────────
+                ws.mergeCells(r, 1, r, 2);
+                ws.mergeCells(r, 4, r, 5);
+                const applyInfo = (col: number, val: string, align: string) => {
+                  const c = ws.getCell(r, col);
+                  c.value = val;
+                  c.font = { name: FONT, size: 11, bold: true, color: { argb: C_TEXT } };
+                  c.fill = solid(C_ROW_ALT);
+                  c.alignment = { horizontal: align as any, vertical: 'middle', indent: align === 'left' ? 1 : 0 };
+                };
+                applyInfo(1, `เอกสาร: ${h.prefix || ''}`, 'left');
+                applyInfo(3, `พนักงานขาย: ${h.data3 || ''}`, 'left');
+                applyInfo(4, `วันที่: ${h.data4 || ''}`, 'right');
+                ws.getRow(r).height = 18; r++;
+                ws.getRow(r).height = 6; r++;  // gap
+
+                const HEADER_LAST = r - 1;
+
+                // ── Helpers ───────────────────────────────────────────────
+                const sectionHeader = (text: string) => {
+                  ws.mergeCells(r, 1, r, 5);
+                  const c = ws.getCell(r, 1);
+                  c.value = `  ${text}`;
+                  c.font = { name: FONT, size: 9, bold: true, color: { argb: C_WHITE } };
+                  c.fill = solid(C_PRIMARY);
+                  c.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+                  ws.getRow(r).height = 28; r++;
+                };
+
+                const tableHeader = (cols: string[], sz = 7) => {
+                  cols.forEach((v, i) => {
+                    const c = ws.getCell(r, i + 1);
+                    c.value = v;
+                    c.font = { name: FONT, size: sz, bold: true, color: { argb: C_DARK } };
+                    c.fill = solid(C_PRIMARY_L);
+                    c.border = border();
+                    c.alignment = {
+                      horizontal: [0,3,4].includes(i) ? 'center' : 'left',
+                      vertical: 'middle',
+                      indent: [0,3,4].includes(i) ? 0 : 1,
+                    };
+                  });
+                  ws.getRow(r).height = sz * 2.5 + 6; r++;
+                };
+
+                const dataRow = (vals: string[], shaded: boolean, isDash: boolean, sz = 6) => {
+                  vals.forEach((v, i) => {
+                    const c = ws.getCell(r, i + 1);
+                    c.value = v;
+                    c.font = { name: FONT, size: sz, italic: isDash, color: { argb: isDash ? C_MUTED : C_TEXT } };
+                    c.fill = solid(shaded ? C_ROW_ALT : C_WHITE);
+                    c.border = border();
+                    c.alignment = {
+                      horizontal: [0,3,4].includes(i) ? 'center' : 'left',
+                      vertical: 'middle',
+                      wrapText: true,
+                      indent: [0,3,4].includes(i) ? 0 : 1,
+                    };
+                  });
+                  ws.getRow(r).height = sz * 3.3 + 4; r++;
+                };
+
+                // ── Tables ────────────────────────────────────────────────
+                let hasData = false;
+
+                pdfData.tables.forEach((table: any) => {
+                  const ttype = table.type || 'default';
+                  // ข้าม cost (ราคา) และ extra-items (จัดการแยกด้านล่าง)
+                  if (ttype === 'cost' || ttype === 'extra-items') return;
+                  const rows = Array.isArray(table.rows) ? table.rows : [];
+
+                  if (ttype === 'distance') {
+                    // ── ระยะเดินทาง ─────────────────────────────────────
+                    if (rows.length === 0) return;
+                    sectionHeader(table.tablename || '5.ค่าเดินทาง');
+                    tableHeader(['', '', 'รายการ', 'ระยะทาง', ''], 7);
+                    rows.forEach((row: any, i: number) => {
+                      const dist = (row.distance || '-').toString();
+                      dataRow(['', '', 'ระยะเดินทาง', dist, ''], i % 2 === 1, false, 6);
+                      hasData = true;
+                    });
+                    ws.getRow(r).height = 8; r++;
+                    return;
+                  }
+
+                  if (rows.length === 0) return;
+                  sectionHeader(table.tablename || '');
+
+                  if (ttype === 'charger') {
+                    tableHeader(['', '', 'รายการสินค้า', 'จำนวน', ''], 8);
+                    rows.forEach((row: any) => {
+                      const name = (row.productName || '').toString().trim();
+                      if (!name) return;
+                      const isDisp = !!row.isDispenser;
+                      const rowFill = isDisp ? C_WHITE : C_CHARGER;
+                      [1, 2, 5].forEach(col => {
+                        ws.getCell(r, col).fill = solid(rowFill);
+                        ws.getCell(r, col).border = border();
+                      });
+                      const nc = ws.getCell(r, 3);
+                      nc.value = isDisp ? `  ${name}` : name;
+                      nc.font = isDisp
+                        ? { name: FONT, size: 7, italic: true, color: { argb: C_MUTED } }
+                        : { name: FONT, size: 8, bold: true, color: { argb: C_DARK } };
+                      nc.fill = solid(rowFill); nc.border = border();
+                      nc.alignment = { horizontal: 'left', vertical: 'middle', indent: isDisp ? 3 : 1 };
+                      const qc = ws.getCell(r, 4);
+                      qc.value = (row.quantity || '').toString();
+                      qc.font = isDisp
+                        ? { name: FONT, size: 7, italic: true, color: { argb: C_MUTED } }
+                        : { name: FONT, size: 8, bold: true, color: { argb: C_ACCENT } };
+                      qc.fill = solid(rowFill); qc.border = border();
+                      qc.alignment = { horizontal: 'center', vertical: 'middle' };
+                      ws.getRow(r).height = isDisp ? 16 : 27; r++;
+                      hasData = true;
+                    });
+
+                  } else {
+                    tableHeader(['รหัส', 'ประเภท', 'รายการสินค้า', 'จำนวน', 'ระยะ (m)'], 7);
+                    rows.forEach((row: any, i: number) => {
+                      const name = (row.name || '').toString().trim();
+                      if (!name || name === '-') return;
+                      const range = (!row.range || row.range === '-') ? '' : row.range.toString();
+                      const isDash = (row.code || '') === '-';
+                      dataRow([
+                        (row.code || '').toString(),
+                        (row.type || '').toString(),
+                        name,
+                        row.amount != null ? row.amount.toString() : '',
+                        range,
+                      ], i % 2 === 1, isDash, 6);
+                      hasData = true;
+                    });
+                  }
+
+                  ws.getRow(r).height = 8; r++;  // spacer
+                });
+
+                // ── Extra Items (ค่าใช้จ่ายเพิ่มเติม) ─────────────────────
+                // ใช้ extraItems state โดยตรง เพื่อโชว์ทุก item แม้ราคา = 0
+                const validExtras = (pdfData.allExtraItems || []) as Array<{ productName: string }>;
+                if (validExtras.length > 0) {
+                  sectionHeader('6.รายการเพิ่มเติม (Extra Cost)');
+                  tableHeader(['', '', 'รายการ', 'จำนวน', ''], 5);
+                  validExtras.forEach((it, i) => {
+                    dataRow(['', '', it.productName, '1', ''], i % 2 === 1, false, 6);
+                    hasData = true;
+                  });
+                  ws.getRow(r).height = 8; r++;
+                }
+
+                if (!hasData) {
+                  alert('ไม่พบรายการสินค้า กรุณากรอกข้อมูลก่อน');
+                  return;
+                }
+
+                // ── Footer note ───────────────────────────────────────────
+                ws.mergeCells(r, 1, r, 5);
+                const noteC = ws.getCell(r, 1);
+                noteC.value = 'หมายเหตุ: จำนวนและระยะทางเป็นค่าประมาณการเบื้องต้น อาจมีการเปลี่ยนแปลงตามหน้างานจริง';
+                noteC.font = { name: FONT, size: 7, italic: true, color: { argb: C_MUTED } };
+                noteC.fill = solid(C_ROW_ALT);
+                noteC.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+                ws.getRow(r).height = 16;
+                const LAST_ROW = r; r++;
+
+                // ── Page setup ────────────────────────────────────────────
+                ws.pageSetup.paperSize = 9;
+                ws.pageSetup.orientation = 'portrait';
+                ws.pageSetup.fitToPage = true;
+                ws.pageSetup.fitToWidth = 1;
+                ws.pageSetup.fitToHeight = 0;
+                ws.pageSetup.horizontalCentered = true;
+                ws.pageSetup.margins = { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.25 };
+                ws.pageSetup.printArea = `A1:E${LAST_ROW}`;
+                ws.pageSetup.printTitlesRow = `1:${HEADER_LAST}`;
+                ws.headerFooter.oddFooter = '&C&7หน้า &P จาก &N';
+
+                // ── Download ──────────────────────────────────────────────
+                const buffer = await workbook.xlsx.writeBuffer();
+                const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                const filename = [
+                  normalizeFilenamePart(customerCode || ''),
+                  normalizeFilenamePart(h.data1 || ''),
+                  normalizeFilenamePart(h.data2 || ''),
+                  normalizeFilenamePart(h.data4 || ''),
+                ].filter(Boolean).join('_') || 'product-list';
+                a.href = url;
+                a.download = `${filename}_รายการสินค้า.xlsx`;
+                a.click();
+                URL.revokeObjectURL(url);
+
+              } catch (error) {
+                console.error('Error exporting Excel:', error);
+                const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                alert('เกิดข้อผิดพลาดในการ Export Excel: ' + errorMessage);
+              }
+            }}
+            className="shadow-lg hover:shadow-xl transition-all duration-200 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-6 py-3 flex items-center gap-2"
+            size="lg"
+          >
+            <FileSpreadsheet className="h-5 w-5" />
+            <span>Export รายการสินค้า</span>
           </Button>
         </div>
       </div>

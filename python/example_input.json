@@ -1,0 +1,42 @@
+{
+  "doc_no": "PP69001",
+  "project_name": "ใบถอดต้นทุน EV CHARGING STATION",
+  "company": "MPJ LOGISTIC",
+  "location": "ศรีราชา ชลบุรี",
+  "salesperson": "Sittipong",
+  "date": "15 ก.ค. 2569",
+  "charger": {
+    "name": "Group Charger: 720 kW",
+    "qty": "1 เครื่อง"
+  },
+  "sections": [
+    {
+      "title": "1. ระบบแรงสูง (High Voltage System)",
+      "items": [
+        { "code": "7.3.11", "type": "หม้อแปลง 22 (24) kV / 416 V", "name": "1000 kVA", "qty": "1", "distance": "" },
+        { "code": "-", "type": "การขอแรงสูง PEA", "name": "ชุดรับไฟ 22 kV 315-1000 kVA", "qty": "1", "distance": "" },
+        { "code": "-", "type": "การขอแรงสูง PEA", "name": "สายเมนแรงสูง CV 3x95 sq.mm.", "qty": "20", "distance": "20 ม." }
+      ]
+    },
+    {
+      "title": "2. ระบบแรงต่ำ (Low Voltage System)",
+      "items": [
+        { "code": "5.1.01", "type": "(TR to MDB) TR to Land", "name": "สาย CV 3x240+1x120 sq.mm. in Conduit", "qty": "1", "distance": "10 ม." },
+        { "code": "5.1.02", "type": "(TR to MDB) Land to MDB", "name": "สาย CV 3x240+1x120 sq.mm. ใต้ดิน", "qty": "1", "distance": "15 ม." },
+        { "code": "5.2.01", "type": "MDB to Charger", "name": "สาย THW 1x70 sq.mm. in Conduit", "qty": "4", "distance": "50 ม." }
+      ]
+    },
+    {
+      "title": "3. อุปกรณ์และเงื่อนไขเพิ่มเติม (Accessories & Additional Terms)",
+      "style": "extra",
+      "items": [
+        { "code": "A.01", "type": "อุปกรณ์ประกอบสถานี", "name": "ป้ายสัญลักษณ์ EV CHARGING STATION ขนาด 60x90 ซม.", "qty": "2", "distance": "" },
+        { "code": "A.02", "type": "ระบบสื่อสาร", "name": "อุปกรณ์ OCPP 1.6 Controller + SIM Card (12 months)", "qty": "1", "distance": "" },
+        { "code": "A.03", "type": "งานปูน", "name": "เทคอนกรีตฐานรากเครื่องชาร์จ ขนาด 1.0x1.0x0.3 ม.", "qty": "1", "distance": "" },
+        { "code": "-", "type": "งานขุดดิน", "name": "ขุดดินฝังท่อร้อยสาย ลึก 0.60 ม. กว้าง 0.30 ม.", "qty": "1", "distance": "50 ม." },
+        { "code": "-", "type": "งานทาสี / ทาสีช่องจอด", "name": "ทาสีช่องจอดรถ EV พร้อมสัญลักษณ์ ขนาดมาตรฐาน 2.5x5.0 ม.", "qty": "4", "distance": "" }
+      ]
+    }
+  ],
+  "note": "หมายเหตุ: จำนวนและระยะทางเป็นค่าประมาณการเบื้องต้น อาจมีการเปลี่ยนแปลงตามหน้างานจริง ราคาในเอกสารนี้ไม่รวม VAT 7%"
+}

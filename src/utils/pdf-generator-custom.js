@@ -261,6 +261,19 @@ export function createCostPDF(jsonData) {
           fontSize: 8,
           textColor: [0, 0, 0], // สีดำ
         },
+        didParseCell: function (data) {
+          if (data.section === 'body') {
+            const origRow = rows[data.row.index];
+            if (origRow && origRow.isDispenser) {
+              data.cell.styles.fontSize = 7;
+              data.cell.styles.fontStyle = 'normal';
+              data.cell.styles.textColor = [80, 80, 80];
+              if (data.column.index === 0) {
+                data.cell.styles.cellPadding = { top: 1, right: 0.5, bottom: 1, left: 10 };
+              }
+            }
+          }
+        },
         didDrawPage: function (data) {
           const currentPageNum = data.pageNumber;
           if (currentPageNum > tableStartPage) {
