@@ -1079,18 +1079,20 @@ function MoreDetailCard(props: any) {
         };
         return shiftRow(mapping[kw], 2);
       } else if (powerAuthority === 'PEA') {
+        // rowNum ในตาราง = ค่าจริงในชีต − 2 (เพราะ shiftRow +2)
+        // ค่าจริง: 240–320→19, 360–400→24, 440→19, 480→19, 520–560→18, 600–640→19, 680–720→25, 760–800→24, 840–1000→25
         const mapping: { [key: number]: { rowNum: number; setCount: number } } = {
-          240: { rowNum: 16, setCount: 2 },
+          240: { rowNum: 17, setCount: 2 },
           280: { rowNum: 17, setCount: 2 },
           320: { rowNum: 17, setCount: 2 },
-          360: { rowNum: 23, setCount: 2 },
-          400: { rowNum: 23, setCount: 2 },
-          440: { rowNum: 16, setCount: 4 },
-          480: { rowNum: 16, setCount: 4 },
-          520: { rowNum: 17, setCount: 4 },
-          560: { rowNum: 17, setCount: 4 },
-          600: { rowNum: 18, setCount: 4 },
-          640: { rowNum: 18, setCount: 4 },
+          360: { rowNum: 22, setCount: 2 },
+          400: { rowNum: 22, setCount: 2 },
+          440: { rowNum: 17, setCount: 4 },
+          480: { rowNum: 17, setCount: 4 },
+          520: { rowNum: 16, setCount: 4 },
+          560: { rowNum: 16, setCount: 4 },
+          600: { rowNum: 17, setCount: 4 },
+          640: { rowNum: 17, setCount: 4 },
           680: { rowNum: 23, setCount: 3 },
           720: { rowNum: 23, setCount: 3 },
           760: { rowNum: 22, setCount: 4 },
