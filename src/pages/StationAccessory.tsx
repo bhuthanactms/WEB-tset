@@ -19967,13 +19967,19 @@ function StationAccessory() {
                   right: { style: 'thin', color: { argb } },
                 });
 
-                // Column widths
+                // Column widths (5 เดิม + ช่องว่างให้กรอกต่อหลังปริ้น)
+                const COL_COUNT = 9;
+                const EMPTY_FILL_COLS = ['', '', '', '']; // ชื่อผู้ขาย, POout, วันรับของ, วันส่งมอบ
                 ws.columns = [
                   { width: 9 },
-                  { width: 27 },
-                  { width: 52 },
+                  { width: 22 },
+                  { width: 42 },
                   { width: 8 },
-                  { width: 13 },
+                  { width: 12 },
+                  { width: 14 }, // ชื่อผู้ขาย
+                  { width: 12 }, // POout
+                  { width: 12 }, // วันรับของ
+                  { width: 12 }, // วันส่งมอบ
                 ];
                 ws.views = [{ showGridLines: false }];
 
@@ -19983,7 +19989,7 @@ function StationAccessory() {
                 ws.getRow(r).height = 8; r++;
 
                 const addTitleRow = (text: string, height: number) => {
-                  ws.mergeCells(r, 1, r, 5);
+                  ws.mergeCells(r, 1, r, COL_COUNT);
                   const c = ws.getCell(r, 1);
                   c.value = text;
                   c.font = { name: FONT, size: 11, bold: true, color: { argb: C_WHITE } };
@@ -19995,14 +20001,14 @@ function StationAccessory() {
                 addTitleRow(`${h.prefix || ''} | สถานที่: ${h.data2 || ''}`, 18);
 
                 // dark-blue thin spacer
-                ws.mergeCells(r, 1, r, 5);
+                ws.mergeCells(r, 1, r, COL_COUNT);
                 ws.getCell(r, 1).fill = solid(C_DARK);
                 ws.getRow(r).height = 5; r++;
                 ws.getRow(r).height = 6; r++;  // empty gap
 
                 // ── Info row ──────────────────────────────────────────────
                 ws.mergeCells(r, 1, r, 2);
-                ws.mergeCells(r, 4, r, 5);
+                ws.mergeCells(r, 4, r, COL_COUNT);
                 const applyInfo = (col: number, val: string, align: string) => {
                   const c = ws.getCell(r, col);
                   c.value = val;
@@ -20019,8 +20025,9 @@ function StationAccessory() {
                 const HEADER_LAST = r - 1;
 
                 // ── Helpers ───────────────────────────────────────────────
+                const centerCols = new Set([0, 3, 4, 5, 6, 7, 8]);
                 const sectionHeader = (text: string) => {
-                  ws.mergeCells(r, 1, r, 5);
+                  ws.mergeCells(r, 1, r, COL_COUNT);
                   const c = ws.getCell(r, 1);
                   c.value = `  ${text}`;
                   c.font = { name: FONT, size: 9, bold: true, color: { argb: C_WHITE } };
@@ -20037,12 +20044,13 @@ function StationAccessory() {
                     c.fill = solid(C_PRIMARY_L);
                     c.border = border();
                     c.alignment = {
-                      horizontal: [0,3,4].includes(i) ? 'center' : 'left',
+                      horizontal: centerCols.has(i) ? 'center' : 'left',
                       vertical: 'middle',
-                      indent: [0,3,4].includes(i) ? 0 : 1,
+                      wrapText: true,
+                      indent: centerCols.has(i) ? 0 : 1,
                     };
                   });
-                  ws.getRow(r).height = sz * 2.5 + 6; r++;
+                  ws.getRow(r).height = sz * 2.5 + 10; r++;
                 };
 
                 const dataRow = (vals: string[], shaded: boolean, isDash: boolean, sz = 6) => {
@@ -20053,10 +20061,10 @@ function StationAccessory() {
                     c.fill = solid(shaded ? C_ROW_ALT : C_WHITE);
                     c.border = border();
                     c.alignment = {
-                      horizontal: [0,3,4].includes(i) ? 'center' : 'left',
+                      horizontal: centerCols.has(i) ? 'center' : 'left',
                       vertical: 'middle',
                       wrapText: true,
-                      indent: [0,3,4].includes(i) ? 0 : 1,
+                      indent: centerCols.has(i) ? 0 : 1,
                     };
                   });
                   ws.getRow(r).height = sz * 3.3 + 4; r++;
@@ -20075,10 +20083,10 @@ function StationAccessory() {
                     // ── ระยะเดินทาง ─────────────────────────────────────
                     if (rows.length === 0) return;
                     sectionHeader(table.tablename || '5.ค่าเดินทาง');
-                    tableHeader(['', '', 'รายการ', 'ระยะทาง', ''], 7);
+                    tableHeader(['', '', 'รายการ', 'ระยะทาง', '', 'ชื่อผู้ขาย', 'POout', 'วันรับของ', 'วันส่งมอบ'], 7);
                     rows.forEach((row: any, i: number) => {
                       const dist = (row.distance || '-').toString();
-                      dataRow(['', '', 'ระยะเดินทาง', dist, ''], i % 2 === 1, false, 6);
+                      dataRow(['', '', 'ระยะเดินทาง', dist, '', ...EMPTY_FILL_COLS], i % 2 === 1, false, 6);
                       hasData = true;
                     });
                     ws.getRow(r).height = 8; r++;
@@ -20089,13 +20097,13 @@ function StationAccessory() {
                   sectionHeader(table.tablename || '');
 
                   if (ttype === 'charger') {
-                    tableHeader(['', '', 'รายการสินค้า', 'จำนวน', ''], 8);
+                    tableHeader(['', '', 'รายการสินค้า', 'จำนวน', '', 'ชื่อผู้ขาย', 'POout', 'วันรับของ', 'วันส่งมอบ'], 8);
                     rows.forEach((row: any) => {
                       const name = (row.productName || '').toString().trim();
                       if (!name) return;
                       const isDisp = !!row.isDispenser;
                       const rowFill = isDisp ? C_WHITE : C_CHARGER;
-                      [1, 2, 5].forEach(col => {
+                      [1, 2, 5, 6, 7, 8, 9].forEach(col => {
                         ws.getCell(r, col).fill = solid(rowFill);
                         ws.getCell(r, col).border = border();
                       });
@@ -20113,12 +20121,19 @@ function StationAccessory() {
                         : { name: FONT, size: 8, bold: true, color: { argb: C_ACCENT } };
                       qc.fill = solid(rowFill); qc.border = border();
                       qc.alignment = { horizontal: 'center', vertical: 'middle' };
+                      // คอลัมน์ว่างหลังระยะ ให้กรอกต่อหลังปริ้น
+                      [6, 7, 8, 9].forEach(col => {
+                        const ec = ws.getCell(r, col);
+                        ec.value = '';
+                        ec.fill = solid(rowFill);
+                        ec.border = border();
+                      });
                       ws.getRow(r).height = isDisp ? 16 : 27; r++;
                       hasData = true;
                     });
 
                   } else {
-                    tableHeader(['รหัส', 'ประเภท', 'รายการสินค้า', 'จำนวน', 'ระยะ (m)'], 7);
+                    tableHeader(['รหัส', 'ประเภท', 'รายการสินค้า', 'จำนวน', 'ระยะ (m)', 'ชื่อผู้ขาย', 'POout', 'วันรับของ', 'วันส่งมอบ'], 7);
                     rows.forEach((row: any, i: number) => {
                       const name = (row.name || '').toString().trim();
                       if (!name || name === '-') return;
@@ -20130,6 +20145,7 @@ function StationAccessory() {
                         name,
                         row.amount != null ? row.amount.toString() : '',
                         range,
+                        ...EMPTY_FILL_COLS,
                       ], i % 2 === 1, isDash, 6);
                       hasData = true;
                     });
@@ -20143,9 +20159,9 @@ function StationAccessory() {
                 const validExtras = (pdfData.allExtraItems || []) as Array<{ productName: string }>;
                 if (validExtras.length > 0) {
                   sectionHeader('6.รายการเพิ่มเติม (Extra Cost)');
-                  tableHeader(['', '', 'รายการ', 'จำนวน', ''], 5);
+                  tableHeader(['', '', 'รายการ', 'จำนวน', '', 'ชื่อผู้ขาย', 'POout', 'วันรับของ', 'วันส่งมอบ'], 5);
                   validExtras.forEach((it, i) => {
-                    dataRow(['', '', it.productName, '1', ''], i % 2 === 1, false, 6);
+                    dataRow(['', '', it.productName, '1', '', ...EMPTY_FILL_COLS], i % 2 === 1, false, 6);
                     hasData = true;
                   });
                   ws.getRow(r).height = 8; r++;
@@ -20157,24 +20173,24 @@ function StationAccessory() {
                 }
 
                 // ── Footer note ───────────────────────────────────────────
-                ws.mergeCells(r, 1, r, 5);
+                ws.mergeCells(r, 1, r, COL_COUNT);
                 const noteC = ws.getCell(r, 1);
-                noteC.value = 'หมายเหตุ: จำนวนและระยะทางเป็นค่าประมาณการเบื้องต้น อาจมีการเปลี่ยนแปลงตามหน้างานจริง';
+                noteC.value = 'หมายเหตุ: จำนวนและระยะทางเป็นค่าประมาณการเบื้องต้น อาจมีการเปลี่ยนแปลงตามหน้างานจริง | คอลัมน์ ชื่อผู้ขาย / POout / วันรับของ / วันส่งมอบ เป็นช่องว่างให้กรอกใช้งานต่อ';
                 noteC.font = { name: FONT, size: 7, italic: true, color: { argb: C_MUTED } };
                 noteC.fill = solid(C_ROW_ALT);
-                noteC.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
-                ws.getRow(r).height = 16;
+                noteC.alignment = { horizontal: 'left', vertical: 'middle', indent: 1, wrapText: true };
+                ws.getRow(r).height = 22;
                 const LAST_ROW = r; r++;
 
                 // ── Page setup ────────────────────────────────────────────
                 ws.pageSetup.paperSize = 9;
-                ws.pageSetup.orientation = 'portrait';
+                ws.pageSetup.orientation = 'landscape';
                 ws.pageSetup.fitToPage = true;
                 ws.pageSetup.fitToWidth = 1;
                 ws.pageSetup.fitToHeight = 0;
                 ws.pageSetup.horizontalCentered = true;
                 ws.pageSetup.margins = { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.25 };
-                ws.pageSetup.printArea = `A1:E${LAST_ROW}`;
+                ws.pageSetup.printArea = `A1:I${LAST_ROW}`;
                 ws.pageSetup.printTitlesRow = `1:${HEADER_LAST}`;
                 ws.headerFooter.oddFooter = '&C&7หน้า &P จาก &N';
 
