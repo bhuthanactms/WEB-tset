@@ -1234,21 +1234,44 @@ export default function Home(): React.JSX.Element {
           value = (row as any)[colKey];
           console.log(`[getMultiChargersIn] Group Charger - Charger: ${chargerName}, Row ${rowNum}, Column ${colKey}, Value: ${value}`);
         } else {
-          // สำหรับ Stand-alone: ใช้คอลัมน์ MEA. 24kV/416/240V: สำหรับทั้ง MEA และ PEA
-        const colKey = 'MEA. 24kV/416/240V:';
-          value = (row as any)[colKey];
+          // สำหรับ Stand-alone: ดึง In เหมือน Single kW (getInFromExcel)
+          let colKey: string | undefined;
 
-        // ถ้าไม่เจอ ลองหา key ที่มี "24kV" หรือ "416" หรือ "240V"
-        if (value === undefined || value === null || value === '') {
-          const keys = Object.keys(row);
-          const foundKey = keys.find(k =>
-            k.includes('24kV') &&
-            k.includes('416') &&
-            k.includes('240V')
-          );
-          if (foundKey) {
-            value = (row as any)[foundKey];
-            console.log(`[getMultiChargersIn] Found alternative key: ${foundKey} = ${value}`);
+          if (form.landToMdb === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' && form.powerAuthority === 'MEA') {
+            const keys = Object.keys(row);
+            colKey = keys.find(k =>
+              (k.includes('กฟน') || k.includes('MEA')) &&
+              k.includes('416') &&
+              !k.includes('24kV')
+            ) || 'MEA. กฟน. 416 V:';
+            value = (row as any)[colKey];
+
+            if (value === undefined || value === null || value === '') {
+              const foundKey = keys.find(k =>
+                k.includes('416') &&
+                k.includes('V') &&
+                !k.includes('24kV')
+              );
+              if (foundKey) {
+                value = (row as any)[foundKey];
+                console.log(`[getMultiChargersIn] Found alternative key for TRAY MEA: ${foundKey} = ${value}`);
+              }
+            }
+          } else {
+            colKey = 'MEA. 24kV/416/240V:';
+            value = (row as any)[colKey];
+
+            if (value === undefined || value === null || value === '') {
+              const keys = Object.keys(row);
+              const foundKey = keys.find(k =>
+                k.includes('24kV') &&
+                k.includes('416') &&
+                k.includes('240V')
+              );
+              if (foundKey) {
+                value = (row as any)[foundKey];
+                console.log(`[getMultiChargersIn] Found alternative key: ${foundKey} = ${value}`);
+              }
             }
           }
         }
@@ -3182,9 +3205,13 @@ export default function Home(): React.JSX.Element {
                   {/* Horizontal summary for each charger */}
                   {chargerTypeMode === 'any' ? (
                     multiChargers.filter(name => name !== '').length > 0 ? (
-                      multiChargers.filter(name => name !== '').map((chargerName, idx) => {
+                      (() => {
+                        const activeChargers = multiChargers.filter(name => name !== '');
+                        const multiIns = getMultiChargersIn();
+                        return activeChargers.map((chargerName, idx) => {
                         // ดึงค่าสำหรับแต่ละประเภทแยกกัน
                         const selectedTypes = form.chargerWiringType && form.chargerWiringType.length > 0 ? form.chargerWiringType : [];
+                        const chargerIn = multiIns[idx]?.in;
 
                         // หา row number
                         let rowNum: number | undefined;
@@ -3209,9 +3236,9 @@ export default function Home(): React.JSX.Element {
                         return (
                           <div key={idx} className="space-y-2 text-base border-b border-gray-200 pb-3 mb-3 last:border-b-0 last:pb-0 last:mb-0">
                             <div className="font-semibold text-gray-900 flex items-center gap-4">
-                              <span>{chargerInstallationType === 'group' ? 'Group Charger' : 'Stand-alone Charger'}{idx + 1}: {multiChargers[idx] || '-'}</span>
+                              <span>{chargerInstallationType === 'group' ? 'Group Charger' : 'Stand-alone Charger'}{idx + 1}: {chargerName || '-'}</span>
                               <span className="text-gray-700 font-normal">
-                              kW: {extractPowerValue(chargerName)} kW
+                              ln(100%): {chargerIn !== undefined && chargerIn > 0 ? chargerIn.toFixed(2) : '-'} A
                             </span>
                             </div>
                             {selectedTypes.length > 0 && (
@@ -3327,7 +3354,8 @@ export default function Home(): React.JSX.Element {
                             )}
                           </div>
                         );
-                      })
+                      });
+                      })()
                     ) : (
                       <div className="text-gray-400">-</div>
                     )
@@ -4058,18 +4086,20 @@ export default function Home(): React.JSX.Element {
                         <span className="font-semibold text-gray-900 text-base">
                           {chargerTypeMode === 'any'
                             ? (
-                              multiChargers.filter(name => name !== '').length > 0
-                                ? (
+                              (() => {
+                                const multiIns = getMultiChargersIn();
+                                if (multiIns.length === 0) return '-';
+                                return (
                                   <span>
-                                    {multiChargers.filter(name => name !== '').map((chargerName, idx) => (
+                                    {multiIns.map((item, idx) => (
                                       <span key={idx}>
                                         {idx > 0 && ', '}
-                                        {chargerInstallationType === 'group' ? 'Group Charger' : 'Stand-alone Charger'}{idx + 1}: {extractPowerValue(chargerName)} kW
+                                        {chargerInstallationType === 'group' ? 'Group Charger' : 'Stand-alone Charger'}{idx + 1}: {item.in > 0 ? `${item.in.toFixed(2)} A` : '-'}
                                       </span>
                                     ))}
                                   </span>
-                                )
-                                : '-'
+                                );
+                              })()
                             )
                             : results?.inOfCharger !== undefined
                               ? results.inOfCharger.toFixed(2) + ' A'
