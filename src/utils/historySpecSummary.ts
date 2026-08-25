@@ -162,7 +162,7 @@ function formatChargerToTerminal(home: any, form: any): string {
       const size = compact(d?.terminalSize)
       const cable = compact(d?.cable)
       const conduit = compact(d?.conduitTray)
-      const title = size ? `Terminal ${idx + 1} (${size})` : `Terminal ${idx + 1}`
+      const title = size ? `Dispenser ${idx + 1} (${size})` : `Dispenser ${idx + 1}`
       return formatWiringBlock(
         wiringType ? `${title}: ${wiringType}` : title,
         cable,
@@ -211,8 +211,8 @@ export function buildHistorySpecSummary(entry: HistoryEntry): HistorySpecLine[] 
   pushLine(lines, 'MDB Main / Sub', formatMdbMainSub(home))
   pushLine(lines, 'ประเภทสาย MDB to Charger พร้อมขนาด', formatMdbToCharger(home, form))
   pushLine(lines, 'Charger (จำนวน / kW)', formatChargerKwLine(home, form))
-  pushLine(lines, 'ประเภทสาย Charger to Terminal (Group Charger) พร้อมขนาด', formatChargerToTerminal(home, form))
-  pushLine(lines, 'Terminal (Group Charger)', formatTerminalGroup(home, form))
+  pushLine(lines, 'ประเภทสาย Charger to Dispenser (Group Charger) พร้อมขนาด', formatChargerToTerminal(home, form))
+  pushLine(lines, 'Dispenser (Group Charger)', formatTerminalGroup(home, form))
 
   return lines
 }

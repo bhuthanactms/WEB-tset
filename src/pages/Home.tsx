@@ -2767,11 +2767,11 @@ export default function Home(): React.JSX.Element {
                     </div>
                   )}
 
-                  {/* จำนวนTerminal - แสดงเฉพาะกรณี Group Charger */}
+                  {/* จำนวนDispenser - แสดงเฉพาะกรณี Group Charger */}
                   {chargerInstallationType === 'group' && (
                     <div className="space-y-3">
                       <Label className="text-sm font-medium text-gray-700">
-                        จำนวนTerminal
+                        จำนวนDispenser
                       </Label>
                       <Select
                         value={form.numberOfTerminals || ''}
@@ -2806,7 +2806,7 @@ export default function Home(): React.JSX.Element {
                                   return `Select (แนะนำ: ${clamped})`;
                                 }
                               }
-                              return 'Select number of terminals';
+                              return 'Select number of dispensers';
                             })()
                           } />
                         </SelectTrigger>
@@ -2844,11 +2844,11 @@ export default function Home(): React.JSX.Element {
                     </div>
                   )}
 
-                  {/* ขนาดTerminal - แสดงเฉพาะกรณี Group Charger และมี numberOfTerminals */}
+                  {/* ขนาดDispenser - แสดงเฉพาะกรณี Group Charger และมี numberOfTerminals */}
                   {chargerInstallationType === 'group' && form.numberOfTerminals && (
                     <div className="space-y-3">
                       <Label className="text-sm font-medium text-gray-700">
-                        ขนาดTerminal
+                        ขนาดDispenser
                       </Label>
                       {Array.from({ length: terminalCount }, (_, idx) => (
                         <Select
@@ -2869,7 +2869,7 @@ export default function Home(): React.JSX.Element {
                           })}
                         >
                           <SelectTrigger className="h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500">
-                            <SelectValue placeholder={`Select terminal ${idx + 1} size`} />
+                            <SelectValue placeholder={`Select dispenser ${idx + 1} size`} />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="350A">350A</SelectItem>
@@ -2882,18 +2882,18 @@ export default function Home(): React.JSX.Element {
                     </div>
                   )}
 
-                  {/* การเดินสายไปTerminal - แสดงเฉพาะกรณี Group Charger และมี terminalSize */}
+                  {/* การเดินสายไปDispenser - แสดงเฉพาะกรณี Group Charger และมี terminalSize */}
                   {chargerInstallationType === 'group' && selectedTerminalSizes.some(Boolean) && (
                     <div className="space-y-3">
                       <Label className="text-sm font-medium text-gray-700">
-                        การเดินสายไปTerminal
+                        การเดินสายไปDispenser
                       </Label>
                       <Select
                         value={form.terminalWiringType || ''}
                         onValueChange={(value) => setForm(f => ({ ...f, terminalWiringType: value }))}
                       >
                         <SelectTrigger className="h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500">
-                          <SelectValue placeholder="Select terminal wiring type" />
+                          <SelectValue placeholder="Select dispenser wiring type" />
                         </SelectTrigger>
                         <SelectContent>
                           {terminalWiringTypeOptions.map((option) => (
@@ -4126,82 +4126,82 @@ export default function Home(): React.JSX.Element {
                   </CardContent>
                 </Card>
 
-                {/* --- Terminal Summary Card --- */}
+                {/* --- Dispenser Summary Card --- */}
                 {chargerInstallationType === 'group' && (
                   <Card className="shadow-lg border-0 mt-4">
                     <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 border-b">
                       <CardTitle className="flex items-center gap-2 text-purple-800">
-                        Terminal
+                        Dispenser
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="p-6">
                       <div className="space-y-4">
-                        {/* Number of Terminals */}
+                        {/* Number of Dispensers */}
                         <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                          <span className="font-medium text-gray-700">จำนวนTerminal:</span>
+                          <span className="font-medium text-gray-700">จำนวนDispenser:</span>
                           <span className="font-semibold text-gray-900">
                             {form.numberOfTerminals || '-'}
                           </span>
                         </div>
-                        {/* Terminal Size */}
+                        {/* Dispenser Size */}
                         {selectedTerminalSizes.some(Boolean) && (
                           <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                            <span className="font-medium text-gray-700">ขนาดTerminal:</span>
+                            <span className="font-medium text-gray-700">ขนาดDispenser:</span>
                             <span className="font-semibold text-gray-900 text-sm text-right">
                               {selectedTerminalSizes.map((size, idx) => (
                                 <span key={`terminal-size-summary-${idx}`} className="block">
-                                  Terminal{idx + 1}: {size || '-'}
+                                  Dispenser{idx + 1}: {size || '-'}
                                 </span>
                               ))}
                             </span>
                           </div>
                         )}
-                        {/* Terminal Wiring Type */}
+                        {/* Dispenser Wiring Type */}
                         {form.terminalWiringType && (
                           <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                            <span className="font-medium text-gray-700">การเดินสายไปTerminal:</span>
+                            <span className="font-medium text-gray-700">การเดินสายไปDispenser:</span>
                             <span className="font-semibold text-gray-900 text-sm">
                               {form.terminalWiringType}
                             </span>
                           </div>
                         )}
-                        {/* Terminal Wiring Cable */}
+                        {/* Dispenser Wiring Cable */}
                         {selectedTerminalSizes.some(Boolean) && form.terminalWiringType && (() => {
                           const terminalDataList = selectedTerminalSizes.map((size, idx) => ({
                             idx,
                             data: getTerminalWiringData(size),
                           }));
-                          console.log('[Terminal Card] Terminal Wiring Cable - terminalDataList:', terminalDataList);
+                          console.log('[Dispenser Card] Dispenser Wiring Cable - terminalDataList:', terminalDataList);
                           return (
                             <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                              <span className="font-medium text-gray-700">Terminal Wiring Cable:</span>
+                              <span className="font-medium text-gray-700">Dispenser Wiring Cable:</span>
                               <span className="font-semibold text-gray-900 text-sm text-right">
                                 {terminalDataList.map(({ idx, data }) => (
                                   <span key={`terminal-cable-${idx}`} className="block">
-                                    Terminal{idx + 1}: {data?.cable || '-'}
+                                    Dispenser{idx + 1}: {data?.cable || '-'}
                                   </span>
                                 ))}
                               </span>
                             </div>
                           );
                         })()}
-                        {/* Terminal Wiring Conduit / Terminal Wire Tray */}
+                        {/* Dispenser Wiring Conduit / Dispenser Wire Tray */}
                         {selectedTerminalSizes.some(Boolean) && form.terminalWiringType && (() => {
                           const terminalDataList = selectedTerminalSizes.map((size, idx) => ({
                             idx,
                             data: getTerminalWiringData(size),
                           }));
-                          console.log('[Terminal Card] Terminal Wiring Conduit/Tray - terminalDataList:', terminalDataList);
+                          console.log('[Dispenser Card] Dispenser Wiring Conduit/Tray - terminalDataList:', terminalDataList);
                           const label = form.terminalWiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 5 ฝังใต้ดิน'
-                            ? 'Terminal Wiring conduit:'
-                            : 'Terminal Wire tray:';
+                            ? 'Dispenser Wiring conduit:'
+                            : 'Dispenser Wire tray:';
                           return (
                             <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                               <span className="font-medium text-gray-700">{label}</span>
                               <span className="font-semibold text-gray-900 text-sm text-right">
                                 {terminalDataList.map(({ idx, data }) => (
                                   <span key={`terminal-conduit-${idx}`} className="block">
-                                    Terminal{idx + 1}: {data?.conduitTray || '-'}
+                                    Dispenser{idx + 1}: {data?.conduitTray || '-'}
                                   </span>
                                 ))}
                               </span>

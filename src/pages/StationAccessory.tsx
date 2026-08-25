@@ -1815,7 +1815,7 @@ function MoreDetailCard(props: any) {
 
         const priceUnits = getTerminalPriceUnits(sheetRow.sheetName, row);
         const inputDistance = Number(distance) || 0;
-        const calcDistance = inputDistance > 0 ? inputDistance + 2.5 : 0; // เผื่อระยะ +2.5 เมตร/Terminal
+        const calcDistance = inputDistance > 0 ? inputDistance + 2.5 : 0; // เผื่อระยะ +2.5 เมตร/Dispenser
         const materialCost = priceUnits.material * calcDistance * multiplier;
         const laborCost = priceUnits.labor * calcDistance * multiplier;
         const totalCost =
@@ -6062,7 +6062,7 @@ function MoreDetailCard(props: any) {
         });
       }
 
-      // เพิ่ม Terminal Configuration ใน section 6 (แยกตามเส้น Terminal)
+      // เพิ่ม Dispenser Configuration ใน section 6 (แยกตามเส้น Terminal)
       if (props.chargerInstallationType === 'group' && props.numberOfTerminals && resolvedTerminalSizes.length > 0 && props.terminalWiringType && terminalLineResults.length > 0) {
         terminalLineResults.forEach((line) => {
           const size = resolvedTerminalSizes[line.terminalIndex] || resolvedTerminalSizes[0] || '';
@@ -6077,7 +6077,7 @@ function MoreDetailCard(props: any) {
             : `(${size || '-'})`;
 
           products.push({
-            type: `Terminal ${line.terminalIndex + 1} Cable config (${props.terminalWiringType || '-'})`,
+            type: `Dispenser ${line.terminalIndex + 1} Cable config (${props.terminalWiringType || '-'})`,
             code: wiringInfo?.code || terminalResult?.code || '-',
             productName: productName,
             distance: `${line.distance}(${line.inputDistance})`,
@@ -7319,11 +7319,14 @@ function MoreDetailCard(props: any) {
 
   const calculateTravelCost = () => {
     const distance = parseFloat(travelDistance) || 0;
-    // ค่าเดินทางอิงจำนวน "หัวชาร์จ" (จำกัด 1–6 ตามตาราง)
-    // กรณี Group Charger: 1 terminal = 2 หัว (2 ช่องจอด) → ใช้ terminalsCount * 2
+    // ค่าเดินทางอิงจำนวนเครื่อง (จำกัด 1–6 ตามตาราง)
+    // Group Charger: จำนวน Dispenser × 2
+    // Stand-alone: อิงจำนวนเครื่องชาร์จ
+    const dispenserCount =
+      resolvedTerminalSizes.filter(Boolean).length || terminalsCount || 1;
     const rawChargersCount =
       props.chargerInstallationType === 'group'
-        ? (terminalsCount || 1) * 2
+        ? dispenserCount * 2
         : (parseInt(props.numberOfChargers) || 1);
     const numberOfChargers = Math.max(1, Math.min(6, rawChargersCount));
 
@@ -7363,37 +7366,25 @@ function MoreDetailCard(props: any) {
       return 0;
     }
 
-    const materialRate = toNumber(row.__EMPTY_4);
-    const laborRate = toNumber(row.__EMPTY_5);
-    const extraCharge = toNumber(row.__EMPTY_6);
-    const laborCost = toNumber(row.__EMPTY_8); // ค่าแรง
-
-    // ค่าเดินทางระหว่างที่พัก และค่าที่พัก + อาหาร
+    // คอลัมน์ในชีต "ตารางสรุปต้นทุนค่าเดินทาง"
+    // __EMPTY_4 = อัตราค่าเดินทางต่อ กม. | __EMPTY_5 = ค่าเดินทางระหว่างที่พัก (คงที่)
+    // __EMPTY_6 = ค่าที่พัก + อาหาร (คงที่) | __EMPTY_8 = ค่าแรง (คงที่)
+    const travelRatePerKm = toNumber(row.__EMPTY_4);
     const travelBetweenAccommodation = toNumber(row.__EMPTY_5);
     const accommodationAndFood = toNumber(row.__EMPTY_6);
+    const laborCost = toNumber(row.__EMPTY_8);
 
-    // คำนวณค่าเดินทาง (ค่าเดินทางตามจำนวนเครื่องชาร์จ)
-    let travelCost = 0;
-    if (isWithinThreshold) {
-      travelCost = (materialRate + laborRate) * distance;
-    } else {
-      travelCost = (materialRate * distance) + laborRate + extraCharge;
-    }
+    // ค่าเดินทาง = อัตราจาก Excel × ระยะ เท่านั้น (ไม่รวมค่าอื่น)
+    const travelCost = travelRatePerKm * distance;
 
     // รวมค่าเดินทาง = ค่าเดินทาง + ค่าเดินทางระหว่างที่พัก + ค่าที่พัก + อาหาร + ค่าแรง
     let cost = travelCost + travelBetweenAccommodation + accommodationAndFood + laborCost;
 
     let travelCostDetails = '';
-
-    // เพิ่มค่าเดินทางระหว่างที่พัก และค่าที่พัก + อาหาร ด้านบน
-    travelCostDetails = `ค่าเดินทางระหว่างที่พัก: ${travelBetweenAccommodation.toLocaleString('th-TH')} บาท`;
+    travelCostDetails = `ค่าเดินทาง: ${travelRatePerKm.toLocaleString('th-TH')} × ${distance.toLocaleString('th-TH')} km = ${travelCost.toLocaleString('th-TH')} บาท`;
+    travelCostDetails += `\nค่าเดินทางระหว่างที่พัก: ${travelBetweenAccommodation.toLocaleString('th-TH')} บาท`;
     travelCostDetails += `\nค่าที่พัก + อาหาร: ${accommodationAndFood.toLocaleString('th-TH')} บาท`;
-
-    if (isWithinThreshold) {
-      travelCostDetails += `\nค่าเดินทางตามจำนวนเครื่องชาร์จ: (${materialRate.toLocaleString('th-TH')} + ${laborRate.toLocaleString('th-TH')}) × ${distance.toLocaleString('th-TH')} km`;
-    } else {
-      travelCostDetails += `\nค่าเดินทางตามจำนวนเครื่องชาร์จ: (${materialRate.toLocaleString('th-TH')} × ${distance.toLocaleString('th-TH')} km) + ${laborRate.toLocaleString('th-TH')} + ${extraCharge.toLocaleString('th-TH')}`;
-    }
+    travelCostDetails += `\nค่าแรง: ${laborCost.toLocaleString('th-TH')} บาท`;
 
     let trainingCost = 0;
     if (trainingWork === 'yes') {
@@ -7517,7 +7508,7 @@ function MoreDetailCard(props: any) {
     } else if (travelType === 'installation') {
       calculateInstallationTravelCost();
     }
-  }, [travelType, travelDistance, installationTravelDistance, trainingWork, transformerSelection, trMdbSelection, mdbSelection, chargerSelection, props.numberOfChargers, props.numberOfTerminals, props.chargerInstallationType, props.excelData]);
+  }, [travelType, travelDistance, installationTravelDistance, trainingWork, transformerSelection, trMdbSelection, mdbSelection, chargerSelection, props.numberOfChargers, props.numberOfTerminals, props.chargerInstallationType, props.excelData, resolvedTerminalSizes, terminalsCount]);
 
   // ดึงข้อมูลค่าออกแบบ/เขียน/เซ็นจาก Excel
   React.useEffect(() => {
@@ -13452,14 +13443,14 @@ function MoreDetailCard(props: any) {
                         );
                       })}
 
-                      {/* แสดงผลลัพธ์ Terminal รวมในส่วน MDB to Charger (กรณี Group Charger) */}
+                      {/* แสดงผลลัพธ์ Dispenser รวมในส่วน MDB to Charger (กรณี Group Charger) */}
                       {props.chargerInstallationType === 'group' && props.numberOfTerminals && resolvedTerminalSizes.length > 0 && props.terminalWiringType && terminalResult && (
                         <div className="bg-purple-50 rounded-lg border border-purple-200 p-4 space-y-4">
                           <div className="text-lg font-semibold text-purple-800">
-                            Terminal Configuration
+                            Dispenser Configuration
                           </div>
                           <div className="text-xs text-gray-600">
-                            <span className="font-medium text-gray-700">ขนาดTerminal:</span>
+                            <span className="font-medium text-gray-700">ขนาดDispenser:</span>
                             <span className="ml-1">{resolvedTerminalSizes.filter(Boolean).join(', ') || '-'}</span>
                             <span className="text-gray-400 mx-2">|</span>
                             <span className="font-medium text-gray-700">ประเภท:</span>
@@ -13471,7 +13462,7 @@ function MoreDetailCard(props: any) {
                               {terminalLineResults.map((line) => (
                                 <div key={line.terminalIndex} className="p-3 bg-white rounded-lg border border-purple-100">
                                   <div className="text-sm font-semibold text-purple-800 mb-2">
-                                    Terminal {line.terminalIndex + 1}
+                                    Dispenser {line.terminalIndex + 1}
                                     <span className="ml-2 text-xs font-normal text-gray-600">
                                       ระยะ {line.distance.toLocaleString('th-TH')}({line.inputDistance.toLocaleString('th-TH')}) เมตร
                                     </span>
@@ -13502,7 +13493,7 @@ function MoreDetailCard(props: any) {
                           )}
 
                           <div className="pt-3 border-t border-purple-200">
-                            <div className="text-sm font-semibold text-purple-800 mb-2">รวมค่าใช้จ่ายทั้งหมด (Terminal)</div>
+                            <div className="text-sm font-semibold text-purple-800 mb-2">รวมค่าใช้จ่ายทั้งหมด (Dispenser)</div>
                             <div className="grid grid-cols-3 gap-4">
                               <div>
                                 <div className="text-sm text-gray-600 mb-1">ค่าของรวม:</div>
@@ -13623,13 +13614,13 @@ function MoreDetailCard(props: any) {
 
           )}
 
-          {/* Terminal Configuration Card - แสดงเฉพาะกรณี Group Charger */}
+          {/* Dispenser Configuration Card - แสดงเฉพาะกรณี Group Charger */}
           {chargerSelection === 'yes' && props.chargerInstallationType === 'group' && props.numberOfTerminals && resolvedTerminalSizes.length > 0 && props.terminalWiringType && (
             <Card className="shadow-xl border-0 overflow-hidden mt-6">
               <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 border-b">
                 <CardTitle className="flex items-center gap-2 text-purple-800">
                   <Box className="h-5 w-5" />
-                  Terminal Configuration <span className="text-xs font-normal text-purple-600">(การตั้งค่า Terminal)</span>
+                  Dispenser Configuration <span className="text-xs font-normal text-purple-600">(การตั้งค่า Dispenser)</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6">
@@ -13638,7 +13629,7 @@ function MoreDetailCard(props: any) {
                     <div className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border border-purple-100">
                       <span className="font-medium text-gray-700 flex items-center gap-2">
                         <Package className="h-4 w-4 text-purple-600" />
-                        จำนวนTerminal:
+                        จำนวนDispenser:
                       </span>
                       <span className="font-semibold text-purple-900">{props.numberOfTerminals}</span>
                     </div>
@@ -13652,19 +13643,19 @@ function MoreDetailCard(props: any) {
                   </div>
 
                   <div className="space-y-3">
-                    <h5 className="text-sm font-semibold text-gray-700">ข้อมูลราย Terminal (รวมการตั้งค่า + การเดินสาย + ระยะคำนวณ)</h5>
+                    <h5 className="text-sm font-semibold text-gray-700">ข้อมูลราย Dispenser (รวมการตั้งค่า + การเดินสาย + ระยะคำนวณ)</h5>
                     {resolvedTerminalSizes.map((size: string, idx: number) => {
                       const info = getTerminalWiringInfoByIndex(idx, size);
                       const distanceValue = terminalLineDistances[idx] || '';
                       return (
                         <div key={`terminal-unified-${idx}`} className="p-4 bg-white rounded-lg border border-purple-100 space-y-3">
-                          <div className="text-sm font-semibold text-purple-800">Terminal{idx + 1}</div>
+                          <div className="text-sm font-semibold text-purple-800">Dispenser{idx + 1}</div>
                           <div className="space-y-3">
                             <div className="p-3 bg-gradient-to-r from-slate-50 to-purple-50 rounded-lg border border-purple-100">
                               <div className="flex flex-wrap items-center gap-2 text-sm">
                                 <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-purple-200">
                                   <Settings className="h-4 w-4 text-purple-600" />
-                                  <span className="font-medium text-gray-700">ขนาดTerminal:</span>
+                                  <span className="font-medium text-gray-700">ขนาดDispenser:</span>
                                   <span className="font-semibold text-purple-900">{size || '-'}</span>
                                 </div>
                                 <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-blue-200">
@@ -13684,7 +13675,7 @@ function MoreDetailCard(props: any) {
                             <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
                               <Label className="text-sm font-medium text-gray-700 flex items-center gap-2">
                                 <Ruler className="h-4 w-4 text-purple-600" />
-                                ระยะสาย Terminal{idx + 1} (เมตร)
+                                ระยะสาย Dispenser{idx + 1} (เมตร)
                               </Label>
                               <Input
                                 type="number"
@@ -13894,7 +13885,7 @@ function MoreDetailCard(props: any) {
                         <CollapsibleTrigger className="w-full p-4 text-left hover:bg-purple-100 transition-colors rounded-lg">
                           <div className="flex items-center justify-between">
                             <div className="text-lg font-semibold text-purple-800">
-                              Terminal Configuration
+                              Dispenser Configuration
                             </div>
                             <div className="flex items-center gap-3">
                               <div className="text-lg font-bold text-purple-700">
@@ -13926,7 +13917,7 @@ function MoreDetailCard(props: any) {
                               return (
                                 <div key={line.terminalIndex} className="p-3 bg-white rounded-lg border border-purple-100">
                                   <div className="text-sm font-semibold text-purple-800 mb-1">
-                                    Terminal {line.terminalIndex + 1}
+                                    Dispenser {line.terminalIndex + 1}
                                     <span className="ml-2 text-xs font-normal text-gray-600">
                                       ระยะ {line.distance.toLocaleString('th-TH')}({line.inputDistance.toLocaleString('th-TH')})
                                     </span>
@@ -17769,7 +17760,7 @@ function MoreDetailCard(props: any) {
                   <CollapsibleTrigger className="w-full p-4 text-left hover:bg-blue-100 transition-colors rounded-lg">
                     <div className="flex items-center justify-between">
                       <div>
-                        <span className="font-medium">ค่าเดินทาง:</span>
+                        <span className="font-medium">รวมค่าเดินทาง:</span>
                         <span className="font-bold text-blue-600 text-lg ml-2">
                           {travelCostResult.toLocaleString('th-TH')} บาท
                         </span>
@@ -17802,11 +17793,17 @@ function MoreDetailCard(props: any) {
                               {constructionTravelCost.travelCost.toLocaleString('th-TH')} บาท
                             </span>
                           </div>
+                          <div className="text-xs text-gray-500 pl-4">
+                            (__EMPTY_4 × {travelDistance} กม.)
+                          </div>
                           <div className="flex justify-between items-center">
                             <span className="text-gray-600">ค่าเดินทางระหว่างที่พัก:</span>
                             <span className="font-semibold text-blue-600">
                               {constructionTravelCost.travelBetweenAccommodation.toLocaleString('th-TH')} บาท
                             </span>
+                          </div>
+                          <div className="text-xs text-gray-500 pl-4">
+                            (__EMPTY_5)
                           </div>
                           <div className="flex justify-between items-center">
                             <span className="text-gray-600">ค่าที่พัก + อาหาร:</span>
@@ -17814,11 +17811,17 @@ function MoreDetailCard(props: any) {
                               {constructionTravelCost.accommodationAndFood.toLocaleString('th-TH')} บาท
                             </span>
                           </div>
+                          <div className="text-xs text-gray-500 pl-4">
+                            (__EMPTY_6)
+                          </div>
                           <div className="flex justify-between items-center">
                             <span className="text-gray-600">ค่าแรง:</span>
                             <span className="font-semibold text-blue-600">
                               {constructionTravelCost.laborCost.toLocaleString('th-TH')} บาท
                             </span>
+                          </div>
+                          <div className="text-xs text-gray-500 pl-4">
+                            (__EMPTY_8)
                           </div>
                           {trainingWork === 'yes' && constructionTravelCost.trainingCost > 0 && (
                             <>
@@ -17827,6 +17830,9 @@ function MoreDetailCard(props: any) {
                                 <span className="font-semibold text-green-600">
                                   {constructionTravelCost.trainingCost.toLocaleString('th-TH')} บาท
                                 </span>
+                              </div>
+                              <div className="text-xs text-gray-500 pl-4">
+                                (row 30: __EMPTY_4 × {travelDistance} กม. + __EMPTY_5 + __EMPTY_6)
                               </div>
                             </>
                           )}
