@@ -2089,8 +2089,12 @@ export default function Home(): React.JSX.Element {
       if (terminalSize === '350A' || terminalSize === '380A') {
         return { sheetName: 'แบบ 9.5', rowNum: 27 };
       }
-      if (terminalSize === '500A' || terminalSize === '600A') {
+      if (terminalSize === '500A') {
         return { sheetName: 'แบบ 9.12', rowNum: 25 };
+      }
+      // 600A: ขยับลง 1 แถวจากเดิม (25 → 26) ทั้ง MEA/PEA
+      if (terminalSize === '600A') {
+        return { sheetName: 'แบบ 9.12', rowNum: 26 };
       }
       return null;
     }
@@ -2099,7 +2103,8 @@ export default function Home(): React.JSX.Element {
         '350A': 12,
         '380A': 12,
         '500A': 17,
-        '600A': 18,
+        // 600A: ขยับลง 1 แถวจากเดิม (18 → 19) ทั้ง MEA/PEA
+        '600A': 19,
       };
       const rowNum = trayRowBySize[terminalSize];
       if (!rowNum) return null;

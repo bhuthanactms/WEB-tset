@@ -1080,15 +1080,15 @@ function MoreDetailCard(props: any) {
         return shiftRow(mapping[kw], 2);
       } else if (powerAuthority === 'PEA') {
         // rowNum ในตาราง = ค่าจริงในชีต − 2 (เพราะ shiftRow +2)
-        // ค่าจริง: 240–320→19, 360–400→24, 440→19, 480→19, 520–560→18, 600–640→19, 680–720→25, 760–800→24, 840–1000→25
+        // ค่าจริง: 240–320→19, 360–400→24, 440→18, 480→18, 520–560→18, 600–640→19, 680–720→25, 760–800→24, 840–1000→25
         const mapping: { [key: number]: { rowNum: number; setCount: number } } = {
           240: { rowNum: 17, setCount: 2 },
           280: { rowNum: 17, setCount: 2 },
           320: { rowNum: 17, setCount: 2 },
           360: { rowNum: 22, setCount: 2 },
           400: { rowNum: 22, setCount: 2 },
-          440: { rowNum: 17, setCount: 4 },
-          480: { rowNum: 17, setCount: 4 },
+          440: { rowNum: 16, setCount: 4 },
+          480: { rowNum: 16, setCount: 4 },
           520: { rowNum: 16, setCount: 4 },
           560: { rowNum: 16, setCount: 4 },
           600: { rowNum: 17, setCount: 4 },
@@ -1221,15 +1221,16 @@ function MoreDetailCard(props: any) {
       }
     } else if (wiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา') {
       // TRAY - แบบ 9.15
+      // NOTE: 240 kW → base 15 + shift(+2) = __rowNum__ 17 (MEA & PEA)
       if (powerAuthority === 'PEA') {
         return shiftMapping({
           30: 5, 40: 5, 60: 5, 80: 6, 120: 8, 160: 9, 180: 10, 200: 10,
-          240: 12, 320: 16, 360: 17, 480: 19, 600: 23, 640: 23, 720: 27, 800: 28
+          240: 15, 320: 16, 360: 17, 480: 19, 600: 23, 640: 23, 720: 27, 800: 28
         }, 2);
       } else if (powerAuthority === 'MEA') {
         return shiftMapping({
           30: 5, 40: 5, 60: 5, 80: 6, 120: 8, 160: 9, 180: 10, 200: 10,
-          240: 12, 320: 16, 360: 17, 480: 19, 600: 20, 640: 23, 720: 27, 800: 28
+          240: 15, 320: 16, 360: 17, 480: 19, 600: 20, 640: 23, 720: 27, 800: 28
         }, 2);
       }
     } else if (wiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา') {
@@ -1641,8 +1642,12 @@ function MoreDetailCard(props: any) {
       if (terminalSize === '350A' || terminalSize === '380A') {
         return { sheetName: 'แบบ 9.5', rowNum: 27 };
       }
-      if (terminalSize === '500A' || terminalSize === '600A') {
+      if (terminalSize === '500A') {
         return { sheetName: 'แบบ 9.12', rowNum: 25 };
+      }
+      // 600A: ขยับลง 1 แถวจากเดิม (25 → 26) ทั้ง MEA/PEA
+      if (terminalSize === '600A') {
+        return { sheetName: 'แบบ 9.12', rowNum: 26 };
       }
       return null;
     }
@@ -1651,7 +1656,8 @@ function MoreDetailCard(props: any) {
         '350A': 12,
         '380A': 12,
         '500A': 17,
-        '600A': 18,
+        // 600A: ขยับลง 1 แถวจากเดิม (18 → 19) ทั้ง MEA/PEA
+        '600A': 19,
       };
       const rowNum = trayRowBySize[terminalSize];
       if (!rowNum) return null;
