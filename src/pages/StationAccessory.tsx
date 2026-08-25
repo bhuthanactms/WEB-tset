@@ -7320,7 +7320,7 @@ function MoreDetailCard(props: any) {
   const calculateTravelCost = () => {
     const distance = parseFloat(travelDistance) || 0;
     // ค่าเดินทางอิงจำนวนเครื่อง (จำกัด 1–6 ตามตาราง)
-    // Group Charger: นับเฉพาะจำนวน Dispenser × 2 (ไม่รวมเครื่อง Group Charger)
+    // Group Charger: นับเฉพาะจำนวน Dispenser เท่านั้น (ไม่คูณ 2, ไม่รวมเครื่อง Group Charger)
     // Stand-alone: อิงจำนวนเครื่องชาร์จ
     const dispenserCount = (() => {
       const fromSizes = resolvedTerminalSizes.filter(Boolean).length;
@@ -7330,7 +7330,7 @@ function MoreDetailCard(props: any) {
     })();
     const rawChargersCount =
       props.chargerInstallationType === 'group'
-        ? dispenserCount * 2
+        ? dispenserCount
         : (parseInt(props.numberOfChargers) || 1);
     const numberOfChargers = Math.max(1, Math.min(6, rawChargersCount));
     console.log('[calculateTravelCost] count source:', {
@@ -17614,7 +17614,7 @@ function MoreDetailCard(props: any) {
 
           <CardDescription className="text-blue-600">
             {props.chargerInstallationType === 'group'
-              ? `คำนวณค่าเดินทางตามระยะทางและจำนวน Dispenser × 2 (${resolvedTerminalSizes.filter(Boolean).length || terminalsCount || 0} × 2)`
+              ? `คำนวณค่าเดินทางตามระยะทางและจำนวน Dispenser (${resolvedTerminalSizes.filter(Boolean).length || terminalsCount || 0} เครื่อง)`
               : 'คำนวณค่าเดินทางตามระยะทางและจำนวนเครื่องชาร์จ'}
           </CardDescription>
 
@@ -17791,7 +17791,7 @@ function MoreDetailCard(props: any) {
                         ระยะทาง: {travelDistance} กม.
                         {props.chargerInstallationType === 'group' && (
                           <span className="text-purple-700 font-medium">
-                            {' '}| นับจาก Dispenser: {resolvedTerminalSizes.filter(Boolean).length || terminalsCount || 0} × 2 = {Math.min(6, (resolvedTerminalSizes.filter(Boolean).length || terminalsCount || 0) * 2)} เครื่อง
+                            {' '}| นับจาก Dispenser: {resolvedTerminalSizes.filter(Boolean).length || terminalsCount || 0} เครื่อง
                             {props.numberOfChargers ? ` (ไม่รวม Group Charger ${props.numberOfChargers} เครื่อง)` : ''}
                           </span>
                         )}
@@ -17810,17 +17810,11 @@ function MoreDetailCard(props: any) {
                               {constructionTravelCost.travelCost.toLocaleString('th-TH')} บาท
                             </span>
                           </div>
-                          <div className="text-xs text-gray-500 pl-4">
-                            (__EMPTY_4 × {travelDistance} กม.)
-                          </div>
                           <div className="flex justify-between items-center">
                             <span className="text-gray-600">ค่าเดินทางระหว่างที่พัก:</span>
                             <span className="font-semibold text-blue-600">
                               {constructionTravelCost.travelBetweenAccommodation.toLocaleString('th-TH')} บาท
                             </span>
-                          </div>
-                          <div className="text-xs text-gray-500 pl-4">
-                            (__EMPTY_5)
                           </div>
                           <div className="flex justify-between items-center">
                             <span className="text-gray-600">ค่าที่พัก + อาหาร:</span>
@@ -17828,17 +17822,11 @@ function MoreDetailCard(props: any) {
                               {constructionTravelCost.accommodationAndFood.toLocaleString('th-TH')} บาท
                             </span>
                           </div>
-                          <div className="text-xs text-gray-500 pl-4">
-                            (__EMPTY_6)
-                          </div>
                           <div className="flex justify-between items-center">
                             <span className="text-gray-600">ค่าแรง:</span>
                             <span className="font-semibold text-blue-600">
                               {constructionTravelCost.laborCost.toLocaleString('th-TH')} บาท
                             </span>
-                          </div>
-                          <div className="text-xs text-gray-500 pl-4">
-                            (__EMPTY_8)
                           </div>
                           {trainingWork === 'yes' && constructionTravelCost.trainingCost > 0 && (
                             <>
@@ -17847,9 +17835,6 @@ function MoreDetailCard(props: any) {
                                 <span className="font-semibold text-green-600">
                                   {constructionTravelCost.trainingCost.toLocaleString('th-TH')} บาท
                                 </span>
-                              </div>
-                              <div className="text-xs text-gray-500 pl-4">
-                                (row 30: __EMPTY_4 × {travelDistance} กม. + __EMPTY_5 + __EMPTY_6)
                               </div>
                             </>
                           )}
@@ -17917,26 +17902,17 @@ function MoreDetailCard(props: any) {
                               {installationTravelCost.travelCost.toLocaleString('th-TH')} บาท
                             </span>
                           </div>
-                          <div className="text-xs text-gray-500 pl-4">
-                            (__EMPTY_4 × {installationTravelDistance} กม.)
-                          </div>
                           <div className="flex justify-between items-center">
                             <span className="text-gray-600">ค่าที่พัก + อาหาร:</span>
                             <span className="font-semibold text-blue-600">
                               {installationTravelCost.accommodationAndFood.toLocaleString('th-TH')} บาท
                             </span>
                           </div>
-                          <div className="text-xs text-gray-500 pl-4">
-                            (__EMPTY_6)
-                          </div>
                           <div className="flex justify-between items-center">
                             <span className="text-gray-600">ค่าแรง:</span>
                             <span className="font-semibold text-blue-600">
                               {installationTravelCost.laborCost.toLocaleString('th-TH')} บาท
                             </span>
-                          </div>
-                          <div className="text-xs text-gray-500 pl-4">
-                            (__EMPTY_8)
                           </div>
                           {trainingWork === 'yes' && installationTravelCost.trainingCost > 0 && (
                             <>
@@ -17945,9 +17921,6 @@ function MoreDetailCard(props: any) {
                                 <span className="font-semibold text-green-600">
                                   {installationTravelCost.trainingCost.toLocaleString('th-TH')} บาท
                                 </span>
-                              </div>
-                              <div className="text-xs text-gray-500 pl-4">
-                                (row 30: __EMPTY_4 × {installationTravelDistance} กม. + __EMPTY_5 + __EMPTY_6)
                               </div>
                             </>
                           )}
