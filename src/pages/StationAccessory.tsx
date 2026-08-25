@@ -7320,15 +7320,26 @@ function MoreDetailCard(props: any) {
   const calculateTravelCost = () => {
     const distance = parseFloat(travelDistance) || 0;
     // ค่าเดินทางอิงจำนวนเครื่อง (จำกัด 1–6 ตามตาราง)
-    // Group Charger: จำนวน Dispenser × 2
+    // Group Charger: นับเฉพาะจำนวน Dispenser × 2 (ไม่รวมเครื่อง Group Charger)
     // Stand-alone: อิงจำนวนเครื่องชาร์จ
-    const dispenserCount =
-      resolvedTerminalSizes.filter(Boolean).length || terminalsCount || 1;
+    const dispenserCount = (() => {
+      const fromSizes = resolvedTerminalSizes.filter(Boolean).length;
+      if (fromSizes > 0) return fromSizes;
+      const fromProp = parseCount(props.numberOfTerminals, 0);
+      return fromProp > 0 ? fromProp : 1;
+    })();
     const rawChargersCount =
       props.chargerInstallationType === 'group'
         ? dispenserCount * 2
         : (parseInt(props.numberOfChargers) || 1);
     const numberOfChargers = Math.max(1, Math.min(6, rawChargersCount));
+    console.log('[calculateTravelCost] count source:', {
+      installationType: props.chargerInstallationType,
+      groupChargers: props.numberOfChargers,
+      dispenserCount,
+      rawChargersCount,
+      travelTableUnits: numberOfChargers,
+    });
 
     const travelSheet = getExcelData('ตารางสรุปต้นทุนค่าเดินทาง');
     if (!travelSheet || travelSheet.length === 0) {
@@ -17602,9 +17613,9 @@ function MoreDetailCard(props: any) {
           </CardTitle>
 
           <CardDescription className="text-blue-600">
-
-            คำนวณค่าเดินทางตามระยะทางและจำนวนเครื่องชาร์จ
-
+            {props.chargerInstallationType === 'group'
+              ? `คำนวณค่าเดินทางตามระยะทางและจำนวน Dispenser × 2 (${resolvedTerminalSizes.filter(Boolean).length || terminalsCount || 0} × 2)`
+              : 'คำนวณค่าเดินทางตามระยะทางและจำนวนเครื่องชาร์จ'}
           </CardDescription>
 
         </CardHeader>
@@ -17778,6 +17789,12 @@ function MoreDetailCard(props: any) {
                     <div className="px-4 pb-4 space-y-3">
                       <div className="text-xs mt-1">
                         ระยะทาง: {travelDistance} กม.
+                        {props.chargerInstallationType === 'group' && (
+                          <span className="text-purple-700 font-medium">
+                            {' '}| นับจาก Dispenser: {resolvedTerminalSizes.filter(Boolean).length || terminalsCount || 0} × 2 = {Math.min(6, (resolvedTerminalSizes.filter(Boolean).length || terminalsCount || 0) * 2)} เครื่อง
+                            {props.numberOfChargers ? ` (ไม่รวม Group Charger ${props.numberOfChargers} เครื่อง)` : ''}
+                          </span>
+                        )}
                         {trainingWork === 'yes' && (
                           <span className="text-green-600 font-medium"> | + งานฝึกอบรม (1วัน)</span>
                         )}
