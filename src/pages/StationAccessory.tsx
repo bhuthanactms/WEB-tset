@@ -27,6 +27,17 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { getJsonData } from '../utils/pdf-generate-example.js'
 import { createCostPDF } from '../utils/pdf-generator-custom.js'
+import {
+  getSpecialStandalone240TrMdbRowDelta,
+  getSpecialStandaloneSingleKw,
+  getSpecialStandaloneTrMdbSheet1Row,
+  isTrayWiringType,
+  isUndergroundWiringType,
+  SPECIAL_TRAY_SIZE_COL,
+  SPECIAL_TRAY_WIRING_SIZE_COLS,
+  SPECIAL_UNDERGROUND_CONDUIT_COLS,
+  SPECIAL_UNDERGROUND_WIRING_SIZE_COLS,
+} from '@/utils/specialStandaloneSingle'
 
 
 
@@ -58,6 +69,39 @@ function parseTransformerKvaForTrMdb(transformer: string): number {
 
 function getTrMdbMappingLookupKey(powerAuthority: string, transformer: string, numericKva: number): string | number {
   return isMeaLowVoltageMeter400A(powerAuthority, transformer) ? TR_MDB_MAP_KEY_MEA_LOW_VOLT_400A : numericKva;
+}
+
+function getSpecialStandaloneKwFromProps(props: any): number | null {
+  return getSpecialStandaloneSingleKw({
+    powerAuthority: props.powerAuthority,
+    chargerInstallationType: props.chargerInstallationType,
+    numberOfChargers: props.numberOfChargers,
+    charger: props.charger,
+    chargerTypeMode: props.chargerTypeMode,
+    multiChargers: props.multiChargers,
+    chargerSummary: props.chargerSummary,
+  });
+}
+
+/** กรณีพิเศษ 240 kW: ขยับแถวราคา TR→MDB (underground +1 / TRAY +4) */
+function applySpecial240TrMdbRowOffset(
+  data: any,
+  wiringType: string,
+  sheetData: any[] | undefined,
+  specialKw: number | null
+): any {
+  if (!data || specialKw !== 240 || !sheetData) return data;
+  const delta = getSpecialStandalone240TrMdbRowDelta(wiringType);
+  if (!delta || data.__rowNum__ == null) return data;
+  const shifted = sheetData.find((r: any) => r.__rowNum__ === data.__rowNum__ + delta);
+  return shifted || data;
+}
+
+function applySpecial240ToRowNum(rowNum: number | null | undefined, wiringType: string, specialKw: number | null): number | null {
+  if (rowNum == null) return null;
+  if (specialKw !== 240) return rowNum;
+  const delta = getSpecialStandalone240TrMdbRowDelta(wiringType);
+  return delta ? rowNum + delta : rowNum;
 }
 
 const THAI_MONTH_ABBR = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
@@ -2450,6 +2494,11 @@ function MoreDetailCard(props: any) {
   }, [props.excelData]);
 
   const getCableSizingRowNum = React.useCallback((): number | null => {
+    const specialKw = getSpecialStandaloneKwFromProps(props);
+    if (specialKw != null) {
+      return getSpecialStandaloneTrMdbSheet1Row(specialKw) ?? null;
+    }
+
     const powerAuthority = props.powerAuthority || '';
     const totalKW = calculateTotalChargerKW();
     if (!powerAuthority) return null;
@@ -2490,7 +2539,7 @@ function MoreDetailCard(props: any) {
     }
 
     return null;
-  }, [props.powerAuthority, props.chargerSummary]);
+  }, [props.powerAuthority, props.chargerSummary, props.chargerInstallationType, props.numberOfChargers, props.charger, props.chargerTypeMode, props.multiChargers]);
 
   const getWiringSizeFromSheet = React.useCallback((wiringType: string): string => {
     if (!wiringType || !cableSizingSheet || cableSizingSheet.length === 0) return '';
@@ -2498,6 +2547,16 @@ function MoreDetailCard(props: any) {
     if (!rowNum) return '';
     const row = cableSizingSheet.find((r: any) => r.__rowNum__ === rowNum);
     if (!row) return '';
+
+    const specialKw = getSpecialStandaloneKwFromProps(props);
+    if (specialKw != null) {
+      if (isUndergroundWiringType(wiringType)) {
+        return SPECIAL_UNDERGROUND_WIRING_SIZE_COLS.map(col => row[col]).filter(Boolean).join(' ');
+      }
+      if (isTrayWiringType(wiringType)) {
+        return SPECIAL_TRAY_WIRING_SIZE_COLS.map(col => row[col]).filter(Boolean).join(' ');
+      }
+    }
 
     const colsByType: Record<string, string[]> = {
       'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ': [
@@ -2521,7 +2580,7 @@ function MoreDetailCard(props: any) {
       value = value + ' )';
     }
     return value;
-  }, [cableSizingSheet, getCableSizingRowNum]);
+  }, [cableSizingSheet, getCableSizingRowNum, props]);
 
   const getWireConduitFromSheet = React.useCallback((wiringType: string): string => {
     if (!wiringType || !cableSizingSheet || cableSizingSheet.length === 0) return '';
@@ -2529,6 +2588,18 @@ function MoreDetailCard(props: any) {
     if (!rowNum) return '';
     const row = cableSizingSheet.find((r: any) => r.__rowNum__ === rowNum);
     if (!row) return '';
+
+    const specialKw = getSpecialStandaloneKwFromProps(props);
+    if (specialKw != null) {
+      if (isUndergroundWiringType(wiringType)) {
+        const values = SPECIAL_UNDERGROUND_CONDUIT_COLS.map(col => row[col]).filter(Boolean).join(' ');
+        return values ? `${values} มม.` : '';
+      }
+      if (isTrayWiringType(wiringType)) {
+        const value = row[SPECIAL_TRAY_SIZE_COL];
+        return value ? `${value} ซม.` : '';
+      }
+    }
 
     const configByType: Record<string, { cols: string[]; unit: string }> = {
       'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ': { cols: ['__EMPTY_26', '__EMPTY_27', '__EMPTY_28'], unit: 'นิ้ว' },
@@ -2542,7 +2613,7 @@ function MoreDetailCard(props: any) {
     const values = config.cols.map(col => row[col]).filter(Boolean).join(' ');
     if (!values) return '';
     return `${values} ${config.unit}`;
-  }, [cableSizingSheet, getCableSizingRowNum]);
+  }, [cableSizingSheet, getCableSizingRowNum, props]);
 
   const trToLandWiringSize = useMemo(() => getWiringSizeFromSheet(props.trToLand || ''), [getWiringSizeFromSheet, props.trToLand]);
   const landToMdbWiringSize = useMemo(() => getWiringSizeFromSheet(props.landToMdb || ''), [getWiringSizeFromSheet, props.landToMdb]);
@@ -3709,6 +3780,7 @@ function MoreDetailCard(props: any) {
     // เพิ่มราคา "เหล็กเท้าแขนสามเหลี่ยมรับ TRAY-LADDER" และ "Support ยึดพื้น TRAY / LADDER" สำหรับกรณี TRAY หรือ LADDER
     // สำหรับกรณี trToLand และ landToMdb แยกกัน
     if (props.trToLand && props.landToMdb) {
+      const specialKwForTrMdb = getSpecialStandaloneKwFromProps(props);
       // TR to Land - TRAY/LADDER
       if (props.trToLand === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา' || props.trToLand === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา') {
         const trToLandInputDistance = parseFloat(trToLandDistance || '0');
@@ -3720,17 +3792,22 @@ function MoreDetailCard(props: any) {
 
           if (props.trToLand === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา') {
             sheetName = 'แบบ 9.15';
-            if (powerAuthority === 'MEA') {
-              const trayRowMappingMEA: { [key: number]: number } = {
-                400: 16, 500: 17, 630: 18, 800: 22, 1000: 24, 1250: 28, 1500: 30
-              };
-              rowNum = trayRowMappingMEA[transformerSize];
-            } else if (powerAuthority === 'PEA') {
-              const trayRowMappingPEA: { [key: number]: number } = {
-                250: 10, 315: 11, 400: 16, 500: 17, 630: 19, 800: 22, 1000: 24, 1250: 28, 1500: 30
-              };
-              rowNum = trayRowMappingPEA[transformerSize];
+            const mapped = trToMdbMapping?.['tray']?.[powerAuthority]?.[transformerSize];
+            rowNum = mapped?.__rowNum__ ?? null;
+            if (rowNum == null) {
+              if (powerAuthority === 'MEA') {
+                const trayRowMappingMEA: { [key: number]: number } = {
+                  400: 16, 500: 17, 630: 18, 800: 22, 1000: 24, 1250: 28, 1500: 30
+                };
+                rowNum = trayRowMappingMEA[transformerSize];
+              } else if (powerAuthority === 'PEA') {
+                const trayRowMappingPEA: { [key: number]: number } = {
+                  250: 10, 315: 11, 400: 16, 500: 17, 630: 19, 800: 22, 1000: 24, 1250: 28, 1500: 30
+                };
+                rowNum = trayRowMappingPEA[transformerSize];
+              }
             }
+            rowNum = applySpecial240ToRowNum(rowNum, props.trToLand, specialKwForTrMdb);
           } else if (props.trToLand === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา') {
             sheetName = 'แบบ 9.16';
             if (powerAuthority === 'MEA') {
@@ -3795,17 +3872,22 @@ function MoreDetailCard(props: any) {
 
           if (props.landToMdb === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา') {
             sheetName = 'แบบ 9.15';
-            if (powerAuthority === 'MEA') {
-              const trayRowMappingMEA: { [key: number]: number } = {
-                400: 16, 500: 17, 630: 18, 800: 22, 1000: 24, 1250: 28, 1500: 30
-              };
-              rowNum = trayRowMappingMEA[transformerSize];
-            } else if (powerAuthority === 'PEA') {
-              const trayRowMappingPEA: { [key: number]: number } = {
-                250: 10, 315: 11, 400: 16, 500: 17, 630: 19, 800: 22, 1000: 24, 1250: 28, 1500: 30
-              };
-              rowNum = trayRowMappingPEA[transformerSize];
+            const mapped = trToMdbMapping?.['tray']?.[powerAuthority]?.[transformerSize];
+            rowNum = mapped?.__rowNum__ ?? null;
+            if (rowNum == null) {
+              if (powerAuthority === 'MEA') {
+                const trayRowMappingMEA: { [key: number]: number } = {
+                  400: 16, 500: 17, 630: 18, 800: 22, 1000: 24, 1250: 28, 1500: 30
+                };
+                rowNum = trayRowMappingMEA[transformerSize];
+              } else if (powerAuthority === 'PEA') {
+                const trayRowMappingPEA: { [key: number]: number } = {
+                  250: 10, 315: 11, 400: 16, 500: 17, 630: 19, 800: 22, 1000: 24, 1250: 28, 1500: 30
+                };
+                rowNum = trayRowMappingPEA[transformerSize];
+              }
             }
+            rowNum = applySpecial240ToRowNum(rowNum, props.landToMdb, specialKwForTrMdb);
           } else if (props.landToMdb === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา') {
             sheetName = 'แบบ 9.16';
             if (powerAuthority === 'MEA') {
@@ -3966,8 +4048,20 @@ function MoreDetailCard(props: any) {
       return null;
     }
 
-    const transformerSize = parseInt(props.transformer || '0', 10) || 0;
+    let transformerSize = parseInt(props.transformer || '0', 10) || 0;
     const powerAuthority = props.powerAuthority;
+
+    // กรณีพิเศษ PEA + standalone 1 เครื่อง: remap ขนาดเหมือน MCCB Main
+    // - 250 kVA + 180/200 kW → ใช้ค่า 315 kVA
+    // - 315 kVA + 240 kW → ใช้ค่า 400 kVA
+    const specialKw = getSpecialStandaloneKwFromProps(props);
+    if (specialKw != null && powerAuthority === 'PEA') {
+      if (transformerSize === 250 && (specialKw === 180 || specialKw === 200)) {
+        transformerSize = 315;
+      } else if (transformerSize === 315 && specialKw === 240) {
+        transformerSize = 400;
+      }
+    }
 
     // หา row number ตามเงื่อนไข
     let rowNum: number | null = null;
@@ -4045,7 +4139,7 @@ function MoreDetailCard(props: any) {
       totalPrice,
       productCode,
     };
-  }, [mdbSelection, props.transformer, props.powerAuthority, lowVoltageRequest, getExcelData]);
+  }, [mdbSelection, props.transformer, props.powerAuthority, props.chargerInstallationType, props.numberOfChargers, props.charger, props.chargerTypeMode, props.multiChargers, props.chargerSummary, lowVoltageRequest, getExcelData]);
 
   const mdbTotals = React.useMemo(() => {
     const emptyTotals = { material: 0, labor: 0, total: 0 };
@@ -19392,25 +19486,45 @@ function StationAccessory() {
     }
 
     let data = null;
+    let sheetNameForSpecial = '';
 
     // กำหนดประเภทการเดินสาย
     if (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2' && pipeType === 'IMC') {
       data = trToMdbMapping['imc']?.[powerAuthority]?.[trMdbLookupKey];
+      sheetNameForSpecial = 'แบบ 9.10';
       console.log('IMC data found:', data);
     } else if (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อเดินในอากาศ กลุ่ม 2' && pipeType === 'RSC') {
       data = trToMdbMapping['rsc']?.[powerAuthority]?.[trMdbLookupKey];
+      sheetNameForSpecial = 'แบบ 9.11';
       console.log('RSC data found:', data);
     } else if (wiringType === 'ขนาดสายไฟ 3P 4W ร้อยท่อฝังใต้ดิน กลุ่ม 5') {
       data = trToMdbMapping['underground']?.[powerAuthority]?.[trMdbLookupKey];
+      sheetNameForSpecial = 'แบบ 9.12';
       console.log('Underground data found:', data);
       console.log('Underground mapping:', trToMdbMapping['underground']);
       console.log('MEA mapping:', trToMdbMapping['underground']?.[powerAuthority]);
     } else if (wiringType === 'ขนาดสายไฟ 3P 4W ราง TRAY ไม่มีฝา') {
       data = trToMdbMapping['tray']?.[powerAuthority]?.[transformerSize];
+      sheetNameForSpecial = 'แบบ 9.15';
       console.log('Tray data found:', data);
     } else if (wiringType === 'ขนาดสายไฟ 3P 4W ราง LADDER ไม่มีฝา') {
       data = trToMdbMapping['ladder']?.[powerAuthority]?.[transformerSize];
+      sheetNameForSpecial = 'แบบ 9.16';
       console.log('Ladder data found:', data);
+    }
+
+    // กรณีพิเศษ standalone 1 เครื่อง 240 kW: underground +1 / TRAY +4 จากแถวเดิม
+    const specialKw = getSpecialStandaloneSingleKw({
+      powerAuthority: homeData?.powerAuthority || homeData?.form?.powerAuthority,
+      chargerInstallationType: homeData?.chargerInstallationType,
+      numberOfChargers: homeData?.numberOfChargers || homeData?.form?.numberOfChargers,
+      charger: homeData?.charger || homeData?.form?.charger,
+      chargerTypeMode: homeData?.chargerTypeMode,
+      multiChargers: homeData?.multiChargers,
+      chargerSummary: homeData?.chargerSummary,
+    });
+    if (data && specialKw === 240 && sheetNameForSpecial) {
+      data = applySpecial240TrMdbRowOffset(data, wiringType, excelData[sheetNameForSpecial], specialKw);
     }
 
     if (!data) {
@@ -19642,13 +19756,43 @@ function StationAccessory() {
   };
   // ฟังก์ชันดึงข้อมูล MDB Configuration จาก mapping (แทนการอ่าน Excel โดยตรง)
   const getMDBConfiguration = (transformerSize: number, mccbBrand: string) => {
-    // ใช้ข้อมูลจาก mapping แทนการอ่าน Excel โดยตรง
-    const key = `${mccbBrand}-${transformerSize}`;
+    // กรณีพิเศษ PEA + standalone 1 เครื่อง 60–240 kW:
+    // - 250 kVA + 180/200 kW → ใช้ค่าจาก 315 kVA
+    // - 315 kVA + 240 kW → ใช้ค่าจาก 400 kVA
+    const specialKw = getSpecialStandaloneSingleKw({
+      powerAuthority: homeData?.powerAuthority || homeData?.form?.powerAuthority,
+      chargerInstallationType: homeData?.chargerInstallationType,
+      numberOfChargers: homeData?.numberOfChargers || homeData?.form?.numberOfChargers,
+      charger: homeData?.charger || homeData?.form?.charger,
+      chargerTypeMode: homeData?.chargerTypeMode,
+      multiChargers: homeData?.multiChargers,
+      chargerSummary: homeData?.chargerSummary,
+    });
+
+    let lookupSize = transformerSize;
+    if (specialKw != null) {
+      if (transformerSize === 250 && (specialKw === 180 || specialKw === 200)) {
+        lookupSize = 315;
+      } else if (transformerSize === 315 && specialKw === 240) {
+        lookupSize = 400;
+      }
+    }
+
+    const key = `${mccbBrand}-${lookupSize}`;
     const mappingData = mdbConfigurationMapping[key];
 
     if (!mappingData) {
-      console.warn(`ไม่พบข้อมูลใน mapping สำหรับ ${mccbBrand} ${transformerSize} kVA`);
+      console.warn(`ไม่พบข้อมูลใน mapping สำหรับ ${mccbBrand} ${lookupSize} kVA`);
       return null;
+    }
+
+    if (lookupSize !== transformerSize) {
+      console.log(
+        `MDB Configuration special remap: ${transformerSize} kVA (${specialKw} kW) → ใช้ค่า ${lookupSize} kVA (${mccbBrand})`,
+        mappingData
+      );
+      // ค่ามาจาก lookupSize แต่โชว์ขนาดหม้อแปลงตามที่เลือกจริง
+      return { ...mappingData, transformerSize };
     }
 
     console.log(`MDB Configuration ${transformerSize} kVA (${mccbBrand}) จาก mapping key "${key}":`, mappingData);
@@ -19973,15 +20117,15 @@ function StationAccessory() {
                 const COL_COUNT = 9;
                 const EMPTY_FILL_COLS = ['', '', '', '']; // ชื่อผู้ขาย, POout, วันรับของ, วันส่งมอบ
                 ws.columns = [
-                  { width: 9 },
-                  { width: 22 },
-                  { width: 42 },
                   { width: 8 },
-                  { width: 12 },
-                  { width: 14 }, // ชื่อผู้ขาย
-                  { width: 12 }, // POout
-                  { width: 12 }, // วันรับของ
-                  { width: 12 }, // วันส่งมอบ
+                  { width: 16 },
+                  { width: 38 },
+                  { width: 7 },
+                  { width: 10 },
+                  { width: 8 }, // ชื่อผู้ขาย (ยังไม่กรอก ย่อไว้ก่อน)
+                  { width: 8 }, // POout (ยังไม่กรอก ย่อไว้ก่อน)
+                  { width: 8 }, // วันรับของ (ยังไม่กรอก ย่อไว้ก่อน)
+                  { width: 8 }, // วันส่งมอบ (ยังไม่กรอก ย่อไว้ก่อน)
                 ];
                 ws.views = [{ showGridLines: false }];
 
@@ -20186,12 +20330,12 @@ function StationAccessory() {
 
                 // ── Page setup ────────────────────────────────────────────
                 ws.pageSetup.paperSize = 9;
-                ws.pageSetup.orientation = 'landscape';
+                ws.pageSetup.orientation = 'portrait';
                 ws.pageSetup.fitToPage = true;
                 ws.pageSetup.fitToWidth = 1;
                 ws.pageSetup.fitToHeight = 0;
                 ws.pageSetup.horizontalCentered = true;
-                ws.pageSetup.margins = { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.25 };
+                ws.pageSetup.margins = { left: 0.35, right: 0.35, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.25 };
                 ws.pageSetup.printArea = `A1:I${LAST_ROW}`;
                 ws.pageSetup.printTitlesRow = `1:${HEADER_LAST}`;
                 ws.headerFooter.oddFooter = '&C&7หน้า &P จาก &N';

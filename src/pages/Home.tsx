@@ -28,6 +28,17 @@ import * as XLSX from 'xlsx'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { getCurrentUserSync as getCurrentUser, canAccessStationAccessory, canSaveHistory } from '@/utils/auth'
 import { saveHistory } from '@/utils/historyService'
+import {
+  getSpecialStandaloneSingleKw,
+  getSpecialStandaloneTrMdbSheet1Row,
+  getSpecialStandaloneTrMdbWiringOptions,
+  isTrayWiringType,
+  isUndergroundWiringType,
+  SPECIAL_TRAY_SIZE_COL,
+  SPECIAL_TRAY_WIRING_SIZE_COLS,
+  SPECIAL_UNDERGROUND_CONDUIT_COLS,
+  SPECIAL_UNDERGROUND_WIRING_SIZE_COLS,
+} from '@/utils/specialStandaloneSingle'
 
 /** Form state interface */
 interface CalculatorForm {
@@ -374,24 +385,32 @@ export default function Home(): React.JSX.Element {
       ? getSelectedTransformerRowNumber()
       : undefined;
 
-    const mdb = trWiringRowNum ? (() => {
-      const trRow = excelData.find(r => r.__rowNum__ === trWiringRowNum);
-      const mccbMain = trRow ? trRow.__EMPTY_7 : '-';
-      return mccbMain ? `${mccbMain} A` : '-';
-    })() : '';
+    const specialMccb = readSpecialMccbMainAtAf();
 
-    const mdbMainAt = trWiringRowNum ? (() => {
-      const trRow = excelData.find(r => r.__rowNum__ === trWiringRowNum);
-      const mccbMain = trRow ? trRow.__EMPTY_7 : '';
-      return mccbMain ? `${mccbMain} A` : '';
-    })() : '';
+    const mdb = specialMccb
+      ? specialMccb.combined
+      : (trWiringRowNum ? (() => {
+        const trRow = excelData.find(r => r.__rowNum__ === trWiringRowNum);
+        const mccbMain = trRow ? trRow.__EMPTY_7 : '-';
+        return mccbMain ? `${mccbMain} A` : '-';
+      })() : '');
 
-    const mdbMainAf = form.powerAuthority ? (() => {
-      const trRowNum = getTRWiringSizeCVsRowNumber();
-      const trRow = excelData.find(r => r.__rowNum__ === trRowNum);
-      const main2 = trRow ? trRow.__EMPTY_10 : '';
-      return main2 ? `${main2} A` : '';
-    })() : '';
+    const mdbMainAt = specialMccb
+      ? specialMccb.at
+      : (trWiringRowNum ? (() => {
+        const trRow = excelData.find(r => r.__rowNum__ === trWiringRowNum);
+        const mccbMain = trRow ? trRow.__EMPTY_7 : '';
+        return mccbMain ? `${mccbMain} A` : '';
+      })() : '');
+
+    const mdbMainAf = specialMccb
+      ? specialMccb.af
+      : (form.powerAuthority ? (() => {
+        const trRowNum = getTRWiringSizeCVsRowNumber();
+        const trRow = excelData.find(r => r.__rowNum__ === trRowNum);
+        const main2 = trRow ? trRow.__EMPTY_10 : '';
+        return main2 ? `${main2} A` : '';
+      })() : '');
 
     const chargerWiringCable = form.chargerWiringType && form.chargerWiringType.length > 0 && form.powerAuthority
       ? getChargerWiringCable()
@@ -551,6 +570,56 @@ export default function Home(): React.JSX.Element {
     const match = chargerStr.match(/(\d+)/)
     return match ? parseInt(match[1]) : 50
   }
+
+  /** กรณีพิเศษ standalone 1 เครื่อง 60–240: แถว Sheet1 สำหรับ TR→MDB / MCCB Main */
+  const getSpecialStandaloneContext = () => {
+    const kw = getSpecialStandaloneSingleKw({
+      powerAuthority: form.powerAuthority,
+      chargerInstallationType,
+      numberOfChargers: form.numberOfChargers,
+      charger: form.charger,
+      chargerTypeMode,
+      multiChargers,
+    });
+    if (kw == null) return null;
+    const rowNum = getSpecialStandaloneTrMdbSheet1Row(kw);
+    if (!rowNum) return null;
+    const row = excelData.find(r => r.__rowNum__ === rowNum);
+    if (!row) return null;
+    return { kw, rowNum, row };
+  };
+
+  const readSpecialWiringSize = (wiringType: string, row: any): string => {
+    if (isUndergroundWiringType(wiringType)) {
+      return SPECIAL_UNDERGROUND_WIRING_SIZE_COLS.map(col => row[col]).filter(Boolean).join(' ');
+    }
+    if (isTrayWiringType(wiringType)) {
+      return SPECIAL_TRAY_WIRING_SIZE_COLS.map(col => row[col]).filter(Boolean).join(' ');
+    }
+    return '';
+  };
+
+  const readSpecialWireConduitOrTray = (wiringType: string, row: any): string => {
+    if (isUndergroundWiringType(wiringType)) {
+      const values = SPECIAL_UNDERGROUND_CONDUIT_COLS.map(col => row[col]).filter(Boolean).join(' ');
+      return values ? `${values} มม.` : '';
+    }
+    if (isTrayWiringType(wiringType)) {
+      const value = row[SPECIAL_TRAY_SIZE_COL];
+      return value ? `${value} ซม.` : '';
+    }
+    return '';
+  };
+
+  const readSpecialMccbMainAtAf = (): { at: string; af: string; combined: string } | null => {
+    const ctx = getSpecialStandaloneContext();
+    if (!ctx) return null;
+    const atRaw = ctx.row.__EMPTY_127;
+    const afRaw = ctx.row.__EMPTY_128;
+    const at = atRaw ? `${atRaw} A` : '';
+    const af = afRaw ? `${afRaw} A` : '';
+    return { at, af, combined: at || '-' };
+  };
 
   // Mapping Charger Type กับเซลล์ใน Excel สำหรับ Stand-alone
   const chargerToExcelCell: Record<string, { mea?: string; pea?: string }> = {
@@ -987,14 +1056,37 @@ export default function Home(): React.JSX.Element {
     : (results?.kWAllCharger ?? (form.charger && form.numberOfChargers ? extractPowerValue(form.charger) * parseInt(String(form.numberOfChargers), 10) : 0));
   const isLowVoltageMeter400 = form.powerAuthority === 'MEA' && formKwForTrMdb > 0 && formKwForTrMdb <= 280;
 
-  // ตัวเลือก TR to Land / Land to MDB: กรณี มิเตอร์แรงต่ำ 400 A จำกัดแค่ 2 แบบ
-  const trToLandOptionsEffective = isLowVoltageMeter400 ? lowVoltageMeterWiringOptions : trToLandOptions;
-  const landToMdbOptionsEffective = isLowVoltageMeter400 ? lowVoltageMeterWiringOptions : landToMdbOptions;
+  // กรณีพิเศษ: PEA + Stand-alone + 1 เครื่อง + 60–240 kW
+  const specialStandaloneSingleKw = getSpecialStandaloneSingleKw({
+    powerAuthority: form.powerAuthority,
+    chargerInstallationType,
+    numberOfChargers: form.numberOfChargers,
+    charger: form.charger,
+    chargerTypeMode,
+    multiChargers,
+  });
+  const isSpecialStandaloneSingle60to240 = specialStandaloneSingleKw != null;
+  const specialStandaloneTrMdbWiringOptions = isSpecialStandaloneSingle60to240
+    ? getSpecialStandaloneTrMdbWiringOptions(specialStandaloneSingleKw)
+    : [];
 
-  // กรณีเปลี่ยนเป็น มิเตอร์แรงต่ำ 400 A ถ้าเลือกค่าที่ไม่อยู่ใน 2 ตัวเลือก ให้รีเซ็ตเป็นตัวเลือกแรก
+  // ตัวเลือก TR to Land / Land to MDB:
+  // 1) กรณีพิเศษ standalone 1 เครื่อง 60–240 → กลุ่ม 5 / TRAY (60–120 ไม่มี TRAY)
+  // 2) มิเตอร์แรงต่ำ 400 A → จำกัด 2 แบบ
+  // 3) ปกติ
+  const trToLandOptionsEffective = isSpecialStandaloneSingle60to240
+    ? specialStandaloneTrMdbWiringOptions
+    : (isLowVoltageMeter400 ? lowVoltageMeterWiringOptions : trToLandOptions);
+  const landToMdbOptionsEffective = isSpecialStandaloneSingle60to240
+    ? specialStandaloneTrMdbWiringOptions
+    : (isLowVoltageMeter400 ? lowVoltageMeterWiringOptions : landToMdbOptions);
+
+  // รีเซ็ตค่าที่ไม่อยู่ในตัวเลือกที่อนุญาต (กรณีพิเศษ / มิเตอร์แรงต่ำ)
   useEffect(() => {
-    if (!isLowVoltageMeter400) return;
-    const allowed = lowVoltageMeterWiringOptions;
+    const allowed = isSpecialStandaloneSingle60to240
+      ? specialStandaloneTrMdbWiringOptions
+      : (isLowVoltageMeter400 ? lowVoltageMeterWiringOptions : null);
+    if (!allowed) return;
     setForm(f => {
       const needTr = f.trToLand && !allowed.includes(f.trToLand);
       const needLand = f.landToMdb && !allowed.includes(f.landToMdb);
@@ -1005,7 +1097,7 @@ export default function Home(): React.JSX.Element {
         ...(needLand && { landToMdb: allowed[0] ?? '' }),
       };
     });
-  }, [isLowVoltageMeter400]);
+  }, [isSpecialStandaloneSingle60to240, isLowVoltageMeter400, specialStandaloneSingleKw]);
 
   // Terminal: บังคับใช้กลุ่ม 5 ฝังใต้ดิน (TRAY ปิดชั่วคราว)
   useEffect(() => {
@@ -1376,6 +1468,11 @@ export default function Home(): React.JSX.Element {
 
   // ฟังก์ชันดึง TR to Land Wire Conduit
   const getTRToLandWireConduit = () => {
+    const specialCtx = getSpecialStandaloneContext();
+    if (specialCtx && form.trToLand) {
+      return readSpecialWireConduitOrTray(form.trToLand, specialCtx.row);
+    }
+
     const trWiringRowNum = getTRWiringSizeCVsRowNumber();
     if (!trWiringRowNum) return '';
 
@@ -1408,6 +1505,11 @@ export default function Home(): React.JSX.Element {
 
   // ฟังก์ชันดึง Land to MDB Wire Conduit
   const getLandToMdbWireConduit = () => {
+    const specialCtx = getSpecialStandaloneContext();
+    if (specialCtx && form.landToMdb) {
+      return readSpecialWireConduitOrTray(form.landToMdb, specialCtx.row);
+    }
+
     const trWiringRowNum = getTRWiringSizeCVsRowNumber();
     if (!trWiringRowNum) return '';
 
@@ -1496,6 +1598,11 @@ export default function Home(): React.JSX.Element {
 
   // ฟังก์ชันดึง TR to Land Wiring Size CVs
   const getTRToLandWiringSizeCVs = () => {
+    const specialCtx = getSpecialStandaloneContext();
+    if (specialCtx && form.trToLand) {
+      return readSpecialWiringSize(form.trToLand, specialCtx.row);
+    }
+
     // Mapping TR to Land Wiring Type to columns
     const wiringTypeToCols: Record<string, string[]> = {
       'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ': [
@@ -1534,6 +1641,11 @@ export default function Home(): React.JSX.Element {
 
   // ฟังก์ชันดึง Land to MDB Wiring Size CVs
   const getLandToMdbWiringSizeCVs = () => {
+    const specialCtx = getSpecialStandaloneContext();
+    if (specialCtx && form.landToMdb) {
+      return readSpecialWiringSize(form.landToMdb, specialCtx.row);
+    }
+
     // Mapping Land to MDB Wiring Type to columns
     const wiringTypeToCols: Record<string, string[]> = {
       'ขนาดสายไฟ 3P 4W ร้อยท่อ กลุ่ม 2 เดินในอากาศ': [
@@ -2221,6 +2333,8 @@ export default function Home(): React.JSX.Element {
         trWireConduit: form.landToMdb ? getLandToMdbWireConduit() : (form.trToLand ? getTRToLandWireConduit() : (getTRWireConduit() || '')),
         // Legacy MDB summary for backward compatibility
         mdb: (() => {
+          const specialMccb = readSpecialMccbMainAtAf();
+          if (specialMccb) return specialMccb.combined;
           // ใช้ row number เดียวกับขนาดหม้อแปลงที่เลือก
           const trRowNum = getSelectedTransformerRowNumber();
           const trRow = excelData.find(r => r.__rowNum__ === trRowNum);
@@ -2231,6 +2345,8 @@ export default function Home(): React.JSX.Element {
         })(),
         // New detailed MDB fields
         mdbMainAt: (() => {
+          const specialMccb = readSpecialMccbMainAtAf();
+          if (specialMccb) return specialMccb.at;
           // AT: __EMPTY_7, row เดียวกับขนาดหม้อแปลงที่เลือก
           const trRowNum = getSelectedTransformerRowNumber();
           const trRow = excelData.find(r => r.__rowNum__ === trRowNum);
@@ -2240,6 +2356,8 @@ export default function Home(): React.JSX.Element {
           return mccbMain ? `${mccbMain} A` : '';
         })(),
         mdbMainAf: (() => {
+          const specialMccb = readSpecialMccbMainAtAf();
+          if (specialMccb) return specialMccb.af;
           // AF: __EMPTY_10, row เดียวกับขนาดหม้อแปลงที่เลือก
           const trRowNum = getSelectedTransformerRowNumber();
           const trRow = excelData.find(r => r.__rowNum__ === trRowNum);
@@ -3182,6 +3300,8 @@ export default function Home(): React.JSX.Element {
                     </div>
                     <div className="text-2xl font-bold text-yellow-700">
                       {(() => {
+                        const specialMccb = readSpecialMccbMainAtAf();
+                        if (specialMccb) return specialMccb.combined;
                         // ใช้ row number เดียวกับขนาดหม้อแปลงที่เลือก
                         const trRowNum = getSelectedTransformerRowNumber();
                         const trRow = excelData.find(r => r.__rowNum__ === trRowNum);
@@ -3662,13 +3782,19 @@ export default function Home(): React.JSX.Element {
                         <div className="flex flex-col items-end">
                           {/* ...existing MDB summary logic... */}
                           {(() => {
+                            const specialMccb = readSpecialMccbMainAtAf();
                             // ใช้ row number จาก TR Wiring Size CVs แทน Transformer Size
                             const trWiringRowNum = getTRWiringSizeCVsRowNumber();
                             const trRow = excelData.find(r => r.__rowNum__ === trWiringRowNum);
-                            const mccbMain = trRow ? trRow.__EMPTY_7 : '-';
+                            // กรณีพิเศษ standalone 1 เครื่อง 60–240: AT=__EMPTY_127, AF=__EMPTY_128
+                            const mccbMain = specialMccb
+                              ? (specialMccb.at || '').replace(/\s*A\s*$/i, '')
+                              : (trRow ? trRow.__EMPTY_7 : '-');
                             console.log(`MDB to Charger MDB Debug - Using TR Wiring Row ${trWiringRowNum}:`, trRow);
                             console.log(`MCCB Main in MDB to Charger (__EMPTY_7): ${mccbMain}`);
-                            const main2 = trRow ? trRow.__EMPTY_10 : '-';
+                            const main2 = specialMccb
+                              ? (specialMccb.af || '').replace(/\s*A\s*$/i, '')
+                              : (trRow ? trRow.__EMPTY_10 : '-');
                             // MCCB Sub
                             // สำหรับ Group Charger: อ่าน __EMPTY_22 (จำนวนชุด) และ __EMPTY_24 (ค่า MCCB Sub)
                             // สำหรับ Stand-alone: MEA: ใช้ __EMPTY_23, __EMPTY_24, __EMPTY_24 | PEA: ใช้ MEA. กฟน. 416 V:, __EMPTY_22, __EMPTY_23
